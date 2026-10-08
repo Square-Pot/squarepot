@@ -70,6 +70,12 @@ dependencies {
     implementation(libs.okhttp)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
+    implementation(libs.camerax.core)
+
+    implementation(libs.mlkit.barcode.scanning)
+    implementation(libs.play.services.tasks)
+    implementation(libs.zxing.cpp)
+
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
