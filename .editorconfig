@@ -19,6 +19,8 @@ indent_size = 4
 [*.md]
 # Two trailing spaces are a hard line break in Markdown.
 trim_trailing_whitespace = false
+# List continuation lines align with the item text, not with an indent step.
+indent_size = unset
 
 [Makefile]
 indent_style = tab
