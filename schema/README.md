@@ -1,7 +1,13 @@
 # Schema
 
-The single, machine-readable definition of the plant fields and the
-spreadsheet format, plus the OpenAPI contract of the server. Every other
-component follows what is defined here; changes start in this directory.
+The single, machine-readable definition of the plant fields. Every other
+component follows what is defined here, and changes start in this directory.
 
-Drafts will land here together with the design documents in [`docs/`](../docs/).
+- [`fields.yaml`](fields.yaml): the fields, their types, labels in each UI
+  language, display rules and the default presets.
+- [`fields.schema.json`](fields.schema.json): the JSON Schema that `fields.yaml`
+  is validated against in pre-commit and CI.
+
+How the fields map onto a Google Sheet is described in
+[`docs/sheet-format.md`](../docs/sheet-format.md). The server's OpenAPI contract
+will be published here as well.
