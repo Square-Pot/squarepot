@@ -7,4 +7,13 @@
     <string name="mode_mlkit">ML Kit</string>
     <string name="mode_zxing">zxing-cpp</string>
     <string name="mode_alternate">Оба</string>
+    <string name="open_bench">Замер</string>
+    <string name="back">Назад</string>
+
+    <string name="bench_title">Замер распознавания</string>
+    <string name="bench_explanation">Выберите папку с фотографиями бирок. Каждое фото поворачивается как надо, уменьшается до разрешения живой камеры и распознаётся всеми декодерами; результаты сохраняются JSON-файлом в той же папке. Файл bench.csv в папке (file,codes,conditions) указывает, что на каждом фото, и тогда распознавания оцениваются: верно, пропущено, ошибочно.</string>
+    <string name="bench_pick_folder">Выбрать папку с фото</string>
+    <string name="bench_progress">Фото %1$d из %2$d</string>
+    <string name="bench_saved">Сохранено: %1$s</string>
+    <string name="bench_failed">Ошибка замера: %1$s</string>
 </resources>

@@ -60,6 +60,8 @@ dependencies {
     implementation(libs.play.services.tasks)
     implementation(libs.zxing.cpp)
 
+    implementation(libs.androidx.documentfile)
+    implementation(libs.androidx.exifinterface)
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
