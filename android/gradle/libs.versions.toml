@@ -13,6 +13,7 @@ documentfile = "1.1.0"
 coroutines = "1.11.0"
 
 mlkit-barcode = "17.3.0"
+play-services-tasks = "18.4.1"
 zxing-cpp = "3.1.1"
 
 junit = "4.13.2"
@@ -38,6 +39,7 @@ camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax"
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 
 mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkit-barcode" }
+play-services-tasks = { module = "com.google.android.gms:play-services-tasks", version.ref = "play-services-tasks" }
 zxing-cpp = { module = "io.github.zxing-cpp:android", version.ref = "zxing-cpp" }
 
 junit = { module = "junit:junit", version.ref = "junit" }

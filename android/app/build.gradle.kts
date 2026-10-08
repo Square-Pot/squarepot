@@ -51,5 +51,11 @@ dependencies {
     implementation(libs.compose.material3)
     debugImplementation(libs.compose.ui.tooling)
 
+    implementation(libs.camerax.core)
+
+    implementation(libs.mlkit.barcode.scanning)
+    implementation(libs.play.services.tasks)
+    implementation(libs.zxing.cpp)
+
     testImplementation(libs.junit)
 }
