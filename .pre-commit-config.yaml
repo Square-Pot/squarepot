@@ -51,3 +51,33 @@ repos:
         args: ["--schemafile", "schema/fields.schema.json"]
       - id: check-metaschema
         files: ^schema/.*\.schema\.json$
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.8
+    hooks:
+      - id: ruff-check
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.1
+    hooks:
+      - id: mypy
+        args: ["--strict"]
+        additional_dependencies: ["types-PyYAML==6.0.12.20260906"]
+
+  - repo: local
+    hooks:
+      - id: check-fields
+        name: Check field schema references
+        language: python
+        additional_dependencies: ["PyYAML==6.0.3"]
+        entry: python schema/check_fields.py
+        files: ^schema/(fields\.yaml|check_fields\.py)$
+        pass_filenames: false
+      - id: check-fields-self-test
+        name: Self-test the field schema checker
+        language: python
+        additional_dependencies: ["PyYAML==6.0.3"]
+        entry: python schema/check_fields.py --self-test
+        files: ^schema/(fields\.yaml|check_fields\.py)$
+        pass_filenames: false
