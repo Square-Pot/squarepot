@@ -79,6 +79,9 @@ dependencies {
     implementation(libs.play.services.tasks)
     implementation(libs.zxing.cpp)
 
+    implementation(libs.androidx.documentfile)
+    implementation(libs.androidx.exifinterface)
+
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)

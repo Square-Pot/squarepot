@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -55,7 +56,7 @@ import java.util.Locale
 import java.util.concurrent.Executors
 
 @Composable
-fun CameraScreen(viewModel: CameraViewModel) {
+fun CameraScreen(viewModel: CameraViewModel, onOpenBench: () -> Unit) {
     val context = LocalContext.current
     var granted by remember { mutableStateOf(context.hasCameraPermission()) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
@@ -73,7 +74,7 @@ fun CameraScreen(viewModel: CameraViewModel) {
                 modifier = Modifier.align(Alignment.Center).padding(24.dp),
             )
         }
-        Controls(viewModel, Modifier.align(Alignment.BottomCenter))
+        Controls(viewModel, onOpenBench, Modifier.align(Alignment.BottomCenter))
     }
 }
 
@@ -138,7 +139,7 @@ private fun LiveCamera(viewModel: CameraViewModel) {
 }
 
 @Composable
-private fun Controls(viewModel: CameraViewModel, modifier: Modifier = Modifier) {
+private fun Controls(viewModel: CameraViewModel, onOpenBench: () -> Unit, modifier: Modifier = Modifier) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     Column(
         modifier
@@ -156,6 +157,7 @@ private fun Controls(viewModel: CameraViewModel, modifier: Modifier = Modifier) 
             ModeChip(state.mode, DecoderMode.ZXING_CPP, stringResource(R.string.mode_zxing), viewModel::setMode)
             ModeChip(state.mode, DecoderMode.ALTERNATE, stringResource(R.string.mode_alternate), viewModel::setMode)
         }
+        Button(onClick = onOpenBench) { Text(stringResource(R.string.open_bench)) }
     }
 }
 
