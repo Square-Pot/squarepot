@@ -1,0 +1,50 @@
+# Secrets and local configuration. Commit only the *.example templates.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.keystore
+*.jks
+service-account*.json
+credentials*.json
+client_secret*.json
+local.properties
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.sqlite3
+*.db
+
+# Node / web
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+
+# Android / Gradle
+.gradle/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# Editors and OS
+.idea/
+.vscode/
+*.iml
+*.swp
+.DS_Store
+Thumbs.db
