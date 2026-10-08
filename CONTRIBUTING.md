@@ -76,10 +76,13 @@ the tests passing at every commit. Rebase and squash fixups before review.
 
 ## Pull requests
 
-1. Branch from `main` with a descriptive name, for example `feat/server-sheets-sync` or `fix/android-overlay-jitter`.
-2. Keep the pull request focused on one change. Fill in the template: what, why, how it was tested.
+1. Branch from `main` with a descriptive name, for example
+   `feat/server-sheets-sync` or `fix/android-overlay-jitter`.
+2. Keep the pull request focused on one change. Fill in the template: what,
+   why, how it was tested.
 3. CI must be green: secret scan, linters, type checks and tests.
-4. At least one maintainer approval is required. Nobody merges their own pull request.
+4. At least one maintainer approval is required. Nobody merges their own pull
+   request.
 5. Pull requests are merged into `main` once approved; `main` stays releasable.
 
 ## Reporting bugs and requesting features
