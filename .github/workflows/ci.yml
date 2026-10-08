@@ -18,8 +18,6 @@ jobs:
   secrets:
     name: Secret scan
     runs-on: ubuntu-24.04
-    env:
-      GITLEAKS_VERSION: 8.30.1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -27,7 +25,12 @@ jobs:
           persist-credentials: false
 
       - name: Install gitleaks
+        # The version comes from the pre-commit hook, so Dependabot bumps both at once.
         run: |
+          GITLEAKS_VERSION="$(awk '/repo: https:\/\/github.com\/gitleaks\/gitleaks$/ { found = 1; next }
+            found && /rev:/ { sub(/^v/, "", $2); print $2; exit }' .pre-commit-config.yaml)"
+          test -n "${GITLEAKS_VERSION}"
+          echo "gitleaks ${GITLEAKS_VERSION}"
           base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
           archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           curl -fsSLO "${base}/${archive}"
