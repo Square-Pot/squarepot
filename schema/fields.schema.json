@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:square-pot:schema:fields",
+  "title": "Square-Pot field schema",
+  "description": "Format of schema/fields.yaml.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "fields", "computed", "presets"],
+  "properties": {
+    "version": {"type": "integer", "minimum": 1},
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/field"}
+    },
+    "computed": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/computed"}
+    },
+    "presets": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/preset"}
+    }
+  },
+  "$defs": {
+    "key": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en", "ru"],
+      "properties": {
+        "en": {"type": "string", "minLength": 1},
+        "ru": {"type": "string", "minLength": 1}
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "type", "label", "group"],
+      "properties": {
+        "key": {"$ref": "#/$defs/key"},
+        "type": {"enum": ["text", "date", "decimal"]},
+        "label": {"$ref": "#/$defs/label"},
+        "description": {"type": "string"},
+        "aliases": {"type": "array", "items": {"$ref": "#/$defs/key"}, "uniqueItems": true},
+        "required": {"type": "boolean"},
+        "group": {"enum": ["basic", "extra"]},
+        "pattern": {"type": "string", "format": "regex"},
+        "display": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "prefix": {"type": "string"},
+            "italic": {"type": "boolean"},
+            "quote": {"type": "boolean"},
+            "case": {"enum": ["lower", "title", "upper", "as-is"]}
+          }
+        }
+      }
+    },
+    "computed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "from"],
+      "properties": {
+        "key": {"$ref": "#/$defs/key"},
+        "label": {"$ref": "#/$defs/label"},
+        "description": {"type": "string"},
+        "from": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/key"}}
+      }
+    },
+    "preset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "fields"],
+      "properties": {
+        "key": {"$ref": "#/$defs/key"},
+        "label": {"$ref": "#/$defs/label"},
+        "fields": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/key"}, "uniqueItems": true}
+      }
+    }
+  }
+}

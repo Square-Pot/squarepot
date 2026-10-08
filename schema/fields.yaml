@@ -1,0 +1,191 @@
+# Square-Pot plant field schema.
+#
+# The single definition of plant fields. The server, labels, photo captions,
+# the Android app, the web app and the bot all read their field list, types,
+# display rules and default presets from this file. The spreadsheet contract
+# built on it is described in docs/sheet-format.md.
+#
+# Plant names follow the International Code of Nomenclature for algae, fungi,
+# and plants (ICN) and, for cultivars, the International Code of Nomenclature
+# for Cultivated Plants (ICNCP): genus capitalised and species epithets in
+# lower case, both in italics; rank abbreviations (subsp., var., f., aff.) in
+# roman type; cultivar epithets in single quotes, roman, without "cv.".
+#
+# Status: draft, pending approval by the product owner.
+#
+# Format (validated against fields.schema.json):
+#   version   schema version; bump the major on a breaking change
+#   fields    ordered list; the order is the default display order
+#     key         column header in the sheet and field name in the API
+#     type        text | date | decimal
+#     label       human-readable name per UI language
+#     aliases     other headers accepted on read (legacy sheets); never written
+#     required    the column must exist, and a row whose cell is empty is
+#                 reported and skipped (see docs/sheet-format.md)
+#     group       basic | extra; basic fields are the core description of a
+#                 plant, extra fields are additional detail. Presets decide what
+#                 is shown; the group only orders and groups fields in the UI.
+#     display     how the field renders inside a plant name or caption
+#       prefix      text placed before the value ("subsp.", "var."), never italic
+#       italic      render the value in italics (genus and epithets)
+#       quote       wrap the value in single curly quotes (cultivar names)
+#       case        lower | title | upper | as-is; normalisation for display only
+#   computed  values derived from fields, never stored in the sheet
+#   presets   named field selections shipped by default; users add their own
+
+version: 1
+
+fields:
+  - key: tag
+    type: text
+    label: {en: Tag, ru: Бирка}
+    aliases: [uid]
+    group: basic
+    description: >-
+      Six-digit plant number encoded on the label, stored with leading zeros
+      ("004217"). Empty means the plant has no label yet. "000000" is
+      reserved and invalid. Unique within an instance; see
+      docs/adr/0002-plant-number-allocation.md.
+    pattern: "^(?!000000)[0-9]{6}$"
+
+  - key: field_number
+    type: text
+    label: {en: Field number, ru: Полевой номер}
+    group: basic
+    description: Collector's field number, such as "SB 1234".
+    display: {case: upper}
+
+  - key: genus
+    type: text
+    label: {en: Genus, ru: Род}
+    group: basic
+    required: true
+    display: {italic: true, case: title}
+
+  - key: affinity
+    type: text
+    label: {en: Affinity, ru: Близкий к}
+    group: basic
+    description: Name of the taxon this plant resembles but is not confirmed as.
+    display: {prefix: "aff.", italic: true, case: as-is}
+
+  - key: species
+    type: text
+    label: {en: Species, ru: Вид}
+    group: basic
+    display: {italic: true, case: lower}
+
+  - key: subspecies
+    type: text
+    label: {en: Subspecies, ru: Подвид}
+    group: basic
+    display: {prefix: "subsp.", italic: true, case: lower}
+
+  - key: variety
+    type: text
+    label: {en: Variety, ru: Разновидность}
+    group: basic
+    display: {prefix: "var.", italic: true, case: lower}
+
+  - key: form
+    type: text
+    label: {en: Form, ru: Форма}
+    group: basic
+    description: Botanical form (forma).
+    display: {prefix: "f.", italic: true, case: lower}
+
+  - key: cultivar
+    type: text
+    label: {en: Cultivar, ru: Сорт}
+    group: basic
+    aliases: [cultivated_variety]
+    display: {quote: true, case: as-is}
+
+  - key: synonym
+    type: text
+    label: {en: Synonym, ru: Синоним}
+    group: extra
+    display: {italic: true, case: as-is}
+
+  - key: ex
+    type: text
+    label: {en: Ex, ru: Ex}
+    group: basic
+    description: Origin of the material, such as the collection or nursery it came from.
+    display: {prefix: "ex", case: as-is}
+
+  - key: locality
+    type: text
+    label: {en: Locality, ru: Местонахождение}
+    group: extra
+    description: Habitat locality of wild-collected material.
+
+  - key: source
+    type: text
+    label: {en: Source, ru: Источник}
+    group: extra
+    description: Where this plant or its seed was acquired (seller, swap, own seed).
+
+  - key: seeding_date
+    type: date
+    label: {en: Seeding date, ru: Дата посева}
+    group: extra
+
+  - key: purchase_date
+    type: date
+    label: {en: Purchase date, ru: Дата покупки}
+    group: extra
+
+  - key: price
+    type: decimal
+    label: {en: Price, ru: Цена}
+    group: extra
+    description: Purchase price, in the currency given in the currency field.
+
+  - key: currency
+    type: text
+    label: {en: Currency, ru: Валюта}
+    group: extra
+    description: >-
+      ISO 4217 code of the price's currency, such as "EUR" or "USD". Read
+      case-insensitively and stored in upper case ("eur" becomes "EUR").
+    pattern: "^[A-Z]{3}$"
+
+  - key: notes
+    type: text
+    label: {en: Notes, ru: Заметки}
+    group: extra
+    aliases: [information]
+    description: Free-form notes.
+
+computed:
+  - key: name
+    label: {en: Name, ru: Название}
+    description: >-
+      Botanical name composed from the taxonomy fields in this order, each with
+      its display rules, skipping empty ones: genus affinity species
+      subspecies variety form cultivar. affinity takes the place of the
+      epithet, as in "Lithops aff. lesliei".
+    from: [genus, affinity, species, subspecies, variety, form, cultivar]
+
+  - key: age
+    label: {en: Age, ru: Возраст}
+    description: >-
+      Time since seeding_date, or since purchase_date when there is no seeding
+      date. Shown in whole months under 24 months, in whole years from 24
+      months on.
+    from: [seeding_date, purchase_date]
+
+presets:
+  - key: label
+    label: {en: Label, ru: Бирка}
+    fields: [field_number, name, ex]
+  - key: overlay
+    label: {en: Camera overlay, ru: Подпись в кадре}
+    fields: [name]
+  - key: chat
+    label: {en: For chat, ru: Для чата}
+    fields: [tag, field_number, name, ex, locality, age]
+  - key: full
+    label: {en: Full, ru: Полная}
+    fields: [tag, field_number, name, synonym, ex, locality, source, seeding_date, purchase_date, price, currency, age, notes]

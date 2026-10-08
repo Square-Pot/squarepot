@@ -41,3 +41,13 @@ repos:
     rev: v1.7.12
     hooks:
       - id: actionlint
+
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.38.2
+    hooks:
+      - id: check-jsonschema
+        name: Validate the field schema
+        files: ^schema/fields\.yaml$
+        args: ["--schemafile", "schema/fields.schema.json"]
+      - id: check-metaschema
+        files: ^schema/.*\.schema\.json$
