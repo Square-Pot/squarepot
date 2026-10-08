@@ -45,4 +45,10 @@
         <item quantity="one">Connected: %d collection</item>
         <item quantity="other">Connected: %d collections</item>
     </plurals>
+
+    <string name="camera_permission_needed">Square-Pot needs the camera to read plant labels.</string>
+    <string name="copied">Copied %1$s</string>
+    <string name="mode_mlkit">ML Kit</string>
+    <string name="mode_zxing">zxing-cpp</string>
+    <string name="mode_alternate">Both</string>
 </resources>

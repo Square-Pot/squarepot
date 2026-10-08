@@ -8,7 +8,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import io.github.squarepot.app.copy.CopyScreen
+import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.squarepot.app.camera.CameraScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -16,7 +17,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MaterialTheme {
-                Surface { CopyScreen() }
+                Surface {
+                    CameraScreen(viewModel())
+                }
             }
         }
     }

@@ -9,7 +9,8 @@ style:
   MagicNumber:
     ignorePropertyDeclaration: true
     ignoreCompanionObjectPropertyDeclaration: true
-    excludes: ["**/test/**"]
+    # Compose UI is full of dp, sp and alpha literals that read better inline.
+    excludes: ["**/test/**", "**/*Screen.kt", "**/*Overlay.kt"]
   UnusedPrivateMember:
     # Compose previews are private and only used by the IDE.
     ignoreAnnotated: ["Preview"]

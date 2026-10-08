@@ -48,4 +48,10 @@
         <item quantity="many">Связь есть: %d коллекций</item>
         <item quantity="other">Связь есть: %d коллекции</item>
     </plurals>
+
+    <string name="camera_permission_needed">Square-Pot нужна камера, чтобы читать бирки растений.</string>
+    <string name="copied">Скопировано: %1$s</string>
+    <string name="mode_mlkit">ML Kit</string>
+    <string name="mode_zxing">zxing-cpp</string>
+    <string name="mode_alternate">Оба</string>
 </resources>
