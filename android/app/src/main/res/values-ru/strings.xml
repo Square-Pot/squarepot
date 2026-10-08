@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Square-Pot</string>
+
+    <string name="camera_permission_needed">Square-Pot нужна камера, чтобы читать бирки растений.</string>
+    <string name="copied">Скопировано: %1$s</string>
+    <string name="mode_mlkit">ML Kit</string>
+    <string name="mode_zxing">zxing-cpp</string>
+    <string name="mode_alternate">Оба</string>
 </resources>

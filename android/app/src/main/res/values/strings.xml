@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Square-Pot</string>
+
+    <string name="camera_permission_needed">Square-Pot needs the camera to read plant labels.</string>
+    <string name="copied">Copied %1$s</string>
+    <string name="mode_mlkit">ML Kit</string>
+    <string name="mode_zxing">zxing-cpp</string>
+    <string name="mode_alternate">Both</string>
 </resources>
