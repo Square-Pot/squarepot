@@ -6,11 +6,13 @@ plugins {
 }
 
 android {
+    // The Kotlin package and R class keep io.github.squarepot.app: package names stay without
+    // underscores (Kotlin style, detekt PackageNaming). Only the published id below has one.
     namespace = "io.github.squarepot.app"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "io.github.squarepot.app"
+        applicationId = "io.github.square_pot.app"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
