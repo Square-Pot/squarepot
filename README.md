@@ -20,8 +20,8 @@ complete and readable in the spreadsheet, with no software needed.
 | Directory | Component | What it does |
 | --- | --- | --- |
 | [`android/`](android/) | Android app | Camera with labels drawn over the live video, single-plant and group modes, copy and share, captioned photos, offline cache |
-| [`server/`](server/) | Server | HTTP API, Google Sheets sync, label generation, photo captions, multi-user mode |
-| [`web/`](web/) | Web app | Label designer, onboarding and spreadsheet connection, collections and sharing, field presets |
+| [`server/`](server/) | Server | HTTP API, Google Sheets sync, label generation, photo captions |
+| [`web/`](web/) | Web app | Label designer, onboarding and spreadsheet connection, collections, field presets |
 | [`bot/`](bot/) | Telegram bot | Thin client to the API: look up a plant by number, inline mode, captions on photos you send |
 | [`schema/`](schema/) | Field schema | The single machine-readable definition of plant fields, plus the OpenAPI contract |
 | [`deploy/`](deploy/) | Deployment | Docker Compose setup for self-hosting |
