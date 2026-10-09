@@ -38,4 +38,11 @@ class BenchManifestTest {
             assertTrue(e.message.orEmpty().contains(BenchManifest.FILE_NAME))
         }
     }
+
+    @Test
+    fun `lists rows whose photo is not in the folder`() {
+        val manifest = BenchManifest.parse("file,codes,conditions\nA.jpg,004217,\nB.jpg,,\nC.jpg,004218,glare")
+        assertEquals(listOf("A.jpg", "C.jpg"), BenchManifest.missingPhotos(manifest, listOf("B.jpg", "D.jpg")))
+        assertEquals(emptyList<String>(), BenchManifest.missingPhotos(manifest, listOf("C.jpg", "B.jpg", "A.jpg")))
+    }
 }

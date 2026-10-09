@@ -53,6 +53,7 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
             onProgress(index + 1, photos.size)
         }
 
+        val missing = BenchManifest.missingPhotos(manifest, photos.map { it.name.orEmpty() })
         val summary = BenchSummary.of(outcomes)
         val outputName = "squarepot-bench-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(Date())
         val report = JSONObject()
@@ -61,6 +62,7 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
             .put("analysisLongSide", ANALYSIS_LONG_SIDE)
             .put("repeats", REPEATS)
             .put("manifest", if (manifest.isEmpty()) JSONObject.NULL else BenchManifest.FILE_NAME)
+            .put("missingPhotos", JSONArray(missing))
             .put("summary", summaryJson(summary))
             .put("photos", photoJson)
         write(tree, outputName, report)
@@ -102,7 +104,7 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
     companion object {
         const val ANALYSIS_LONG_SIDE = 1280
         const val REPEATS = 3
-        private const val FORMAT = 2
+        private const val FORMAT = 3
         private const val WARM_UP_RUNS = 2
         private const val NANOS_PER_MILLI = 1_000_000f
     }

@@ -75,6 +75,8 @@ IMG_0003.jpg,,lowlight
 
 For each decoder the report counts correct, missed and wrong codes, overall
 and per condition. Photos missing from `bench.csv` are decoded but not scored.
+Rows of `bench.csv` whose photo is not in the folder are listed under
+`missingPhotos` in the report.
 
 ## Build
 

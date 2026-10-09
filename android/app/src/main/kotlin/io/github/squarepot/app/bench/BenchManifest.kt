@@ -18,7 +18,8 @@ data class Expectation(val codes: Set<String>, val conditions: Set<String>)
  * `codes` are the label numbers visible in the photo, separated by spaces; empty means the photo
  * holds no readable label (any decode is wrong). `conditions` are free-form tags separated by `;`,
  * such as `glare`, `tilt`, `dirt`, `lowlight`, `far`. Lines starting with `#` and blank lines are
- * ignored. Photos not listed are decoded but not scored.
+ * ignored. Photos not listed are decoded but not scored; rows whose photo is not in the folder are
+ * reported by [missingPhotos].
  */
 object BenchManifest {
     const val FILE_NAME = "bench.csv"
@@ -50,4 +51,8 @@ object BenchManifest {
         }
         return result
     }
+
+    /** Files listed in [manifest] that are not among [photos], in manifest order. */
+    fun missingPhotos(manifest: Map<String, Expectation>, photos: Collection<String>): List<String> =
+        manifest.keys.filter { it !in photos }
 }
