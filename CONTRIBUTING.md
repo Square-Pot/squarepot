@@ -41,6 +41,20 @@ pre-commit run --all-files
 Each component adds its own linters, type checks and tests as it gets code;
 its README explains how to run them locally.
 
+## Licensing
+
+The server, bot and web app are licensed under `AGPL-3.0-or-later`; the
+Android app and `schema/` under `Apache-2.0` (see the README). Start every
+new source file with an [SPDX](https://spdx.dev/) identifier of the license
+of its directory, in the file's comment syntax:
+
+```python
+# SPDX-License-Identifier: AGPL-3.0-or-later
+```
+
+By contributing, you agree that your contribution is licensed under the
+license of the directory it goes into.
+
 ## Configuration and secrets
 
 - All configuration comes from environment variables.
