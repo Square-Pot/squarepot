@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package io.github.squarepot.app.decoder
 
 import io.github.squarepot.app.recognition.Detection

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package io.github.squarepot.app.recognition
 
 import org.junit.Assert.assertEquals

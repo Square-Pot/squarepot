@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package io.github.squarepot.app.recognition
 
 import io.github.squarepot.app.recognition.SingleTargetSelector.State
