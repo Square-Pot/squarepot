@@ -31,6 +31,8 @@ repos:
     hooks:
       - id: editorconfig-checker
         alias: ec
+        # License texts are kept verbatim.
+        exclude: (^|/)LICENSE$
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.49.1
