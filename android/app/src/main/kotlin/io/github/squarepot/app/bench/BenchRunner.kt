@@ -33,12 +33,12 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
         val manifest = readManifest(tree)
         val photos = tree.listFiles()
             .filter { it.isFile && it.type?.startsWith("image/") == true }
-            .sortedBy { it.name }
+            .map { (it.name ?: it.uri.toString()) to it }
+            .sortedBy { (name, _) -> name }
         val outcomes = mutableListOf<PhotoOutcome>()
         val photoJson = JSONArray()
 
-        photos.forEachIndexed { index, photo ->
-            val name = photo.name ?: photo.uri.toString()
+        photos.forEachIndexed { index, (name, photo) ->
             val expected = manifest[name]
             val image = loader.load(photo.uri)
             if (image == null) {
@@ -53,7 +53,7 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
             onProgress(index + 1, photos.size)
         }
 
-        val missing = BenchManifest.missingPhotos(manifest, photos.map { it.name.orEmpty() })
+        val missing = BenchManifest.missingPhotos(manifest, photos.map { (name, _) -> name })
         val summary = BenchSummary.of(outcomes)
         val outputName = "squarepot-bench-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(Date())
         val report = JSONObject()
@@ -66,7 +66,7 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
             .put("summary", summaryJson(summary))
             .put("photos", photoJson)
         write(tree, outputName, report)
-        val labelled = photos.count { (it.name ?: "") in manifest }
+        val labelled = photos.count { (name, _) -> name in manifest }
         return Result(summary, photos.size, labelled, "$outputName.json")
     }
 
