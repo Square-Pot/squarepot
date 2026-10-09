@@ -197,8 +197,9 @@ Recorded on 2026-10-09:
 3. **Numbers on import.** The product owner's collection already has strictly
    unique numbers. A collision on import is treated as an error to report,
    not as a normal case.
-4. **Licenses.** AGPL-3.0 for the server, bot and web app; Apache-2.0 for the
-   Android app.
+4. **Licenses.** `AGPL-3.0-or-later` for the server, bot, web app and
+   everything else by default; `Apache-2.0` for the Android app and for the
+   field schema in `schema/`, which both sides use. See the README.
 5. **Field names.** `tag` for the label number (instead of `uid`, which is
    still read), `cultivar` and `notes`. `number` was rejected as too easily
    confused with `field_number`.
