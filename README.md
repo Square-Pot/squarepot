@@ -52,4 +52,19 @@ convention and pull request flow. Please follow the
 
 ## License
 
-Not chosen yet. Until a license is added, all rights are reserved.
+Square-Pot uses two licenses:
+
+| Part | License |
+| --- | --- |
+| Server ([`server/`](server/)), Telegram bot ([`bot/`](bot/)), web app ([`web/`](web/)), and everything not listed below | [GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-or-later`) |
+| Android app ([`android/`](android/)) | [Apache License 2.0](android/LICENSE) (`Apache-2.0`) |
+| Field schema and its tooling ([`schema/`](schema/)) | [Apache License 2.0](schema/LICENSE) (`Apache-2.0`) |
+
+The AGPL applies as version 3 or, at your option, any later version. It keeps
+the server side open: anyone who runs a modified Square-Pot server for other
+people must publish their changes. The Android app and the schema use the
+permissive Apache license, so the app can be distributed freely and both sides
+can use the shared schema.
+
+Each directory with its own license carries a `LICENSE` file, and source files
+state their license with an [SPDX](https://spdx.dev/) identifier.
