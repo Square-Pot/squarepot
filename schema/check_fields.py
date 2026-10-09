@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Check the cross-references in schema/fields.yaml.
 
 JSON Schema validates the shape of the file; this script checks what JSON
