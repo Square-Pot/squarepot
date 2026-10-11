@@ -54,6 +54,7 @@
     <string name="mode_mlkit">ML Kit</string>
     <string name="mode_zxing">zxing-cpp</string>
     <string name="mode_alternate">Оба</string>
+    <string name="resolution_max">Макс</string>
     <string name="open_bench">Замер</string>
     <string name="back">Назад</string>
 

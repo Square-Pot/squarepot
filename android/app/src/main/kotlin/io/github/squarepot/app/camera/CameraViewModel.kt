@@ -20,6 +20,7 @@ enum class DecoderMode { MLKIT, ZXING_CPP, ALTERNATE }
 
 data class CameraUiState(
     val mode: DecoderMode = DecoderMode.MLKIT,
+    val resolution: AnalysisResolution = AnalysisResolution.P720,
     val frame: FrameSize? = null,
     val detections: List<Detection> = emptyList(),
     val selection: SingleTargetSelector.State = SingleTargetSelector.State.Searching,
@@ -47,6 +48,12 @@ class CameraViewModel : ViewModel() {
         if (mode == _state.value.mode) return
         resetRequested = true
         _state.update { it.copy(mode = mode) }
+    }
+
+    fun setResolution(resolution: AnalysisResolution) {
+        if (resolution == _state.value.resolution) return
+        resetRequested = true
+        _state.update { it.copy(resolution = resolution) }
     }
 
     fun nextDecoder(): TagDecoder = when (_state.value.mode) {

@@ -7,14 +7,12 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
-import android.util.Size
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
-import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
@@ -93,15 +91,11 @@ private fun LiveCamera(viewModel: CameraViewModel) {
             previewResolutionSelector = ResolutionSelector.Builder()
                 .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
                 .build()
-            imageAnalysisResolutionSelector = ResolutionSelector.Builder()
-                .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
-                .setResolutionStrategy(
-                    ResolutionStrategy(ANALYSIS_SIZE, ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER),
-                )
-                .build()
+            imageAnalysisResolutionSelector = state.resolution.selector()
             imageAnalysisBackpressureStrategy = ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
         }
     }
+    var appliedResolution by remember { mutableStateOf(state.resolution) }
     // The analysis thread lives exactly as long as the binding to this lifecycle owner.
     DisposableEffect(lifecycleOwner, controller) {
         val executor = Executors.newSingleThreadExecutor()
@@ -111,6 +105,14 @@ private fun LiveCamera(viewModel: CameraViewModel) {
             controller.unbind()
             controller.clearImageAnalysisAnalyzer()
             executor.shutdown()
+        }
+    }
+
+    // Changing the selector makes the controller rebind the camera.
+    LaunchedEffect(controller, state.resolution) {
+        if (state.resolution != appliedResolution) {
+            controller.imageAnalysisResolutionSelector = state.resolution.selector()
+            appliedResolution = state.resolution
         }
     }
 
@@ -151,6 +153,9 @@ private fun Controls(viewModel: CameraViewModel, onOpenBench: () -> Unit, modifi
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        state.frame?.let {
+            Text("${it.width}×${it.height}", color = Color.White, style = MaterialTheme.typography.bodySmall)
+        }
         state.stats.toSortedMap().forEach { (id, s) ->
             if (s.frames > 0) Text(formatStats(id, s), color = Color.White, style = MaterialTheme.typography.bodySmall)
         }
@@ -158,6 +163,15 @@ private fun Controls(viewModel: CameraViewModel, onOpenBench: () -> Unit, modifi
             ModeChip(state.mode, DecoderMode.MLKIT, stringResource(R.string.mode_mlkit), viewModel::setMode)
             ModeChip(state.mode, DecoderMode.ZXING_CPP, stringResource(R.string.mode_zxing), viewModel::setMode)
             ModeChip(state.mode, DecoderMode.ALTERNATE, stringResource(R.string.mode_alternate), viewModel::setMode)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            AnalysisResolution.entries.forEach { r ->
+                FilterChip(
+                    selected = state.resolution == r,
+                    onClick = { viewModel.setResolution(r) },
+                    label = { Text(stringResource(r.label), color = Color.White) },
+                )
+            }
         }
         Button(onClick = onOpenBench) { Text(stringResource(R.string.open_bench)) }
     }
@@ -190,5 +204,11 @@ private fun Context.copyToClipboard(text: String) {
     Toast.makeText(this, getString(R.string.copied, text), Toast.LENGTH_SHORT).show()
 }
 
-private val ANALYSIS_SIZE = Size(1280, 720)
+private val AnalysisResolution.label: Int
+    get() = when (this) {
+        AnalysisResolution.P720 -> R.string.resolution_720
+        AnalysisResolution.P1080 -> R.string.resolution_1080
+        AnalysisResolution.MAX -> R.string.resolution_max
+    }
+
 private const val PERCENT = 100f
