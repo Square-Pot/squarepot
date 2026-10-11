@@ -2,10 +2,10 @@
 
 Square-Pot is an open, self-hosted system for managing a plant collection.
 Every pot carries a small label with a Data Matrix code that holds the plant's
-six-digit number. Point a phone camera at the pots and each plant's name
-appears next to its label in the live video, for a single plant or a whole
-tray at once. From there you can copy the details, share them to a chat, or
-take a photo with every plant already captioned.
+six-digit number. Move a phone camera over the pots and the name of the
+nearest plant appears next to its label in the live video. From there you can
+copy the details, share them to a chat, or take a full-resolution photo of one
+plant or a whole group with every plant already captioned.
 
 The collection itself lives in a Google Sheet owned by the user. The server
 only caches, indexes and syncs it. If the server goes away, the data stays
@@ -19,7 +19,7 @@ complete and readable in the spreadsheet, with no software needed.
 
 | Directory | Component | What it does |
 | --- | --- | --- |
-| [`android/`](android/) | Android app | Camera with labels drawn over the live video, single-plant and group modes, copy and share, captioned photos, offline cache |
+| [`android/`](android/) | Android app | Live camera that names the nearest plant, captioned photos of one plant or a group, copy and share, offline cache |
 | [`server/`](server/) | Server | HTTP API, Google Sheets sync, label generation, photo captions |
 | [`web/`](web/) | Web app | Label designer, onboarding and spreadsheet connection, collections, field presets |
 | [`bot/`](bot/) | Telegram bot | Thin client to the API: look up a plant by number, inline mode, captions on photos you send |
