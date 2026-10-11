@@ -47,14 +47,16 @@ The app currently holds only the recognition spike, which measures how
 reliably labels are read in real conditions before the rest of the app is
 built:
 
-- **Live camera.** 720p analysis frames are decoded by ML Kit, zxing-cpp, or
-  both on alternate frames. In single-plant mode the app picks the label you
+- **Live camera.** Analysis frames (720p by default; 1080p or the largest
+  16:9 size can be picked) are decoded by ML Kit, zxing-cpp, or both on
+  alternate frames. In single-plant mode the app picks the label you
   are aiming at, locks it after a few stable frames (with a haptic tick) and
   copies its number when you tap. The bottom panel shows each decoder's
   decode rate and latency over the last 120 frames.
 - **Bench.** Pick a folder of label photos. Each photo is made upright (EXIF
-  orientation), scaled to the live analysis resolution and decoded by both
-  decoders. The results are written as `squarepot-bench-<time>.json` in the
+  orientation), scaled to a long side of 1280, 1920 and 2560 px in turn (the
+  720p, 1080p and a larger analysis frame) and decoded by both decoders at each
+  size. The results are written as `squarepot-bench-<time>.json` in the
   same folder.
 
 ### Bench ground truth

@@ -18,7 +18,7 @@ class BenchImage(val bitmap: Bitmap, val exifRotation: Int, val exifFlipped: Boo
  * store photos sideways with an orientation tag, while camera frames arrive upright), and the
  * long side scaled down to [longSide] px.
  */
-class BenchImageLoader(private val resolver: ContentResolver, private val longSide: Int) {
+class BenchImageLoader(private val resolver: ContentResolver, val longSide: Int) {
 
     fun load(uri: Uri): BenchImage? {
         val sourceLongSide = sourceLongSideOf(uri)

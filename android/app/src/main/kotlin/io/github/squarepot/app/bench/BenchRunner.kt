@@ -16,18 +16,20 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Runs every decoder over every photo in a folder the user picked, at the live analysis
- * resolution, scores the results against the folder's [BenchManifest] when there is one, and
- * writes the report as JSON next to the photos.
+ * Runs every decoder over every photo in a folder the user picked, at each analysis size in
+ * [ANALYSIS_LONG_SIDES], scores the results against the folder's [BenchManifest] when there is
+ * one, and writes the report as JSON next to the photos.
  *
- * Photos are made upright and scaled so that the long side is [ANALYSIS_LONG_SIDE] px, what the
- * camera analysis sees, so that the numbers match live use rather than full-resolution stills.
+ * Photos are made upright and scaled so that the long side matches a camera analysis frame
+ * (1280 for 720p, 1920 for 1080p, 2560 for a larger stream), so that the numbers match live use
+ * rather than full-resolution stills. Photos smaller than a size are decoded at their own size.
+ * Each decoder is reported per size, as `<decoder>@<long side>`.
  */
 class BenchRunner(private val context: Context, private val decoders: List<TagDecoder>) {
 
     class Result(val summary: BenchSummary, val photos: Int, val labelledPhotos: Int, val outputName: String)
 
-    private val loader = BenchImageLoader(context.contentResolver, ANALYSIS_LONG_SIDE)
+    private val loaders = ANALYSIS_LONG_SIDES.map { BenchImageLoader(context.contentResolver, it) }
 
     /** Blocks. [onProgress] is called with (done, total) from the calling thread. */
     fun run(folder: Uri, onProgress: (Int, Int) -> Unit): Result {
@@ -42,15 +44,10 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
 
         photos.forEachIndexed { index, (name, photo) ->
             val expected = manifest[name]
-            val image = loader.load(photo.uri)
-            if (image == null) {
-                photoJson.put(JSONObject().put("name", name).put("error", "cannot decode image"))
-            } else {
-                if (index == 0) warmUp(image.bitmap)
-                val measured = decoders.map { measure(name, it, image.bitmap, expected) }
+            loaders.forEach { loader ->
+                val (json, measured) = benchPhoto(name, photo.uri, expected, loader, warm = index == 0)
+                photoJson.put(json)
                 outcomes += measured
-                photoJson.put(photoJson(name, image, expected, measured))
-                image.bitmap.recycle()
             }
             onProgress(index + 1, photos.size)
         }
@@ -61,7 +58,7 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
         val report = JSONObject()
             .put("format", FORMAT)
             .put("device", deviceJson())
-            .put("analysisLongSide", ANALYSIS_LONG_SIDE)
+            .put("analysisLongSides", JSONArray(ANALYSIS_LONG_SIDES))
             .put("repeats", REPEATS)
             .put("manifest", if (manifest.isEmpty()) JSONObject.NULL else BenchManifest.FILE_NAME)
             .put("missingPhotos", JSONArray(missing))
@@ -72,13 +69,40 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
         return Result(summary, photos.size, labelled, "$outputName.json")
     }
 
+    /** Decodes one photo at one size with every decoder; returns its JSON entry and the outcomes. */
+    private fun benchPhoto(
+        name: String,
+        uri: Uri,
+        expected: Expectation?,
+        loader: BenchImageLoader,
+        warm: Boolean,
+    ): Pair<JSONObject, List<PhotoOutcome>> {
+        val longSide = loader.longSide
+        val image = loader.load(uri)
+        if (image == null) {
+            val error = JSONObject().put("name", name).put("longSide", longSide).put("error", "cannot decode image")
+            return error to emptyList()
+        }
+        if (warm) warmUp(image.bitmap)
+        val measured = decoders.map { measure(name, it, "${it.id}@$longSide", image.bitmap, expected) }
+        val json = photoJson(name, image, expected, measured).put("longSide", longSide)
+        image.bitmap.recycle()
+        return json to measured
+    }
+
     private fun readManifest(tree: DocumentFile): Map<String, Expectation> {
         val file = tree.findFile(BenchManifest.FILE_NAME) ?: return emptyMap()
         val text = context.contentResolver.openInputStream(file.uri)?.use { it.readBytes().decodeToString() }
         return BenchManifest.parse(requireNotNull(text) { "Cannot read ${BenchManifest.FILE_NAME}" })
     }
 
-    private fun measure(photo: String, decoder: TagDecoder, bitmap: Bitmap, expected: Expectation?): PhotoOutcome {
+    private fun measure(
+        photo: String,
+        decoder: TagDecoder,
+        id: String,
+        bitmap: Bitmap,
+        expected: Expectation?,
+    ): PhotoOutcome {
         val input = DecoderInput.Still(bitmap)
         var codes = emptySet<String>()
         val millis = List(REPEATS) { run ->
@@ -88,7 +112,7 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
             if (run == 0) codes = found.map { it.code.value }.toSet()
             ms
         }
-        return PhotoOutcome(photo, decoder.id, codes, millis, expected)
+        return PhotoOutcome(photo, id, codes, millis, expected)
     }
 
     /** First calls load models and native code; keep them out of the timings. */
@@ -104,9 +128,9 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
     }
 
     companion object {
-        const val ANALYSIS_LONG_SIDE = 1280
+        val ANALYSIS_LONG_SIDES = listOf(1280, 1920, 2560)
         const val REPEATS = 3
-        private const val FORMAT = 3
+        private const val FORMAT = 4
         private const val WARM_UP_RUNS = 2
         private const val NANOS_PER_MILLI = 1_000_000f
     }

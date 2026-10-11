@@ -6,7 +6,7 @@ import android.os.Build
 import org.json.JSONArray
 import org.json.JSONObject
 
-// JSON pieces of the bench report, format 2.
+// JSON pieces of the bench report, format 4.
 
 /** The device a bench ran on, for comparing phones. */
 internal fun deviceJson() = JSONObject()
