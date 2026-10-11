@@ -51,6 +51,9 @@ jobs:
 
       - name: Build debug APK
         if: success() || failure()
+        env:
+          # The PR head, not the merge commit GitHub checks out, so bench reports name the reviewed commit.
+          SQUAREPOT_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: ./gradlew --no-daemon assembleDebug
 
       - name: Upload debug APK

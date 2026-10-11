@@ -3,15 +3,24 @@
 package io.github.squarepot.app.bench
 
 import android.os.Build
+import io.github.squarepot.app.BuildConfig
 import org.json.JSONArray
 import org.json.JSONObject
 
 // JSON pieces of the bench report, format 4.
 
+/** The app build a bench ran, so that a report can be matched to the reviewed commit. */
+internal fun appJson() = JSONObject()
+    .put("applicationId", BuildConfig.APPLICATION_ID)
+    .put("versionName", BuildConfig.VERSION_NAME)
+    .put("buildType", BuildConfig.BUILD_TYPE)
+    .put("commit", BuildConfig.COMMIT)
+
 /** The device a bench ran on, for comparing phones. */
 internal fun deviceJson() = JSONObject()
     .put("manufacturer", Build.MANUFACTURER)
     .put("model", Build.MODEL)
+    .put("release", Build.VERSION.RELEASE)
     .put("sdk", Build.VERSION.SDK_INT)
     .put("abis", JSONArray(Build.SUPPORTED_ABIS.toList()))
 

@@ -57,6 +57,7 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
         val outputName = "squarepot-bench-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(Date())
         val report = JSONObject()
             .put("format", FORMAT)
+            .put("app", appJson())
             .put("device", deviceJson())
             .put("analysisLongSides", JSONArray(ANALYSIS_LONG_SIDES))
             .put("repeats", REPEATS)

@@ -21,6 +21,9 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.0.1"
+        // The commit the APK was built from (set by CI), recorded in bench reports.
+        val commit = providers.environmentVariable("SQUAREPOT_COMMIT").orElse("local").get()
+        buildConfigField("String", "COMMIT", "\"$commit\"")
     }
 
     buildTypes {
@@ -38,6 +41,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {
