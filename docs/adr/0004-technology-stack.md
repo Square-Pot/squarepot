@@ -10,9 +10,9 @@ server with a sync worker, a web app, a Telegram bot, and the deployment that
 ties them together. It is an open-source project that should attract
 contributors, and self-hosters must be able to run it on modest hardware.
 
-The camera feature sets the hardest constraint: captions must follow labels in
-the live view with no visible lag, which needs direct control of the camera
-pipeline and an efficient barcode decoder.
+The camera feature sets the hardest constraint: in live mode, the caption must
+follow the nearest label with no visible lag as the phone moves, which needs
+direct control of the camera pipeline and an efficient barcode decoder.
 
 ## Decision
 
@@ -37,7 +37,7 @@ The parts share a contract, not code:
 ## Consequences
 
 - Native Android gives full control of CameraX and ML Kit, which the live
-  overlay needs. The product owner has decided on Android only for now; an
+  mode needs. The product owner has decided on Android only for now; an
   iOS app would be a separate project.
 - Python has the widest pool of contributors for the server and bot, and mature
   libraries for Google APIs, images and PDFs.
@@ -60,4 +60,5 @@ The parts share a contract, not code:
   used Detectron2). Far heavier than needed: zxing-cpp finds Data Matrix codes
   in photos quickly on a CPU.
 - **A web scanner instead of a native app.** Browser camera access and decoding
-  are not fast or controllable enough for a stable live overlay in group mode.
+  are not fast or controllable enough for a caption that follows a label
+  smoothly in live mode.
