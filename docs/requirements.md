@@ -9,19 +9,20 @@ quickly outgrows paper labels: the label holds a number or a short name, and
 everything else (field number, origin, locality, age) lives in a notebook or a
 spreadsheet. Today, finding out what is in a pot means reading its code with a
 phone, typing the number into a lookup tool, and copying the answer into a
-chat. It works, but it is slow, and with a tray of thirty plants it is painful.
+chat. It works, but it is slow, and with a table of thirty plants it is
+painful.
 
 Existing collection apps are closed services. They keep the data on their own
 servers, and when the service ends, so does the collection.
 
 ## Goals
 
-1. **Point and know.** Aim a phone at a pot, or a whole tray, and see each
-   plant's name next to its label in the live camera view.
+1. **Point and know.** Aim a phone at a pot and see the plant's name next to
+   its label in the live camera view.
 2. **Data that outlives the software.** The collection stays in a spreadsheet
    the collector owns, readable without Square-Pot.
-3. **Share without explaining.** A photo of a tray can be sent with every plant
-   already captioned.
+3. **Share without explaining.** A photo of one plant or a whole group can be
+   sent with every plant already captioned.
 4. **Show only what matters.** The collector chooses which fields appear,
    and saves the choice as a preset.
 5. **Open and self-hosted.** A collector runs their own instance with one
@@ -57,41 +58,69 @@ now.
 
 ### Identifying plants (Android)
 
-Recognition looks for Data Matrix symbols only, in frames of about 720p.
-Small, distant codes are deliberately out of scope: the user is expected to
-hold the phone close to the pots.
+Recognition looks for Data Matrix symbols only. The app has two ways of
+working, for two different jobs.
 
-#### Single mode
+#### Live mode: look up one plant at a time
 
-One plant at a time.
+The scene: small pots, about 5–6 cm across, stand close together on a table.
+The collector moves the phone over them, held at about 45° to the table, and
+looks at the plants one after another. Many labels are in the frame at once,
+but only one matters at a time. The working distance from the phone to the
+labels is not fixed yet; the recognition spike measures it.
 
-- A crosshair in the middle of the view. Among the codes found, the app picks
-  the one with the best score of size and closeness to the centre.
-- The selection does not jump between neighbouring codes (hysteresis). A
-  target locks after a few stable frames, with haptic feedback.
-- One tap copies the plant's details to the clipboard.
+- The app picks the **largest label in the frame**, which is the nearest one,
+  and ignores all the others. Size is the main criterion.
+- Between labels of similar size, the one closer to the vertical middle band of
+  the frame wins: only the horizontal position counts. A label above or below
+  the middle is not penalised, because the label sits on the rim of the pot,
+  above the plant (far rim) or below it (near rim), while the middle of the
+  frame usually shows the plant itself. There is no crosshair in the centre of
+  the view.
+- It shows that plant's caption (the `overlay` preset) next to the label. Other
+  labels in the frame get no caption.
+- The selection does not jump back and forth between labels of almost the same
+  size.
+- One tap copies the plant's details to the clipboard, or opens the full card.
+- Optional: a quick screenshot or a short video clip with the recognised
+  plant's caption, ready to send to a friend.
+- The largest label must be read reliably in that scene, at the working
+  distance measured by the spike. Smaller, more distant labels need not be
+  read at all.
+- The resolution at which frames are analysed is left open. It will be chosen
+  from the measurements of the recognition spike.
 
-#### Group mode
+#### Photo mode: a captioned photo for a chat
 
-A tray of plants that stand close together.
+The collector takes a full-resolution still photo, not a frame from the video,
+to send to a chat or a group. Before the photo is captioned, they choose the
+mode explicitly:
 
-- Codes of roughly the same size are expected. Codes far smaller or larger than
-  the median (outside about 0.5×–2×) are ignored as noise.
-- Each code is tracked by its number across frames. Caption positions are
-  smoothed, and a caption stays visible for about 300 ms after its code is
-  lost, so that captions do not flicker.
-- Captions are laid out without overlapping. In the frame, a caption shows the
-  short `overlay` preset; tapping it opens the full card.
+- **Single plant** (the common case): caption the largest label only. Smaller
+  labels that happen to be in the shot are ignored.
+- **Group**: find and caption every label in the photo.
+
+The layout of the captions is the main requirement:
+
+- Every field of the chosen preset fits.
+- The captions do not cover the plants.
+- It is always clear which caption belongs to which plant.
+
+One way to do it, given as an example rather than a decision: a coloured frame
+around each code, and small captions along the bottom of the photo, each with a
+marker of the matching colour.
+
+- Captioning happens on the device. The original photo is kept unchanged.
+- Nice to have, not required because it is costly: before saving, the
+  collector can tap a label to exclude it from the captions.
 
 #### In both modes
 
-- Copy or share the details of one plant, or of every plant in view, as text
-  using the chosen preset.
-- Take a photo with captions drawn onto it, ready to send to a chat. Captioning
-  happens on the device.
-- Numbers are unique, so a scan finds exactly one plant. If an import ever
-  finds the same number twice, the collision is reported, and until it is fixed
-  a scan of that number shows every match
+- Copy or share the details of the recognised plants as text, using the chosen
+  preset.
+- Numbers are unique, so a label identifies exactly one plant. If an import
+  ever finds the same number twice, the collision is reported, and until it is
+  fixed that number shows every match
   ([ADR 0002](adr/0002-plant-number-allocation.md)).
 
 ### Offline
@@ -136,8 +165,9 @@ A thin client to the API. It has no data or logic of its own.
 - Look up a plant by number.
 - Inline mode: `@bot 004217` in any chat inserts the plant's card. Numbers
   typed without leading zeros (`@bot 4217`) are padded to six digits.
-- Send it a photo, and it replies with the photo captioned (codes found on the
-  server with zxing-cpp).
+- Send it a photo, and it replies with the photo captioned, the same way as
+  photo mode in the app: single plant by default, group when asked. Codes are
+  found on the server with zxing-cpp.
 - Search collections by any text.
 - It answers only the Telegram accounts the collector has allowed.
 
@@ -165,8 +195,9 @@ labels before development builds on them.
 
 | Area | Target |
 | --- | --- |
-| Recognition | A 10×10 label is read at typical scanning distance in normal indoor light, including with glare and moderate tilt. A reference set of real photos is kept as a regression test. |
-| Responsiveness | Captions follow the labels in the live view with no visible lag on a mid-range phone. In single mode a target locks in under half a second. |
+| Recognition, live | In the live scene (pots of about 5–6 cm on a table, phone at about 45°, at the working distance measured by the spike), the largest label in the frame is read in normal indoor light, including with glare. A set of frames taken in that scene is kept as a regression test. |
+| Recognition, photo | In a full-resolution photo, single-plant mode reads the largest label, and group mode finds every label in the shot. A reference set of real photos is kept as a regression test. |
+| Responsiveness | In live mode, the caption appears next to the largest label within half a second of it coming into view, on a mid-range phone, with no visible lag as the phone moves. |
 | Offline | Every identification feature works with no network. |
 | Durability | Losing the server loses no plant data. Server-only state (settings, presets and the registry of issued numbers) is covered by the operator's backups, and the guide explains how. |
 | Sheets API | Syncing stays within the default Google quotas for a collection of several thousand plants ([ADR 0003](adr/0003-spreadsheet-as-source-of-truth.md)). |
