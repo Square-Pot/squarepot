@@ -58,7 +58,7 @@
     <string name="back">Back</string>
 
     <string name="bench_title">Recognition bench</string>
-    <string name="bench_explanation">Pick a folder with label photos. Each photo is turned upright, scaled to the sizes of live camera frames (720p, 1080p and larger) and decoded by every decoder; the results are saved as a JSON file in the same folder. A bench.csv in the folder (file,codes,conditions) lists what each photo shows, so decodes are scored as correct, missed or wrong.</string>
+    <string name="bench_explanation">Pick a folder with label photos. Each photo is turned upright, scaled to the sizes of live camera frames (720p, 1080p and larger) and at full resolution and decoded by every decoder; the results are saved as a JSON file in the same folder. A bench.csv in the folder (file,codes,conditions) lists what each photo shows, so decodes are scored as correct, missed or wrong.</string>
     <string name="bench_pick_folder">Choose photo folder</string>
     <string name="bench_progress">Decoding photo %1$d of %2$d</string>
     <string name="bench_saved">Saved %1$s</string>

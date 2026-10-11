@@ -55,7 +55,8 @@ built:
   decode rate and latency over the last 120 frames.
 - **Bench.** Pick a folder of label photos. Each photo is made upright (EXIF
   orientation), scaled to a long side of 1280, 1920 and 2560 px in turn (the
-  720p, 1080p and a larger analysis frame) and decoded by both decoders at each
+  720p, 1080p and a larger analysis frame, for the live mode), then taken at
+  full resolution (for the photo mode), and decoded by both decoders at each
   size. The results are written as `squarepot-bench-<time>.json` in the
   same folder.
 

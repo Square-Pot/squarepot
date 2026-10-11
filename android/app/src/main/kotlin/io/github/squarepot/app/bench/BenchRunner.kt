@@ -22,9 +22,10 @@ import java.util.Locale
  * one, and writes the report as JSON next to the photos.
  *
  * Photos are made upright and scaled so that the long side matches a camera analysis frame
- * (1280 for 720p, 1920 for 1080p, 2560 for a larger stream), so that the numbers match live use
- * rather than full-resolution stills. Photos smaller than a size are decoded at their own size.
- * Each decoder is reported per size, as `<decoder>@<long side>`.
+ * (1280 for 720p, 1920 for 1080p, 2560 for a larger stream), for the live mode, and decoded once
+ * more at their own resolution, for the photo mode. Photos smaller than a size are decoded at
+ * their own size. Each decoder is reported per size, as `<decoder>@<long side>` or
+ * `<decoder>@full`.
  */
 class BenchRunner(private val context: Context, private val decoders: List<TagDecoder>) {
 
@@ -60,7 +61,7 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
             .put("format", FORMAT)
             .put("app", appJson())
             .put("device", deviceJson())
-            .put("analysisLongSides", JSONArray(ANALYSIS_LONG_SIDES))
+            .put("analysisLongSides", JSONArray(ANALYSIS_LONG_SIDES.map(::sizeLabel)))
             .put("repeats", REPEATS)
             .put("manifest", if (manifest.isEmpty()) JSONObject.NULL else BenchManifest.FILE_NAME)
             .put("missingPhotos", JSONArray(missing))
@@ -82,12 +83,15 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
         val longSide = loader.longSide
         val image = loader.load(uri)
         if (image == null) {
-            val error = JSONObject().put("name", name).put("longSide", longSide).put("error", "cannot decode image")
+            val error = JSONObject()
+                .put("name", name)
+                .put("longSide", sizeLabel(longSide))
+                .put("error", "cannot decode image")
             return error to emptyList()
         }
         if (warm) warmUp(image.bitmap)
-        val measured = decoders.map { measure(name, it, "${it.id}@$longSide", image.bitmap, expected) }
-        val json = photoJson(name, image, expected, measured).put("longSide", longSide)
+        val measured = decoders.map { measure(name, it, "${it.id}@${sizeLabel(longSide)}", image.bitmap, expected) }
+        val json = photoJson(name, image, expected, measured).put("longSide", sizeLabel(longSide))
         image.bitmap.recycle()
         return json to measured
     }
@@ -131,7 +135,12 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
     }
 
     companion object {
-        val ANALYSIS_LONG_SIDES = listOf(1280, 1920, 2560)
+        /** Stands for a photo's own resolution in [ANALYSIS_LONG_SIDES]. */
+        const val FULL_RESOLUTION = Int.MAX_VALUE
+        val ANALYSIS_LONG_SIDES = listOf(1280, 1920, 2560, FULL_RESOLUTION)
+
+        fun sizeLabel(longSide: Int): String = if (longSide == FULL_RESOLUTION) "full" else longSide.toString()
+
         const val REPEATS = 3
         private const val FORMAT = 4
         private const val WARM_UP_RUNS = 2
