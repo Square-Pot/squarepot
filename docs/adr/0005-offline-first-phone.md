@@ -6,9 +6,10 @@
 ## Context
 
 Plants live in greenhouses, on balconies and in sheds, where mobile coverage is
-often poor or absent. The live overlay looks up every recognised code many
-times a second. Even a fast network round trip is too slow for that, and any
-dependency on the network makes the feature fail exactly where it is used.
+often poor or absent. In live mode, the app looks up the nearest label many
+times a second as the phone moves. Even a fast network round trip is too slow
+for that, and any dependency on the network makes the feature fail exactly
+where it is used.
 
 ## Decision
 
