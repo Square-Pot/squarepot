@@ -6,7 +6,8 @@ import kotlin.math.ceil
 
 /**
  * What one decoder found on one photo, how long each repeated run took, and what the photo is
- * known to show ([expected] is null for photos missing from the manifest).
+ * known to show ([expected] is null for photos missing from the manifest). [largest] is the code
+ * of the decoder's largest detection, what a single-plant mode would show.
  */
 data class PhotoOutcome(
     val photo: String,
@@ -14,6 +15,7 @@ data class PhotoOutcome(
     val codes: Set<String>,
     val millis: List<Float>,
     val expected: Expectation? = null,
+    val largest: String? = null,
 ) {
     val correct: Set<String> get() = expected?.let { codes intersect it.codes }.orEmpty()
     val missed: Set<String> get() = expected?.let { it.codes - codes }.orEmpty()
@@ -35,6 +37,26 @@ data class Score(val photos: Int, val expected: Int, val correct: Int, val wrong
     }
 }
 
+/**
+ * Single-plant picks over photos with a known primary label: [correct] when the decoder's largest
+ * detection is the primary label, [wrong] when it is another code; the rest found nothing.
+ */
+data class PrimaryScore(val photos: Int, val correct: Int, val wrong: Int) {
+    /** Share of photos whose primary label was picked, 0 when there were none. */
+    val rate: Float get() = if (photos == 0) 0f else correct.toFloat() / photos
+
+    companion object {
+        fun of(outcomes: List<PhotoOutcome>): PrimaryScore {
+            val known = outcomes.filter { it.expected?.primary != null }
+            return PrimaryScore(
+                photos = known.size,
+                correct = known.count { it.largest == it.expected?.primary },
+                wrong = known.count { it.largest != null && it.largest != it.expected?.primary },
+            )
+        }
+    }
+}
+
 /** Per-decoder totals over a bench run. */
 data class DecoderSummary(
     val decoderId: String,
@@ -47,6 +69,9 @@ data class DecoderSummary(
     val labelled: Score,
     /** The same, per condition tag; a photo with several tags counts under each. */
     val byCondition: Map<String, Score>,
+    /** Single-plant picks over photos with a primary label, overall and per condition tag. */
+    val primary: PrimaryScore = PrimaryScore(0, 0, 0),
+    val primaryByCondition: Map<String, PrimaryScore> = emptyMap(),
 )
 
 data class BenchSummary(
@@ -81,11 +106,15 @@ data class BenchSummary(
                 medianMillis = percentile(millis, MEDIAN),
                 p95Millis = percentile(millis, P95),
                 labelled = Score.of(labelled),
-                byCondition = conditions.associateWith { c ->
-                    Score.of(labelled.filter { c in it.expected?.conditions.orEmpty() })
-                },
+                byCondition = conditions.associateWith { c -> Score.of(labelled.withCondition(c)) },
+                primary = PrimaryScore.of(labelled),
+                primaryByCondition = conditions
+                    .associateWith { c -> PrimaryScore.of(labelled.withCondition(c)) }
+                    .filterValues { it.photos > 0 },
             )
         }
+
+        private fun List<PhotoOutcome>.withCondition(c: String) = filter { c in it.expected?.conditions.orEmpty() }
 
         private const val MEDIAN = 0.5
         private const val P95 = 0.95

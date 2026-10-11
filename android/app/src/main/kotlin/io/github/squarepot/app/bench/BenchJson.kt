@@ -40,6 +40,7 @@ internal fun photoJson(name: String, image: BenchImage, expected: Expectation?, 
                     val result = JSONObject()
                         .put("codes", JSONArray(o.codes.sorted()))
                         .put("ms", JSONArray(o.millis.map { it.toDouble() }))
+                        .put("largest", o.largest ?: JSONObject.NULL)
                     if (expected != null) {
                         result
                             .put("correct", JSONArray(o.correct.sorted()))
@@ -66,6 +67,8 @@ internal fun summaryJson(summary: BenchSummary) = JSONObject()
                     .put("p95Ms", it.p95Millis.toDouble())
                     .put("labelled", scoreJson(it.labelled))
                     .put("byCondition", JSONObject(it.byCondition.mapValues { (_, s) -> scoreJson(s) }))
+                    .put("primary", primaryJson(it.primary))
+                    .put("primaryByCondition", JSONObject(it.primaryByCondition.mapValues { (_, s) -> primaryJson(s) }))
             },
         ),
     )
@@ -75,6 +78,13 @@ internal fun summaryJson(summary: BenchSummary) = JSONObject()
 private fun expectationJson(e: Expectation) = JSONObject()
     .put("codes", JSONArray(e.codes.sorted()))
     .put("conditions", JSONArray(e.conditions.sorted()))
+    .put("primary", e.primary ?: JSONObject.NULL)
+
+private fun primaryJson(s: PrimaryScore) = JSONObject()
+    .put("photos", s.photos)
+    .put("correct", s.correct)
+    .put("wrong", s.wrong)
+    .put("rate", s.rate.toDouble())
 
 private fun scoreJson(s: Score) = JSONObject()
     .put("photos", s.photos)

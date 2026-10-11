@@ -64,19 +64,23 @@ built:
 To score decodes, put a `bench.csv` next to the photos:
 
 ```csv
-file,codes,conditions
-IMG_0001.jpg,004217,glare
-IMG_0002.jpg,004218 004219,tilt;lowlight
-IMG_0003.jpg,,lowlight
+file,codes,conditions,primary
+IMG_0001.jpg,004217,glare,004217
+IMG_0002.jpg,004218 004219,tilt;lowlight,004219
+IMG_0003.jpg,,lowlight,
 ```
 
 - `codes`: the label numbers visible in the photo, separated by spaces. Leave it
   empty for a photo with no readable label; then any decode counts as wrong.
 - `conditions`: tags separated by `;`, such as `glare`, `tilt`, `dirt`,
   `lowlight` or `far`.
+- `primary` (optional column): the largest label in the photo, the one a
+  single-plant mode must pick. It must be one of `codes`.
 
 For each decoder the report counts correct, missed and wrong codes, overall
-and per condition. Photos missing from `bench.csv` are decoded but not scored.
+and per condition. Where `primary` is given, it also counts how often the
+decoder's largest detection is that label (`primary`, `primaryByCondition`).
+Photos missing from `bench.csv` are decoded but not scored.
 Rows of `bench.csv` whose photo is not in the folder are listed under
 `missingPhotos` in the report.
 

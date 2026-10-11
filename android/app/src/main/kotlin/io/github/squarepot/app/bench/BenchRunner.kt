@@ -9,6 +9,7 @@ import android.os.SystemClock
 import androidx.documentfile.provider.DocumentFile
 import io.github.squarepot.app.decoder.DecoderInput
 import io.github.squarepot.app.decoder.TagDecoder
+import io.github.squarepot.app.recognition.Detection
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -105,15 +106,16 @@ class BenchRunner(private val context: Context, private val decoders: List<TagDe
         expected: Expectation?,
     ): PhotoOutcome {
         val input = DecoderInput.Still(bitmap)
-        var codes = emptySet<String>()
+        var found = emptyList<Detection>()
         val millis = List(REPEATS) { run ->
             val start = SystemClock.elapsedRealtimeNanos()
-            val found = decoder.decode(input)
+            val detections = decoder.decode(input)
             val ms = (SystemClock.elapsedRealtimeNanos() - start) / NANOS_PER_MILLI
-            if (run == 0) codes = found.map { it.code.value }.toSet()
+            if (run == 0) found = detections
             ms
         }
-        return PhotoOutcome(photo, id, codes, millis, expected)
+        val codes = found.map { it.code.value }.toSet()
+        return PhotoOutcome(photo, id, codes, millis, expected, found.maxByOrNull { it.area }?.code?.value)
     }
 
     /** First calls load models and native code; keep them out of the timings. */

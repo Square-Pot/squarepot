@@ -58,6 +58,23 @@ class BenchSummaryTest {
     }
 
     @Test
+    fun `scores the largest detection against the primary label`() {
+        val near = Expectation(setOf("111111", "222222"), setOf("sweep"), primary = "111111")
+        val unknown = Expectation(setOf("333333"), setOf("sweep"))
+        val outcomes = listOf(
+            PhotoOutcome("a.jpg", "z", setOf("111111", "222222"), listOf(1f), near, largest = "111111"),
+            PhotoOutcome("b.jpg", "z", setOf("222222"), listOf(1f), near, largest = "222222"),
+            PhotoOutcome("c.jpg", "z", emptySet(), listOf(1f), near, largest = null),
+            PhotoOutcome("d.jpg", "z", setOf("333333"), listOf(1f), unknown, largest = "333333"),
+        )
+
+        val z = BenchSummary.of(outcomes).decoders.single()
+        assertEquals(PrimaryScore(photos = 3, correct = 1, wrong = 1), z.primary)
+        assertEquals(1f / 3, z.primary.rate, 1e-6f)
+        assertEquals(mapOf("sweep" to PrimaryScore(photos = 3, correct = 1, wrong = 1)), z.primaryByCondition)
+    }
+
+    @Test
     fun `empty run gives empty summary`() {
         val summary = BenchSummary.of(emptyList())
         assertEquals(emptyList<DecoderSummary>(), summary.decoders)

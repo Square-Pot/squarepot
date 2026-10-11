@@ -42,6 +42,17 @@ class BenchManifestTest {
     }
 
     @Test
+    fun `reads an optional primary column`() {
+        val manifest = BenchManifest.parse("file,codes,conditions,primary\nA.jpg,004217 004218,sweep,004218\nB.jpg,,,")
+        assertEquals(Expectation(setOf("004217", "004218"), setOf("sweep"), "004218"), manifest["A.jpg"])
+        assertEquals(Expectation(emptySet(), emptySet()), manifest["B.jpg"])
+        val e = assertThrows(IllegalArgumentException::class.java) {
+            BenchManifest.parse("file,codes,conditions,primary\nA.jpg,004217,,004219")
+        }
+        assertTrue(e.message.orEmpty().contains("primary"))
+    }
+
+    @Test
     fun `lists rows whose photo is not in the folder`() {
         val manifest = BenchManifest.parse("file,codes,conditions\nA.jpg,004217,\nB.jpg,,\nC.jpg,004218,glare")
         assertEquals(listOf("A.jpg", "C.jpg"), BenchManifest.missingPhotos(manifest, listOf("B.jpg", "D.jpg")))
