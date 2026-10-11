@@ -13,7 +13,9 @@ import zxingcpp.BarcodeReader
  *
  * Options follow the host benchmark (#58 report): rotation search is required for Data Matrix,
  * downscaling is nearly free and helps large noisy symbols, inversion is not needed for
- * dark-on-light labels and doubles the time.
+ * dark-on-light labels and doubles the time. The Android wrapper turns `tryHarder` off by
+ * default, unlike the C++ core and the Python binding the host bench used; without it the Data
+ * Matrix detector misses most real labels (17 of 206 on the reference set against 201 on the host).
  */
 class ZxingCppTagDecoder : TagDecoder {
     override val id = "zxing-cpp"
@@ -21,6 +23,7 @@ class ZxingCppTagDecoder : TagDecoder {
     private val reader = BarcodeReader(
         BarcodeReader.Options(
             formats = setOf(BarcodeReader.Format.DATA_MATRIX),
+            tryHarder = true,
             tryRotate = true,
             tryDownscale = true,
             tryInvert = false,
