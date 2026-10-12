@@ -4,11 +4,12 @@ version = "0.1.0"
 description = "Square-Pot API server: a cache, index and sync engine for plant collections kept in Google Sheets."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "src/squarepot_server/labels/fonts/LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.0",
     "fastapi>=0.143.0",
+    "fonttools>=4.66.1",
     "google-auth>=2.61.0",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.15.0",
@@ -44,6 +45,11 @@ filterwarnings = ["error"]
 [tool.mypy]
 strict = true
 files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+# These ship no type information.
+module = ["fontTools.*"]
+ignore_missing_imports = true
 
 [tool.ruff]
 extend = "../ruff.toml"
