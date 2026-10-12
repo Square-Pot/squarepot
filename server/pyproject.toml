@@ -24,7 +24,9 @@ dev = [
     "httpx2>=2.13.1",
     "mypy>=2.3.1",
     "pillow>=12.3.0",
+    "pypdfium2>=5.13.0",
     "pytest>=9.1.1",
+    "resvg-py>=0.5.0",
     "types-pyyaml>=6.0.12.20260906",
     "types-requests>=2.33.0.20261006",
     "zxing-cpp>=3.1.1",
@@ -48,7 +50,7 @@ files = ["src", "tests"]
 
 [[tool.mypy.overrides]]
 # These ship no type information.
-module = ["fontTools.*"]
+module = ["fontTools.*", "pypdfium2.*"]
 ignore_missing_imports = true
 
 [tool.ruff]
