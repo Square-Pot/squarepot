@@ -1,0 +1,824 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Square-Pot API",
+    "summary": "Plant collections kept in Google Sheets, looked up by label number.",
+    "license": {
+      "name": "AGPL-3.0-or-later",
+      "identifier": "AGPL-3.0-or-later"
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "service"
+        ],
+        "summary": "Check that the server is up",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schema": {
+      "get": {
+        "tags": [
+          "schema"
+        ],
+        "summary": "Get the field schema",
+        "description": "Field definitions, computed fields and presets, which clients need to render names and captions. Fetch it again when `Sync.schema_version` changes.",
+        "operationId": "get_schema",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/collections": {
+      "get": {
+        "tags": [
+          "collections"
+        ],
+        "summary": "List collections and how fresh their copies are",
+        "operationId": "list_collections",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Collection"
+                  },
+                  "type": "array",
+                  "title": "Response List Collections"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/plants/by-tag/{tag}": {
+      "get": {
+        "tags": [
+          "plants"
+        ],
+        "summary": "Find the plant with a tag number",
+        "description": "Leading zeros may be left out: `4217` finds `004217`. Responds `404` when no plant has the number, and `422` when it is not a valid tag.",
+        "operationId": "get_plants_by_tag",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tag",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{1,6}$",
+              "examples": [
+                "004217",
+                "4217"
+              ],
+              "title": "Tag"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagLookup"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/sync": {
+      "get": {
+        "tags": [
+          "sync"
+        ],
+        "summary": "Get changes to the local copy since a cursor",
+        "description": "Without `cursor`, returns a full copy of every collection. With the `cursor` of the previous response, returns only what changed since then, or a full copy when the cursor can no longer be served. See `kind`. Responses are gzip-compressed when the client accepts it.",
+        "operationId": "sync",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`cursor` from the previous sync response; omit for a full copy. Any value is accepted: one the server cannot use gives a full copy, never an error.",
+              "title": "Cursor"
+            },
+            "description": "`cursor` from the previous sync response; omit for a full copy. Any value is accepted: one the server cannot use gives a full copy, never an error."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sync"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Collection": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Opaque, stable collection id.",
+            "examples": [
+              "main"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name chosen by the owner.",
+            "examples": [
+              "Lithops"
+            ]
+          },
+          "plant_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Plant Count",
+            "description": "Number of imported plants."
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At",
+            "description": "When the server last confirmed that its copy matches the sheet: the last successful check, whether or not the sheet had changed. `null` before the first."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Why the last sync attempt failed, such as an unreachable sheet or a missing `genus` column. `null` when it succeeded. The server keeps serving its last copy."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "plant_count",
+          "synced_at",
+          "error"
+        ],
+        "title": "Collection",
+        "description": "One collection: one tab of a Google Sheet."
+      },
+      "ComputedField": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Key",
+            "examples": [
+              "genus"
+            ]
+          },
+          "label": {
+            "$ref": "#/components/schemas/Label"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "from": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "examples": [
+                "genus"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "From",
+            "description": "Fields the value is derived from."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "from"
+        ],
+        "title": "ComputedField"
+      },
+      "Display": {
+        "properties": {
+          "prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefix",
+            "description": "Text before the value (\"subsp.\"), never italic."
+          },
+          "italic": {
+            "type": "boolean",
+            "title": "Italic",
+            "description": "Render the value in italics.",
+            "default": false
+          },
+          "quote": {
+            "type": "boolean",
+            "title": "Quote",
+            "description": "Wrap the value in single curly quotes.",
+            "default": false
+          },
+          "case": {
+            "type": "string",
+            "enum": [
+              "lower",
+              "title",
+              "upper",
+              "as-is"
+            ],
+            "title": "Case",
+            "description": "Case normalisation, for display only.",
+            "default": "as-is"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Display",
+        "description": "How a field renders inside a plant name or caption."
+      },
+      "Error": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Stable, machine-readable error code, such as `not_found`.",
+            "examples": [
+              "not_found"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable explanation, in English."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "Error",
+        "description": "The body of every error response."
+      },
+      "FieldDefinition": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Key",
+            "description": "Column header in the sheet and key in `Plant.fields`.",
+            "examples": [
+              "genus"
+            ]
+          },
+          "type": {
+            "$ref": "#/components/schemas/FieldType"
+          },
+          "label": {
+            "$ref": "#/components/schemas/Label"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "aliases": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "examples": [
+                "genus"
+              ]
+            },
+            "type": "array",
+            "title": "Aliases",
+            "description": "Other headers accepted on read.",
+            "default": []
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": false
+          },
+          "group": {
+            "$ref": "#/components/schemas/FieldGroup"
+          },
+          "pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pattern",
+            "description": "Regular expression a value matches."
+          },
+          "display": {
+            "$ref": "#/components/schemas/Display"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "type",
+          "label",
+          "group"
+        ],
+        "title": "FieldDefinition"
+      },
+      "FieldGroup": {
+        "type": "string",
+        "enum": [
+          "basic",
+          "extra"
+        ],
+        "title": "FieldGroup"
+      },
+      "FieldSchema": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldDefinition"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Fields"
+          },
+          "computed": {
+            "items": {
+              "$ref": "#/components/schemas/ComputedField"
+            },
+            "type": "array",
+            "title": "Computed"
+          },
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/Preset"
+            },
+            "type": "array",
+            "title": "Presets",
+            "description": "The built-in presets. Presets defined by the owner will be listed here too."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "fields",
+          "computed",
+          "presets"
+        ],
+        "title": "FieldSchema",
+        "description": "The field schema, `schema/fields.yaml` as JSON.\n\nClients keep it with their local copy and fetch it again when\n`Sync.schema_version` differs from its `version`."
+      },
+      "FieldType": {
+        "type": "string",
+        "enum": [
+          "text",
+          "date",
+          "decimal"
+        ],
+        "title": "FieldType"
+      },
+      "Health": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Always `ok` when the server answers.",
+            "examples": [
+              "ok"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "Server version.",
+            "examples": [
+              "0.1.0"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "version"
+        ],
+        "title": "Health"
+      },
+      "Label": {
+        "properties": {
+          "en": {
+            "type": "string",
+            "minLength": 1,
+            "title": "En"
+          },
+          "ru": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ru"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "en",
+          "ru"
+        ],
+        "title": "Label",
+        "description": "A name in each UI language."
+      },
+      "Plant": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Opaque plant id, stable across syncs while the row can be matched. Clients must not parse it. A tag is not an id: rows without a tag have one too."
+          },
+          "collection_id": {
+            "type": "string",
+            "title": "Collection Id",
+            "description": "Id of the collection the plant belongs to."
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!000000)[0-9]{6}$",
+                "description": "Six-digit plant number with leading zeros, as on the label: \"004217\".",
+                "examples": [
+                  "004217"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag",
+            "description": "Plant number; `null` when the plant has no label yet."
+          },
+          "row": {
+            "type": "integer",
+            "minimum": 2.0,
+            "title": "Row",
+            "description": "Row number in the sheet, for showing to the owner."
+          },
+          "fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Fields",
+            "description": "Field values by key from `schema/fields.yaml`, except `tag`, which is in `Plant.tag`. Empty and invalid cells are omitted. Values are in canonical form: `text` trimmed, `date` as `YYYY-MM-DD`, `decimal` as a plain decimal string such as `12.50`. Computed fields (`name`, `age`) are not included; clients render them by the schema's rules.",
+            "examples": [
+              {
+                "genus": "Lithops",
+                "seeding_date": "2024-03-15",
+                "species": "lesliei"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "collection_id",
+          "tag",
+          "row",
+          "fields"
+        ],
+        "title": "Plant",
+        "description": "One plant: one row of a collection's tab."
+      },
+      "Preset": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Key",
+            "examples": [
+              "genus"
+            ]
+          },
+          "label": {
+            "$ref": "#/components/schemas/Label"
+          },
+          "fields": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "examples": [
+                "genus"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Fields",
+            "description": "Field and computed field keys, in display order."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "fields"
+        ],
+        "title": "Preset"
+      },
+      "Sync": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SyncKind",
+            "description": "`full`: the response holds every collection and plant, and the client replaces its whole copy with it. `delta`: it holds only what changed since the cursor, and the client applies it to its copy. The server answers with `full` when no cursor was sent, the cursor is malformed, unknown or too old, or the schema version has changed since it was issued."
+          },
+          "cursor": {
+            "type": "string",
+            "title": "Cursor",
+            "description": "Opaque cursor to send with the next sync. Clients must not parse it."
+          },
+          "schema_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Schema Version",
+            "description": "`version` of `schema/fields.yaml` that the field keys follow."
+          },
+          "collections": {
+            "items": {
+              "$ref": "#/components/schemas/Collection"
+            },
+            "type": "array",
+            "title": "Collections",
+            "description": "Collections that are new or changed (`delta`), or all of them (`full`). A change of `synced_at` or `error` alone counts as a change."
+          },
+          "removed_collections": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Removed Collections",
+            "description": "Ids of collections removed since the cursor. Their plants are listed in `removed_plants` too. Always empty in `full`."
+          },
+          "plants": {
+            "items": {
+              "$ref": "#/components/schemas/Plant"
+            },
+            "type": "array",
+            "title": "Plants",
+            "description": "Plants that are new or changed (`delta`), or all of them (`full`)."
+          },
+          "removed_plants": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Removed Plants",
+            "description": "Ids of plants removed since the cursor. Always empty in `full`."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "cursor",
+          "schema_version",
+          "collections",
+          "removed_collections",
+          "plants",
+          "removed_plants"
+        ],
+        "title": "Sync",
+        "description": "A batch of changes to the client's local copy of every collection (ADR 0005)."
+      },
+      "SyncKind": {
+        "type": "string",
+        "enum": [
+          "full",
+          "delta"
+        ],
+        "title": "SyncKind"
+      },
+      "TagLookup": {
+        "properties": {
+          "tag": {
+            "type": "string",
+            "pattern": "^(?!000000)[0-9]{6}$",
+            "title": "Tag",
+            "description": "Six-digit plant number with leading zeros, as on the label: \"004217\".",
+            "examples": [
+              "004217"
+            ]
+          },
+          "plants": {
+            "items": {
+              "$ref": "#/components/schemas/Plant"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Plants",
+            "description": "Every plant with this number. Numbers are unique, so this holds one plant, except while an import collision is unresolved (ADR 0002)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tag",
+          "plants"
+        ],
+        "title": "TagLookup"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "description": "The API token set by the operator at installation.",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
