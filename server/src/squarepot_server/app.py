@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.gzip import GZipMiddleware
@@ -13,13 +16,15 @@ from starlette.exceptions import HTTPException
 from squarepot_server import __version__
 from squarepot_server.api import routes
 from squarepot_server.api.models import Error
+from squarepot_server.config import Settings, get_settings
+from squarepot_server.runtime import Runtime
+from squarepot_server.store import CollectionStore
 
 ERROR_CODES = {
     status.HTTP_401_UNAUTHORIZED: "unauthorized",
     status.HTTP_404_NOT_FOUND: "not_found",
     status.HTTP_405_METHOD_NOT_ALLOWED: "method_not_allowed",
     status.HTTP_422_UNPROCESSABLE_CONTENT: "invalid_request",
-    status.HTTP_501_NOT_IMPLEMENTED: "not_implemented",
 }
 
 
@@ -55,8 +60,20 @@ def operation_id(route: APIRoute) -> str:
     return route.name
 
 
-def create_app() -> FastAPI:
+def create_app(settings: Settings | None = None, store: CollectionStore | None = None) -> FastAPI:
+    """Build the app. Settings come from the environment unless given; tests pass a fake store."""
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        runtime = Runtime.start(settings or get_settings(), store)
+        app.state.runtime = runtime
+        try:
+            yield
+        finally:
+            runtime.stop()
+
     app = FastAPI(
+        lifespan=lifespan,
         title="Square-Pot API",
         version=__version__,
         summary="Plant collections kept in Google Sheets, looked up by label number.",
