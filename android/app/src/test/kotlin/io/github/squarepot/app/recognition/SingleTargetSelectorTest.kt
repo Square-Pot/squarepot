@@ -29,8 +29,22 @@ class SingleTargetSelectorTest {
     }
 
     @Test
-    fun `score prefers a centred label over an equal one at the edge`() {
+    fun `score prefers a label near the vertical middle over an equal one at the side`() {
         assertTrue(SingleTargetSelector.score(centre, frame) > SingleTargetSelector.score(edge, frame))
+    }
+
+    @Test
+    fun `score ignores vertical position`() {
+        val onRimAbove = tag("333333", 640f, 80f)
+        val onRimBelow = tag("444444", 640f, 650f)
+        assertEquals(SingleTargetSelector.score(centre, frame), SingleTargetSelector.score(onRimAbove, frame), 1e-6f)
+        assertEquals(SingleTargetSelector.score(centre, frame), SingleTargetSelector.score(onRimBelow, frame), 1e-6f)
+    }
+
+    @Test
+    fun `size outweighs horizontal position`() {
+        val nearAtSide = tag("555555", 100f, 360f, side = 90f)
+        assertTrue(SingleTargetSelector.score(nearAtSide, frame) > SingleTargetSelector.score(centre, frame))
     }
 
     @Test

@@ -2,13 +2,17 @@
 
 package io.github.squarepot.app.recognition
 
-import kotlin.math.hypot
+import kotlin.math.abs
 
 /**
- * Picks the one label the user is aiming at, frame by frame, for the single-plant mode.
+ * Picks the one label to show, frame by frame, for the single-plant mode: the largest, which is
+ * the nearest pot's.
  *
- * - Each detection is scored by its share of the frame area times its proximity to the centre,
- *   so a large label near the crosshair wins over a small one at the edge.
+ * - Each detection is scored by its share of the frame area, weighted down by up to
+ *   [SIDE_PENALTY] as it moves from the vertical middle of the frame to the left or right edge.
+ *   Size decides; horizontal position only separates labels of similar size. There is no
+ *   penalty for vertical position: the plant fills the middle of the frame and its label sits on
+ *   the rim above or below it.
  * - Hysteresis: once a target is chosen, a different label replaces it only when it scores
  *   [Config.switchMargin] times higher, so the target does not flicker between neighbours.
  * - A target is locked after [Config.framesToLock] frames in which it was seen and chosen.
@@ -95,18 +99,18 @@ class SingleTargetSelector(private val config: Config = Config()) {
     }
 
     companion object {
+        /** How much a label at the left or right edge loses against one on the vertical middle line. */
+        const val SIDE_PENALTY = 0.5f
+
         /**
-         * Frame-area share times centre proximity, in 0..1. Proximity falls linearly from 1 at the
-         * centre to 0 at the corners.
+         * Frame-area share times a horizontal weight, in 0..1. The weight falls linearly from 1 on
+         * the vertical middle line to 1 - [SIDE_PENALTY] at the left and right edges.
          */
         fun score(detection: Detection, frame: FrameSize): Float {
             val frameArea = frame.width.toFloat() * frame.height
-            val cx = frame.width / 2f
-            val cy = frame.height / 2f
-            val maxDistance = hypot(cx, cy)
-            val c = detection.center
-            val proximity = (1f - hypot(c.x - cx, c.y - cy) / maxDistance).coerceIn(0f, 1f)
-            return (detection.area / frameArea).coerceIn(0f, 1f) * proximity
+            val half = frame.width / 2f
+            val offset = (abs(detection.center.x - half) / half).coerceIn(0f, 1f)
+            return (detection.area / frameArea).coerceIn(0f, 1f) * (1f - SIDE_PENALTY * offset)
         }
 
         private fun State.target(): Detection? = when (this) {

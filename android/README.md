@@ -49,9 +49,11 @@ built:
 
 - **Live camera.** Analysis frames (720p by default; 1080p or the largest
   16:9 size can be picked) are decoded by ML Kit, zxing-cpp, or both on
-  alternate frames. In single-plant mode the app picks the label you
-  are aiming at, locks it after a few stable frames (with a haptic tick) and
-  copies its number when you tap. The bottom panel shows each decoder's
+  alternate frames. In single-plant mode the app picks the largest label in
+  the frame (the nearest pot's), preferring labels near the vertical middle
+  when sizes are close and ignoring vertical position, since the label sits on
+  the pot rim above or below the plant. It locks the label after a few stable
+  frames (with a haptic tick) and copies its number when you tap. The bottom panel shows each decoder's
   decode rate and latency over the last 120 frames.
 - **Bench.** Pick a folder of label photos. Each photo is made upright (EXIF
   orientation), scaled to a long side of 1280, 1920 and 2560 px in turn (the

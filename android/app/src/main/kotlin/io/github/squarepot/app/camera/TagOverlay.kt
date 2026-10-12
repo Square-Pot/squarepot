@@ -22,7 +22,7 @@ import io.github.squarepot.app.recognition.SingleTargetSelector.State
 import kotlin.math.max
 
 /**
- * Draws the crosshair, every detected label (thin), and the selected one (yellow while tracking,
+ * Draws every detected label (thin) and the selected one (yellow while tracking,
  * green when locked, with its number).
  *
  * Assumes the preview fills the view with centre crop (PreviewView FILL_CENTER) and shows the
@@ -32,7 +32,6 @@ import kotlin.math.max
 fun TagOverlay(state: CameraUiState, modifier: Modifier = Modifier) {
     val textMeasurer = rememberTextMeasurer()
     Canvas(modifier) {
-        drawCrosshair()
         val frame = state.frame ?: return@Canvas
         val map = FrameToView(frame, size.width, size.height)
 
@@ -74,14 +73,6 @@ private fun DrawScope.drawQuad(detection: Detection, map: FrameToView, color: Co
     }
     path.close()
     drawPath(path, color, style = Stroke(width))
-}
-
-private fun DrawScope.drawCrosshair() {
-    val arm = 16.dp.toPx()
-    val c = center
-    val color = Color.White.copy(alpha = 0.8f)
-    drawLine(color, Offset(c.x - arm, c.y), Offset(c.x + arm, c.y), 2.dp.toPx())
-    drawLine(color, Offset(c.x, c.y - arm), Offset(c.x, c.y + arm), 2.dp.toPx())
 }
 
 private val LOCKED = Color(0xFF4CAF50)
