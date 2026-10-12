@@ -8,7 +8,7 @@ import secrets
 from collections.abc import Iterator
 from typing import Annotated, Any, cast
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,12 +19,18 @@ from squarepot_server.api.models import (
     Error,
     FieldSchema,
     Health,
+    LabelFormat,
+    LabelRequest,
+    LabelTemplate,
     Plant,
     Sync,
     SyncKind,
     TagLookup,
 )
 from squarepot_server.db import CollectionRow, PlantRow, current_seq, get_meta
+from squarepot_server.labels.caption import caption
+from squarepot_server.labels.layout import TEMPLATES, Item, LayoutError, layout_pages
+from squarepot_server.labels.render import to_pdf, to_svg
 from squarepot_server.runtime import Runtime
 
 bearer = HTTPBearer(
@@ -34,6 +40,8 @@ bearer = HTTPBearer(
 
 
 CURSOR_SEQ = re.compile(r"[0-9]{1,18}")
+LABEL_TYPES = {LabelFormat.PDF: "application/pdf", LabelFormat.SVG: "image/svg+xml"}
+LABELS_TITLE = "Square-Pot labels"
 
 
 def get_runtime(request: Request) -> Runtime:
@@ -213,4 +221,99 @@ def sync(
         removed_collections=[row.id for row in collection_rows if row.removed],
         plants=[to_plant(row) for row in plant_rows if not row.removed],
         removed_plants=[row.id for row in plant_rows if row.removed],
+    )
+
+
+@router.get(
+    "/labels/templates",
+    tags=["labels"],
+    summary="List label templates",
+    description="Built-in label sizes and sheet layouts, to start a `/labels` request from.",
+)
+def list_label_templates() -> list[LabelTemplate]:
+    return list(TEMPLATES.values())
+
+
+def listed(values: list[str]) -> str:
+    shown = ", ".join(values[:10])
+    return shown + (f" and {len(values) - 10} more" if len(values) > 10 else "")
+
+
+@router.post(
+    "/labels",
+    tags=["labels"],
+    summary="Print labels for plants",
+    description=(
+        "Lays out a label for each plant on pages, as PDF (every page) or SVG (one page). "
+        "Each label holds the plant's code, whole and with its quiet zone, and a caption from "
+        "the preset. A layout too small for the code is refused with `422`, never cropped; "
+        "a caption too long for the label is shrunk, then cut short with an ellipsis."
+    ),
+    response_class=Response,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "The label sheet.",
+            "content": {
+                media_type: {"schema": {"type": "string", "format": "binary"}}
+                for media_type in LABEL_TYPES.values()
+            },
+            "headers": {
+                "X-Page-Count": {
+                    "description": "Number of pages in the layout.",
+                    "schema": {"type": "integer"},
+                }
+            },
+        },
+        **errors(status.HTTP_404_NOT_FOUND, status.HTTP_422_UNPROCESSABLE_CONTENT),
+    },
+)
+def create_labels(body: LabelRequest, session: SessionDep, runtime: RuntimeDep) -> Response:
+    template = TEMPLATES.get(body.template)
+    if template is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"No label template {body.template!r}."
+        )
+    preset = next((p for p in runtime.schema.presets if p.key == body.preset), None)
+    if preset is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No preset {body.preset!r}.")
+    layout = template.layout.model_copy(update=body.layout.model_dump(exclude_none=True))
+
+    rows = {
+        row.id: row
+        for row in session.scalars(
+            select(PlantRow).where(PlantRow.id.in_(set(body.plants)), ~PlantRow.removed)
+        )
+    }
+    if missing := [plant_id for plant_id in body.plants if plant_id not in rows]:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No plant with the id {listed(missing)}.")
+    if untagged := [plant_id for plant_id in body.plants if rows[plant_id].tag is None]:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"These plants have no number to print: {listed(untagged)}.",
+        )
+    items = [
+        Item(cast(str, rows[plant_id].tag), caption(runtime.schema, preset, rows[plant_id].fields))
+        for plant_id in body.plants
+    ]
+    try:
+        pages = layout_pages(layout, items, body.skip)
+    except LayoutError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
+
+    if body.format == LabelFormat.SVG:
+        if body.page > len(pages):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                f"There is no page {body.page}: the labels take {len(pages)}.",
+            )
+        content = to_svg(pages[body.page - 1], LABELS_TITLE)
+    else:
+        content = to_pdf(pages, LABELS_TITLE)
+    return Response(
+        content,
+        media_type=LABEL_TYPES[body.format],
+        headers={
+            "X-Page-Count": str(len(pages)),
+            "Content-Disposition": f'inline; filename="labels.{body.format.value}"',
+        },
     )

@@ -12,6 +12,7 @@ import pypdfium2
 import pytest
 import resvg_py
 import zxingcpp
+from fastapi.testclient import TestClient
 from PIL import Image
 
 from squarepot_server.api.models import LabelLayout, PageSize
@@ -351,3 +352,82 @@ def test_words_are_kept_whole_when_a_smaller_size_allows() -> None:
     area = Rect(0, 0, 14, 20)
     _, lines = fit(caption(SCHEMA, LABEL, PLANTS[2]), area, max_lines=6)
     assert "Gymnocalycium" in [text(line).split(" ")[0] for line in lines]
+
+
+# The API
+
+
+def test_templates_are_listed(client: TestClient) -> None:
+    body = client.get("/api/v1/labels/templates").json()
+    assert [template["key"] for template in body] == ["strip", "compact"]
+    assert body[0]["layout"]["module_mm"] == 1.2
+
+
+def test_labels_as_pdf(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/labels", json={"plants": ["main:004218", "main:004217"], "skip": 76}
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.headers["x-page-count"] == "2"
+    images = [
+        page.render(scale=DPI / 72).to_pil().convert("L")
+        for page in pypdfium2.PdfDocument(response.content)
+    ]
+    assert [[text for text, _, _ in decode(image)] for image in images] == [["004218"], ["004217"]]
+
+
+def test_labels_as_svg_page_by_page(client: TestClient) -> None:
+    request = {"plants": ["main:004217"] * 78, "format": "svg", "page": 2}
+    response = client.post("/api/v1/labels", json=request)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/svg+xml"
+    assert response.headers["x-page-count"] == "2"
+    png = resvg_py.svg_to_bytes(svg_string=response.text, dpi=DPI, background="#ffffff")
+    assert [text for text, _, _ in decode(Image.open(io.BytesIO(png)))] == ["004217"]
+
+
+def test_layout_overrides_apply(client: TestClient) -> None:
+    request = {
+        "plants": ["main:004217"],
+        "template": "compact",
+        "layout": {"page": "letter", "module_mm": 1.0, "width_mm": 12},
+        "format": "svg",
+    }
+    response = client.post("/api/v1/labels", json=request)
+    assert response.status_code == 200
+    assert 'width="215.9mm" height="279.4mm"' in response.text
+
+
+@pytest.mark.parametrize(
+    ("request_body", "status", "message"),
+    [
+        ({"plants": ["main:nope"]}, 404, "No plant with the id main:nope."),
+        ({"plants": ["main:004217"], "template": "huge"}, 422, "No label template 'huge'."),
+        ({"plants": ["main:004217"], "preset": "nope"}, 422, "No preset 'nope'."),
+        (
+            {"plants": ["main:004217"], "layout": {"width_mm": 10}},
+            422,
+            "A 10x35 mm label cannot hold a 12 mm code with its quiet zone",
+        ),
+        ({"plants": ["main:004217"], "format": "svg", "page": 2}, 422, "There is no page 2"),
+        ({"plants": []}, 422, "plants"),
+        ({"plants": ["main:004217"], "layout": {"module_mm": 0.3}}, 422, "module_mm"),
+    ],
+)
+def test_labels_errors(
+    client: TestClient, request_body: dict[str, object], status: int, message: str
+) -> None:
+    response = client.post("/api/v1/labels", json=request_body)
+    assert response.status_code == status
+    body = response.json()
+    assert body["code"] == ("not_found" if status == 404 else "invalid_request")
+    assert message in body["message"]
+
+
+def test_plants_without_a_number_cannot_be_labelled(client: TestClient) -> None:
+    sync = client.get("/api/v1/sync").json()
+    [untagged] = [plant["id"] for plant in sync["plants"] if plant["tag"] is None]
+    response = client.post("/api/v1/labels", json={"plants": ["main:004217", untagged]})
+    assert response.status_code == 422
+    assert response.json()["message"] == f"These plants have no number to print: {untagged}."

@@ -11,8 +11,8 @@ PostgreSQL (SQLite for a minimal install).
 
 A working prototype for one owner. It reads collections from Google Sheets
 through a service account, keeps a copy in its database, checks the sheets for
-changes in the background, and serves lookups by tag and the phone's sync.
-Labels, photo captions and assigning numbers come later.
+changes in the background, serves lookups by tag and the phone's sync, and
+prints label sheets. Photo captions and assigning numbers come later.
 
 ## API contract
 
@@ -27,6 +27,8 @@ fails when the committed file is out of date.
 | `GET /api/v1/collections` | Lists collections and how fresh the server's copy of each is. |
 | `GET /api/v1/plants/by-tag/{tag}` | Finds the plant with a label number. Leading zeros may be left out. |
 | `GET /api/v1/sync?cursor=…` | Returns the changes to the phone's local copy since a cursor, or a full copy ([ADR 0005](../docs/adr/0005-offline-first-phone.md)). |
+| `GET /api/v1/labels/templates` | Lists the built-in label sizes and sheet layouts. |
+| `POST /api/v1/labels` | Prints labels for plants, as a PDF or one SVG page. |
 
 Every route except `health` needs the operator's API token as
 `Authorization: Bearer <token>`. Every error has the same body:
@@ -94,6 +96,14 @@ HTTPS is in place.
   wherever it moves in the sheet. A plant without one is identified by its
   contents.
 - **Migrations.** The server applies its Alembic migrations at startup.
+- **Labels.** Each label holds the plant's number in a 10×10 Data Matrix
+  ([ADR 0001](../docs/adr/0001-label-code-format.md)) and a caption from the
+  `label` preset. The code is always printed whole, with a white quiet zone of
+  at least one module on the label: a layout too small for that is refused,
+  never cropped, and only the caption shrinks or is cut short. Text is
+  converted to outlines with the bundled [fonts](src/squarepot_server/labels/fonts/),
+  so printing needs no fonts installed. A test renders every template as SVG
+  and PDF and decodes every symbol with zxing-cpp.
 
 ## Development
 
