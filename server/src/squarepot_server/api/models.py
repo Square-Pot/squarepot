@@ -219,3 +219,101 @@ class Sync(ApiModel):
     removed_plants: list[str] = Field(
         description="Ids of plants removed since the cursor. Always empty in `full`.",
     )
+
+
+class PageSize(StrEnum):
+    A4 = "a4"
+    LETTER = "letter"
+
+
+class LabelFormat(StrEnum):
+    PDF = "pdf"
+    SVG = "svg"
+
+
+class LabelLayout(ApiModel):
+    """Label size and sheet layout. Lengths are in millimetres."""
+
+    width_mm: float = Field(gt=0, le=300, description="Label width.")
+    height_mm: float = Field(gt=0, le=300, description="Label height.")
+    module_mm: float = Field(
+        ge=0.5,
+        le=5,
+        description=(
+            "Size of one module of the code. The symbol is 10 modules wide, and a white quiet "
+            "zone of at least one module surrounds it on the label."
+        ),
+    )
+    max_lines: int = Field(
+        ge=0, le=20, description="Most caption lines under the code; `0` prints the code only."
+    )
+    caption_box: bool = Field(description="Draw a frame around the caption.")
+    show_number: bool = Field(
+        description="Print the six-digit number as the caption's first line; needs `max_lines`."
+    )
+    page: PageSize
+    margin_mm: float = Field(
+        ge=0,
+        le=50,
+        description=(
+            "Blank margin on every side of the page. Most printers cannot print the outer "
+            "3-5 mm, so a smaller margin can cut off the outer labels. Print at 100 %."
+        ),
+    )
+    gap_mm: float = Field(ge=0, le=50, description="Space between labels, where they are cut.")
+    cut_lines: bool = Field(
+        description="Draw thin grey cutting lines in the gaps; needs `gap_mm` of 0.1 or more."
+    )
+
+
+class LabelLayoutOverrides(ApiModel):
+    """Values that replace those of the template; omitted ones keep the template's."""
+
+    width_mm: float | None = Field(default=None, gt=0, le=300)
+    height_mm: float | None = Field(default=None, gt=0, le=300)
+    module_mm: float | None = Field(default=None, ge=0.5, le=5)
+    max_lines: int | None = Field(default=None, ge=0, le=20)
+    caption_box: bool | None = None
+    show_number: bool | None = None
+    page: PageSize | None = None
+    margin_mm: float | None = Field(default=None, ge=0, le=50)
+    gap_mm: float | None = Field(default=None, ge=0, le=50)
+    cut_lines: bool | None = None
+
+
+class LabelTemplate(ApiModel):
+    key: Key = Field(examples=["strip"])
+    label: Label
+    description: str
+    layout: LabelLayout
+
+
+class LabelRequest(ApiModel):
+    plants: list[str] = Field(
+        min_length=1,
+        max_length=2000,
+        description="Ids of the plants to label, in print order. Every plant must have a tag.",
+    )
+    template: Key = Field(
+        default="strip", description="Key of a template from `/labels/templates`."
+    )
+    preset: Key = Field(default="label", description="Key of the preset that makes the caption.")
+    layout: LabelLayoutOverrides = Field(default_factory=LabelLayoutOverrides)
+    format: LabelFormat = LabelFormat.PDF
+    page: int = Field(
+        default=1,
+        ge=1,
+        description=(
+            "Page to return as SVG, which holds one page; ignored for PDF, which holds them all. "
+            "The page count is in the `X-Page-Count` response header."
+        ),
+    )
+    skip: int = Field(
+        default=0,
+        ge=0,
+        le=1000,
+        description=(
+            "Label positions to leave empty at the start, to reuse a partly used sheet; "
+            "fewer than a page holds."
+        ),
+    )
