@@ -1,0 +1,15 @@
+# Keep secrets, local state and build output out of image build contexts.
+.git
+internal
+**/.env
+**/.env.*
+**/service-account*.json
+**/credentials*.json
+**/client_secret*.json
+**/.venv
+**/__pycache__
+**/.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
+**/node_modules
+**/build
