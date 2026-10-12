@@ -247,6 +247,129 @@
           }
         }
       }
+    },
+    "/api/v1/labels/templates": {
+      "get": {
+        "tags": [
+          "labels"
+        ],
+        "summary": "List label templates",
+        "description": "Built-in label sizes and sheet layouts, to start a `/labels` request from.",
+        "operationId": "list_label_templates",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LabelTemplate"
+                  },
+                  "type": "array",
+                  "title": "Response List Label Templates"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/labels": {
+      "post": {
+        "tags": [
+          "labels"
+        ],
+        "summary": "Print labels for plants",
+        "description": "Lays out a label for each plant on pages, as PDF (every page) or SVG (one page). Each label holds the plant's code, whole and with its quiet zone, and a caption from the preset. A layout too small for the code is refused with `422`, never cropped; a caption too long for the label is shrunk, then cut short with an ellipsis.",
+        "operationId": "create_labels",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The label sheet.",
+            "headers": {
+              "X-Page-Count": {
+                "description": "Number of pages in the layout.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -611,6 +734,324 @@
         ],
         "title": "Label",
         "description": "A name in each UI language."
+      },
+      "LabelFormat": {
+        "type": "string",
+        "enum": [
+          "pdf",
+          "svg"
+        ],
+        "title": "LabelFormat"
+      },
+      "LabelLayout": {
+        "properties": {
+          "width_mm": {
+            "type": "number",
+            "maximum": 300.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Width Mm",
+            "description": "Label width."
+          },
+          "height_mm": {
+            "type": "number",
+            "maximum": 300.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Height Mm",
+            "description": "Label height."
+          },
+          "module_mm": {
+            "type": "number",
+            "maximum": 5.0,
+            "minimum": 0.5,
+            "title": "Module Mm",
+            "description": "Size of one module of the code. The symbol is 10 modules wide, and a white quiet zone of at least one module surrounds it on the label."
+          },
+          "max_lines": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Max Lines",
+            "description": "Most caption lines under the code; `0` prints the code only."
+          },
+          "caption_box": {
+            "type": "boolean",
+            "title": "Caption Box",
+            "description": "Draw a frame around the caption."
+          },
+          "show_number": {
+            "type": "boolean",
+            "title": "Show Number",
+            "description": "Print the six-digit number as the caption's first line; needs `max_lines`."
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageSize"
+          },
+          "margin_mm": {
+            "type": "number",
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Margin Mm",
+            "description": "Blank margin on every side of the page. Most printers cannot print the outer 3-5 mm, so a smaller margin can cut off the outer labels. Print at 100 %."
+          },
+          "gap_mm": {
+            "type": "number",
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Gap Mm",
+            "description": "Space between labels, where they are cut."
+          },
+          "cut_lines": {
+            "type": "boolean",
+            "title": "Cut Lines",
+            "description": "Draw thin grey cutting lines in the gaps; needs `gap_mm` of 0.1 or more."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "width_mm",
+          "height_mm",
+          "module_mm",
+          "max_lines",
+          "caption_box",
+          "show_number",
+          "page",
+          "margin_mm",
+          "gap_mm",
+          "cut_lines"
+        ],
+        "title": "LabelLayout",
+        "description": "Label size and sheet layout. Lengths are in millimetres."
+      },
+      "LabelLayoutOverrides": {
+        "properties": {
+          "width_mm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 300.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width Mm"
+          },
+          "height_mm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 300.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Mm"
+          },
+          "module_mm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 5.0,
+                "minimum": 0.5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Module Mm"
+          },
+          "max_lines": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Lines"
+          },
+          "caption_box": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption Box"
+          },
+          "show_number": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Show Number"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PageSize"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "margin_mm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Mm"
+          },
+          "gap_mm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap Mm"
+          },
+          "cut_lines": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cut Lines"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "LabelLayoutOverrides",
+        "description": "Values that replace those of the template; omitted ones keep the template's."
+      },
+      "LabelRequest": {
+        "properties": {
+          "plants": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 2000,
+            "minItems": 1,
+            "title": "Plants",
+            "description": "Ids of the plants to label, in print order. Every plant must have a tag."
+          },
+          "template": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Template",
+            "description": "Key of a template from `/labels/templates`.",
+            "default": "strip",
+            "examples": [
+              "genus"
+            ]
+          },
+          "preset": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Preset",
+            "description": "Key of the preset that makes the caption.",
+            "default": "label",
+            "examples": [
+              "genus"
+            ]
+          },
+          "layout": {
+            "$ref": "#/components/schemas/LabelLayoutOverrides"
+          },
+          "format": {
+            "$ref": "#/components/schemas/LabelFormat",
+            "default": "pdf"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Page",
+            "description": "Page to return as SVG, which holds one page; ignored for PDF, which holds them all. The page count is in the `X-Page-Count` response header.",
+            "default": 1
+          },
+          "skip": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 0.0,
+            "title": "Skip",
+            "description": "Label positions to leave empty at the start, to reuse a partly used sheet; fewer than a page holds.",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "plants"
+        ],
+        "title": "LabelRequest"
+      },
+      "LabelTemplate": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Key",
+            "examples": [
+              "strip"
+            ]
+          },
+          "label": {
+            "$ref": "#/components/schemas/Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/LabelLayout"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "description",
+          "layout"
+        ],
+        "title": "LabelTemplate"
+      },
+      "PageSize": {
+        "type": "string",
+        "enum": [
+          "a4",
+          "letter"
+        ],
+        "title": "PageSize"
       },
       "Plant": {
         "properties": {
