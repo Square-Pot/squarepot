@@ -14,9 +14,10 @@ from squarepot_server.fields import load_schema
 from tests.conftest import HEADER, TOKEN, FakeStore, collection, runtime
 
 PROTECTED = [
-    path.replace("{tag}", "004217")
+    (method.upper(), path.replace("{tag}", "004217"))
     for path, operations in openapi.document()["paths"].items()
-    if any(operation.get("security") for operation in operations.values())
+    for method, operation in operations.items()
+    if operation.get("security")
 ]
 
 
@@ -28,20 +29,22 @@ def test_health_needs_no_token(client: TestClient) -> None:
 
 def test_every_route_but_health_is_protected() -> None:
     assert sorted(PROTECTED) == [
-        "/api/v1/collections",
-        "/api/v1/plants/by-tag/004217",
-        "/api/v1/schema",
-        "/api/v1/sync",
+        ("GET", "/api/v1/collections"),
+        ("GET", "/api/v1/labels/templates"),
+        ("GET", "/api/v1/plants/by-tag/004217"),
+        ("GET", "/api/v1/schema"),
+        ("GET", "/api/v1/sync"),
+        ("POST", "/api/v1/labels"),
     ]
 
 
-@pytest.mark.parametrize("path", PROTECTED)
+@pytest.mark.parametrize(("method", "path"), PROTECTED)
 @pytest.mark.parametrize("authorization", [None, "Bearer wrong-token", "Basic dGVzdA=="])
 def test_a_missing_or_wrong_token_is_refused(
-    client: TestClient, path: str, authorization: str | None
+    client: TestClient, method: str, path: str, authorization: str | None
 ) -> None:
     headers = {"Authorization": authorization or ""}
-    response = client.get(path, headers=headers)
+    response = client.request(method, path, headers=headers)
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == "Bearer"
     assert response.json()["code"] == "unauthorized"
