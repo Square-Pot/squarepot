@@ -64,6 +64,8 @@ repos:
     rev: v2.3.1
     hooks:
       - id: mypy
+        # Components with dependencies are type-checked in their own CI job.
+        files: ^schema/
         args: ["--strict"]
         additional_dependencies: ["types-PyYAML==6.0.12.20260906"]
 
