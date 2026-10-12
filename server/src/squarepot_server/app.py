@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""The FastAPI application."""
+
+from __future__ import annotations
+
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
+from starlette.exceptions import HTTPException
+
+from squarepot_server import __version__
+from squarepot_server.api import routes
+from squarepot_server.api.models import Error
+
+ERROR_CODES = {
+    status.HTTP_401_UNAUTHORIZED: "unauthorized",
+    status.HTTP_404_NOT_FOUND: "not_found",
+    status.HTTP_405_METHOD_NOT_ALLOWED: "method_not_allowed",
+    status.HTTP_422_UNPROCESSABLE_CONTENT: "invalid_request",
+    status.HTTP_501_NOT_IMPLEMENTED: "not_implemented",
+}
+
+
+def error_response(status_code: int, code: str, message: str) -> JSONResponse:
+    body = Error(code=code, message=message)
+    return JSONResponse(body.model_dump(), status_code=status_code)
+
+
+async def on_http_error(request: Request, exc: HTTPException) -> JSONResponse:
+    code = ERROR_CODES.get(exc.status_code, "error")
+    response = error_response(exc.status_code, code, str(exc.detail))
+    if exc.headers:
+        response.headers.update(exc.headers)
+    return response
+
+
+async def on_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+    # Starlette logs the traceback; the client gets no internals.
+    return error_response(
+        status.HTTP_500_INTERNAL_SERVER_ERROR, "internal_error", "Internal server error."
+    )
+
+
+async def on_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    message = "; ".join(
+        f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}" for error in exc.errors()
+    )
+    return error_response(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid_request", message)
+
+
+def operation_id(route: APIRoute) -> str:
+    """Use the handler's name as the operation id, for readable generated clients."""
+    return route.name
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="Square-Pot API",
+        version=__version__,
+        summary="Plant collections kept in Google Sheets, looked up by label number.",
+        license_info={"name": "AGPL-3.0-or-later", "identifier": "AGPL-3.0-or-later"},
+        generate_unique_id_function=operation_id,
+    )
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
+    app.add_exception_handler(HTTPException, on_http_error)  # type: ignore[arg-type]
+    app.add_exception_handler(RequestValidationError, on_validation_error)  # type: ignore[arg-type]
+    app.add_exception_handler(Exception, on_unexpected_error)
+    app.include_router(routes.public)
+    app.include_router(routes.router)
+    return app
