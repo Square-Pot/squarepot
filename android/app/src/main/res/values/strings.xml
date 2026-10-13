@@ -1,4 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Square-Pot</string>
+
+    <string name="copy_title">Local copy</string>
+    <string name="copy_never">Not downloaded yet</string>
+    <string name="copy_refreshed">Updated %1$s</string>
+    <string name="copy_refresh">Refresh</string>
+    <plurals name="copy_plants">
+        <item quantity="one">%d plant</item>
+        <item quantity="other">%d plants</item>
+    </plurals>
+    <string name="sync_running">Updating…</string>
+    <string name="sync_queued">Update waiting for a network</string>
+    <string name="sync_failed">Last update failed: %1$s</string>
+    <string name="server_missing">Enter the server address and token to download the copy.</string>
+
+    <string name="failure_unauthorized">the server rejected the token</string>
+    <string name="failure_network">no connection to the server</string>
+    <string name="failure_server">the server answered with an error</string>
+    <string name="failure_cleartext">this build connects over HTTPS only, and the address starts with http://</string>
+    <string name="failure_bad_response">the server\'s answer could not be read; the app may need an update</string>
+
+    <string name="lookup_title">Find by label number</string>
+    <string name="lookup_hint">Label number</string>
+    <string name="lookup_search">Find</string>
+    <string name="lookup_none">No plant with this number in the copy</string>
+    <string name="lookup_collision">Several plants share this number. Resolve it in the sheet.</string>
+
+    <string name="collections_title">Collections</string>
+    <string name="collection_server_never">The server has not read the sheet yet</string>
+    <string name="collection_server_synced">Server read the sheet %1$s</string>
+    <string name="collection_server_error">Sheet error: %1$s</string>
+
+    <string name="server_title">Server</string>
+    <string name="server_url">Server address</string>
+    <string name="server_url_hint" translatable="false">https://plants.example.org</string>
+    <string name="server_token">API token</string>
+    <string name="server_check">Check</string>
+    <string name="server_save">Save</string>
+    <string name="check_running">Checking…</string>
+    <string name="check_bad_url">Enter an address starting with https:// or http://</string>
+    <string name="check_bad_token">The token is empty or has characters it cannot contain: only Latin letters, digits and symbols, no spaces</string>
+    <plurals name="check_ok">
+        <item quantity="one">Connected: %d collection</item>
+        <item quantity="other">Connected: %d collections</item>
+    </plurals>
 </resources>
