@@ -1,4 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Square-Pot</string>
+
+    <string name="copy_title">Локальная копия</string>
+    <string name="copy_never">Ещё не загружена</string>
+    <string name="copy_refreshed">Обновлена %1$s</string>
+    <string name="copy_refresh">Обновить</string>
+    <plurals name="copy_plants">
+        <item quantity="one">%d растение</item>
+        <item quantity="few">%d растения</item>
+        <item quantity="many">%d растений</item>
+        <item quantity="other">%d растения</item>
+    </plurals>
+    <string name="sync_running">Обновляется…</string>
+    <string name="sync_queued">Обновление ждёт сети</string>
+    <string name="sync_failed">Последнее обновление не удалось: %1$s</string>
+    <string name="server_missing">Укажите адрес сервера и токен, чтобы загрузить копию.</string>
+
+    <string name="failure_unauthorized">сервер не принял токен</string>
+    <string name="failure_network">нет связи с сервером</string>
+    <string name="failure_server">сервер ответил ошибкой</string>
+    <string name="failure_cleartext">эта сборка подключается только по HTTPS, а адрес начинается с http://</string>
+    <string name="failure_bad_response">не удалось прочитать ответ сервера; возможно, нужно обновить приложение</string>
+
+    <string name="lookup_title">Поиск по номеру бирки</string>
+    <string name="lookup_hint">Номер бирки</string>
+    <string name="lookup_search">Найти</string>
+    <string name="lookup_none">В копии нет растения с этим номером</string>
+    <string name="lookup_collision">Этот номер у нескольких растений. Исправьте в таблице.</string>
+
+    <string name="collections_title">Коллекции</string>
+    <string name="collection_server_never">Сервер ещё не читал таблицу</string>
+    <string name="collection_server_synced">Сервер читал таблицу %1$s</string>
+    <string name="collection_server_error">Ошибка таблицы: %1$s</string>
+
+    <string name="server_title">Сервер</string>
+    <string name="server_url">Адрес сервера</string>
+    <string name="server_token">API-токен</string>
+    <string name="server_check">Проверить</string>
+    <string name="server_save">Сохранить</string>
+    <string name="check_running">Проверяю…</string>
+    <string name="check_bad_url">Введите адрес, начинающийся с https:// или http://</string>
+    <string name="check_bad_token">Токен пустой или содержит недопустимые символы: только латинские буквы, цифры и знаки, без пробелов</string>
+    <plurals name="check_ok">
+        <item quantity="one">Связь есть: %d коллекция</item>
+        <item quantity="few">Связь есть: %d коллекции</item>
+        <item quantity="many">Связь есть: %d коллекций</item>
+        <item quantity="other">Связь есть: %d коллекции</item>
+    </plurals>
 </resources>
