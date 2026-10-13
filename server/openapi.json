@@ -789,9 +789,9 @@
           "margin_mm": {
             "type": "number",
             "maximum": 50.0,
-            "minimum": 0.0,
+            "minimum": 5.0,
             "title": "Margin Mm",
-            "description": "Blank margin on every side of the page. Most printers cannot print the outer 3-5 mm, so a smaller margin can cut off the outer labels. Print at 100 %."
+            "description": "Blank margin on every side of the page, at least 5 mm: most printers cannot print the outer 3-5 mm. Print at 100 %."
           },
           "gap_mm": {
             "type": "number",
@@ -914,7 +914,7 @@
               {
                 "type": "number",
                 "maximum": 50.0,
-                "minimum": 0.0
+                "minimum": 5.0
               },
               {
                 "type": "null"

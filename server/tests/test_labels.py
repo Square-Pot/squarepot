@@ -413,6 +413,7 @@ def test_layout_overrides_apply(client: TestClient) -> None:
         ({"plants": ["main:004217"], "format": "svg", "page": 2}, 422, "There is no page 2"),
         ({"plants": []}, 422, "plants"),
         ({"plants": ["main:004217"], "layout": {"module_mm": 0.3}}, 422, "module_mm"),
+        ({"plants": ["main:004217"], "layout": {"margin_mm": 4.9}}, 422, "margin_mm"),
     ],
 )
 def test_labels_errors(
