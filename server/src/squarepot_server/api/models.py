@@ -231,6 +231,10 @@ class LabelFormat(StrEnum):
     SVG = "svg"
 
 
+# Most printers cannot print the outer 3-5 mm of a sheet.
+MIN_MARGIN_MM = 5
+
+
 class LabelLayout(ApiModel):
     """Label size and sheet layout. Lengths are in millimetres."""
 
@@ -253,11 +257,11 @@ class LabelLayout(ApiModel):
     )
     page: PageSize
     margin_mm: float = Field(
-        ge=0,
+        ge=MIN_MARGIN_MM,
         le=50,
         description=(
-            "Blank margin on every side of the page. Most printers cannot print the outer "
-            "3-5 mm, so a smaller margin can cut off the outer labels. Print at 100 %."
+            "Blank margin on every side of the page, at least 5 mm: most printers cannot "
+            "print the outer 3-5 mm. Print at 100 %."
         ),
     )
     gap_mm: float = Field(ge=0, le=50, description="Space between labels, where they are cut.")
@@ -276,7 +280,7 @@ class LabelLayoutOverrides(ApiModel):
     caption_box: bool | None = None
     show_number: bool | None = None
     page: PageSize | None = None
-    margin_mm: float | None = Field(default=None, ge=0, le=50)
+    margin_mm: float | None = Field(default=None, ge=MIN_MARGIN_MM, le=50)
     gap_mm: float | None = Field(default=None, ge=0, le=50)
     cut_lines: bool | None = None
 
