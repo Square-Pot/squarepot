@@ -1,16 +1,28 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""The CSV file store: the server without a Google account."""
+"""The CSV file store and the demo collection: the server without a Google account."""
 
 from __future__ import annotations
 
+import shutil
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 from pydantic import SecretStr, ValidationError
 
+from squarepot_server.app import create_app
 from squarepot_server.config import CollectionConfig, Settings, StoreKind
+from squarepot_server.fields import load_schema, parse_tab
+from squarepot_server.labels.caption import caption
 from squarepot_server.store import CsvFileStore, StoreError
-from tests.conftest import TOKEN
+from tests.conftest import TOKEN, runtime
+from tests.test_sync import ids, sync
+
+DEMO = Path(__file__).resolve().parents[1] / "demo" / "plants.csv"
+SCHEMA_FILE = Path(__file__).resolve().parents[2] / "schema" / "fields.yaml"
+# The tags of the A4 sample sheet of labels.
+SAMPLE_TAGS = [f"{n:06d}" for n in range(1, 78)]
 
 
 def file_collection(path: Path) -> CollectionConfig:
@@ -64,3 +76,68 @@ def test_collections_must_suit_the_store(
             store=store,
             collections=[CollectionConfig.model_validate(collection)],
         )
+
+
+def test_the_demo_collection_is_valid_and_matches_the_sample_sheet() -> None:
+    parsed = parse_tab(load_schema(SCHEMA_FILE), CsvFileStore().read(file_collection(DEMO)))
+    assert parsed.issues == []
+    assert [row.tag for row in parsed.rows if row.tag] == SAMPLE_TAGS
+    assert len(parsed.rows) > len(SAMPLE_TAGS)  # and some plants without a label yet
+
+
+def test_demo_names_follow_the_display_rules() -> None:
+    # The schema adds "aff." to an affinity itself, so the sheet holds only the epithet.
+    schema = load_schema(SCHEMA_FILE)
+    label = next(preset for preset in schema.presets if preset.key == "label")
+    parsed = parse_tab(schema, CsvFileStore().read(file_collection(DEMO)))
+    texts = [
+        " ".join("".join(run.text for run in item) for item in caption(schema, label, row.fields))
+        for row in parsed.rows
+    ]
+    assert not any("aff. aff." in text for text in texts)
+    assert sum(" aff. " in text for text in texts) > 0
+
+
+@pytest.fixture
+def demo(tmp_path: Path) -> Iterator[tuple[TestClient, Path]]:
+    path = tmp_path / "plants.csv"
+    shutil.copy(DEMO, path)
+    settings = Settings(
+        api_token=SecretStr(TOKEN),
+        database_url=f"sqlite:///{tmp_path / 'squarepot.db'}",
+        store=StoreKind.FILE,
+        collections=[file_collection(path)],
+        sync_interval_seconds=0,
+    )
+    with TestClient(create_app(settings), headers={"Authorization": f"Bearer {TOKEN}"}) as client:
+        runtime(client).syncer.run_once()
+        yield client, path
+
+
+def test_the_demo_syncs_and_numbers_are_found(demo: tuple[TestClient, Path]) -> None:
+    client, _ = demo
+    body = sync(client)
+    assert body["kind"] == "full"
+    assert body["collections"][0]["error"] is None
+    assert sorted(plant["tag"] for plant in body["plants"] if plant["tag"]) == SAMPLE_TAGS
+    found = client.get("/api/v1/plants/by-tag/000042")
+    assert found.status_code == 200
+    assert ids(found.json()["plants"]) == ["demo:000042"]
+
+
+def test_an_edit_of_the_file_reaches_the_delta(demo: tuple[TestClient, Path]) -> None:
+    client, path = demo
+    first = sync(client)
+    last = first["plants"][-1]["id"]
+    lines = path.read_text().splitlines()
+    edited = lines[1].replace(",alba,", ",nivea,")
+    assert edited != lines[1]
+    # Edit the first plant, remove the last one, and add one with a new number in its place.
+    path.write_text("\n".join([lines[0], edited, *lines[2:-1], "000078,,Demoa,,nova"]) + "\n")
+    runtime(client).syncer.run_once()
+    body = sync(client, first["cursor"])
+    assert body["kind"] == "delta"
+    assert ids(body["plants"]) == ["demo:000001", "demo:000078"]
+    assert body["plants"][0]["fields"]["species"] == "nivea"
+    assert body["removed_plants"] == [last]
+    assert client.get("/api/v1/plants/by-tag/000078").status_code == 200
