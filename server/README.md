@@ -12,7 +12,8 @@ PostgreSQL (SQLite for a minimal install).
 A working prototype for one owner. It reads collections from Google Sheets
 through a service account, keeps a copy in its database, checks the sheets for
 changes in the background, serves lookups by tag and the phone's sync, and
-prints label sheets. Photo captions and assigning numbers come later.
+prints label sheets. Photo captions and assigning numbers come later. A demo
+mode reads fictional plants from a CSV file instead, without a Google account.
 
 ## API contract
 
@@ -78,6 +79,32 @@ The prototype speaks plain HTTP. To reach it from a phone on your network, set
 `SQUAREPOT_LISTEN=0.0.0.0:8000`, but do not expose it to the internet until
 HTTPS is in place.
 
+### Demo mode
+
+To try the server, or to test a client end to end, without a Google account:
+the server reads [`demo/plants.csv`](demo/plants.csv), 80 fictional plants
+laid out like a sheet's tab. 77 of them have the numbers `000001` to `000077`,
+the same as an A4 sheet of `strip` labels, so a printed sample sheet scans to
+real plants. The other three have no number yet. From `deploy/`:
+
+```sh
+export SQUAREPOT_API_TOKEN=$(openssl rand -hex 32)
+docker compose -f compose.demo.yaml up -d --build
+curl -H "Authorization: Bearer $SQUAREPOT_API_TOKEN" http://127.0.0.1:8000/api/v1/plants/by-tag/000042
+```
+
+Compose needs `SQUAREPOT_API_TOKEN` for every command on this file, so stop the
+demo from the same shell with `docker compose -f compose.demo.yaml down`.
+
+The file is mounted read-only, and the server checks it every 5 seconds: edit
+it, and the change reaches `/api/v1/sync` as a delta, as an edit of the sheet
+would. To reach the demo from a phone, set `SQUAREPOT_LISTEN=0.0.0.0:8000` as
+well. Outside Docker, set `SQUAREPOT_STORE=file` and give each collection in
+`SQUAREPOT_COLLECTIONS` a `file` instead of a `spreadsheet_id` and `sheet`;
+keys meant for the other store are ignored. The file is UTF-8 with commas
+between fields, as most spreadsheets export CSV; a file saved with semicolons
+reads as one column and is reported as missing its `genus` column.
+
 ## How it works
 
 - **Sync.** Every `SQUAREPOT_SYNC_INTERVAL_SECONDS` (60 by default), the
@@ -87,8 +114,10 @@ HTTPS is in place.
   Google cannot be reached, the server keeps serving its last copy and reports
   the error.
 - **Storage adapter.** The sync talks to a `CollectionStore` interface
-  ([ADR 0003](../docs/adr/0003-spreadsheet-as-source-of-truth.md)). Google
-  Sheets is its only implementation, and the tests use an in-memory one.
+  ([ADR 0003](../docs/adr/0003-spreadsheet-as-source-of-truth.md)). It has
+  two implementations, chosen with `SQUAREPOT_STORE`: Google Sheets, and CSV
+  files for the demo, whose version is a hash of the file's content. The tests
+  also use an in-memory one.
 - **Change sequence.** Every change to a collection or plant takes the next
   number of one sequence, and removed rows are kept as tombstones. A sync
   cursor is a position in that sequence, so a delta is everything after it.

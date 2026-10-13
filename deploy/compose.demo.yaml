@@ -1,0 +1,26 @@
+# Square-Pot in demo mode: the server reads fictional plants from
+# server/demo/plants.csv instead of a Google Sheet, so no Google key is needed.
+# From this directory:
+#   export SQUAREPOT_API_TOKEN=$(openssl rand -hex 32)
+#   docker compose -f compose.demo.yaml up -d --build
+# Edit server/demo/plants.csv and the change reaches /api/v1/sync within seconds.
+name: squarepot-demo
+
+services:
+  server:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    environment:
+      SQUAREPOT_API_TOKEN: ${SQUAREPOT_API_TOKEN:?set SQUAREPOT_API_TOKEN, for example with openssl rand -hex 32}
+      SQUAREPOT_STORE: file
+      SQUAREPOT_COLLECTIONS: '[{"id": "demo", "name": "Demo plants", "file": "/demo/plants.csv"}]'
+      SQUAREPOT_SYNC_INTERVAL_SECONDS: "5"
+    volumes:
+      - ../server/demo:/demo:ro
+      - data:/data
+    ports:
+      - "${SQUAREPOT_LISTEN:-127.0.0.1:8000}:8000"
+
+volumes:
+  data:
