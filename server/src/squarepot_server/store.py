@@ -1,8 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Where collections are stored: the CollectionStore interface (ADR 0003) and Google Sheets."""
+"""Where collections are stored: the CollectionStore interface (ADR 0003), Sheets and CSV files."""
 
 from __future__ import annotations
 
+import csv
+import hashlib
+import io
 from pathlib import Path
 from typing import Any, Protocol, cast
 from urllib.parse import quote
@@ -60,17 +63,26 @@ class GoogleSheetsStore:
             raise StoreError(f"Google answered {response.status_code}: {message}")
         return cast(dict[str, Any], response.json())
 
+    @staticmethod
+    def tab(collection: CollectionConfig) -> tuple[str, str]:
+        # Settings make sure of both with this store.
+        if not (collection.spreadsheet_id and collection.sheet):
+            raise StoreError(f"collection {collection.id!r} has no spreadsheet_id and sheet")
+        return collection.spreadsheet_id, collection.sheet
+
     def version(self, collection: CollectionConfig) -> str:
+        spreadsheet_id, _ = self.tab(collection)
         body = self.get(
-            f"https://www.googleapis.com/drive/v3/files/{quote(collection.spreadsheet_id)}",
+            f"https://www.googleapis.com/drive/v3/files/{quote(spreadsheet_id)}",
             {"fields": "modifiedTime", "supportsAllDrives": "true"},
         )
         return str(body["modifiedTime"])
 
     def read(self, collection: CollectionConfig) -> list[list[Cell]]:
-        sheet = collection.sheet.replace("'", "''")
+        spreadsheet_id, sheet = self.tab(collection)
+        sheet = sheet.replace("'", "''")
         body = self.get(
-            f"https://sheets.googleapis.com/v4/spreadsheets/{quote(collection.spreadsheet_id)}"
+            f"https://sheets.googleapis.com/v4/spreadsheets/{quote(spreadsheet_id)}"
             f"/values/{quote(f"'{sheet}'", safe='')}",
             {
                 "valueRenderOption": "UNFORMATTED_VALUE",
@@ -79,3 +91,32 @@ class GoogleSheetsStore:
             },
         )
         return cast(list[list[Cell]], body.get("values", []))
+
+
+class CsvFileStore:
+    """Reads each collection from a CSV file laid out as a tab: a header row, then a plant per row.
+
+    For the demo and for trying Square-Pot without a Google account. Every cell is
+    text, as typed into a sheet; the file is read as UTF-8, with or without a
+    byte order mark, and fields are separated by commas only. Editing the file
+    is editing the sheet: the next sync sees it.
+    """
+
+    @staticmethod
+    def load(collection: CollectionConfig) -> bytes:
+        if collection.file is None:
+            raise StoreError(f"collection {collection.id!r} has no file")
+        try:
+            return collection.file.read_bytes()
+        except OSError as error:
+            raise StoreError(f"cannot read {collection.file}: {error.strerror}") from error
+
+    def version(self, collection: CollectionConfig) -> str:
+        return hashlib.sha256(self.load(collection)).hexdigest()
+
+    def read(self, collection: CollectionConfig) -> list[list[Cell]]:
+        try:
+            text = self.load(collection).decode("utf-8-sig")
+        except UnicodeDecodeError as error:
+            raise StoreError(f"{collection.file} is not UTF-8: {error}") from error
+        return [list[Cell](row) for row in csv.reader(io.StringIO(text, newline=""))]
