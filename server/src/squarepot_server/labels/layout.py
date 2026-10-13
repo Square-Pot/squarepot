@@ -44,9 +44,9 @@ TEMPLATES = {
                 width_mm=15,
                 height_mm=35,
                 module_mm=1.2,
-                max_lines=6,
+                max_lines=8,
                 caption_box=True,
-                show_number=False,
+                show_number=True,
                 page=PageSize.A4,
                 margin_mm=10,
                 gap_mm=2,
@@ -56,7 +56,10 @@ TEMPLATES = {
         LabelTemplate(
             key="compact",
             label=Label(en="Compact", ru="Компактная"),
-            description="The code and one line of caption, for the smallest pots.",
+            description=(
+                "The code and one line of caption, for the smallest pots; the line is the "
+                "caption, so the number is not printed."
+            ),
             layout=LabelLayout(
                 width_mm=15,
                 height_mm=20,

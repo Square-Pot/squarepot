@@ -67,14 +67,15 @@ def layout(template: str, **changes: object) -> LabelLayout:
 
 
 # Every template, and each at the edges of what it allows: the smallest label that holds the
-# symbol, the smallest module, no caption, no frame, the number printed, Letter paper.
+# symbol, the smallest module, no caption, no frame, with and without the number, Letter paper.
 CHANGES: dict[str, dict[str, Any]] = {
     "default": {},
     "smallest-module": {"module_mm": 0.5, "width_mm": 6, "height_mm": 12},
     "tightest-width": {"width_mm": 14.4},
     "large-module": {"module_mm": 2.0, "width_mm": 25, "height_mm": 45},
-    "code-only": {"max_lines": 0, "height_mm": 14.4, "width_mm": 14.4},
+    "code-only": {"max_lines": 0, "show_number": False, "height_mm": 14.4, "width_mm": 14.4},
     "no-frame-with-number": {"caption_box": False, "show_number": True},
+    "no-number": {"show_number": False},
     "letter-no-gap": {"page": PageSize.LETTER, "gap_mm": 0, "cut_lines": False},
     "tightest-gap": {"width_mm": 14.4, "gap_mm": 0.1, "cut_lines": True},
 }
@@ -210,7 +211,9 @@ def test_a_layout_too_small_is_an_error_not_a_crop(
 
 
 def test_the_smallest_label_that_holds_the_symbol_is_accepted() -> None:
-    [page] = layout_pages(layout("strip", width_mm=14.4, height_mm=14.4, max_lines=0), items(1))
+    [page] = layout_pages(
+        layout("strip", width_mm=14.4, height_mm=14.4, max_lines=0, show_number=False), items(1)
+    )
     [symbol] = page.symbols
     assert symbol.quiet == pytest.approx(symbol.label)
 
@@ -361,6 +364,8 @@ def test_templates_are_listed(client: TestClient) -> None:
     body = client.get("/api/v1/labels/templates").json()
     assert [template["key"] for template in body] == ["strip", "compact"]
     assert body[0]["layout"]["module_mm"] == 1.2
+    assert body[0]["layout"]["show_number"] is True
+    assert body[0]["layout"]["margin_mm"] == 10
 
 
 def test_labels_as_pdf(client: TestClient) -> None:
