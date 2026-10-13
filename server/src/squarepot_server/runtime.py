@@ -11,10 +11,10 @@ from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from squarepot_server.api.models import FieldSchema
-from squarepot_server.config import CollectionConfig, Settings
+from squarepot_server.config import CollectionConfig, Settings, StoreKind
 from squarepot_server.db import make_engine
 from squarepot_server.fields import Cell, load_schema
-from squarepot_server.store import CollectionStore, GoogleSheetsStore, StoreError
+from squarepot_server.store import CollectionStore, CsvFileStore, GoogleSheetsStore, StoreError
 from squarepot_server.sync import Syncer, SyncWorker, migrate
 
 log = logging.getLogger(__name__)
@@ -65,7 +65,9 @@ class Runtime:
         migrate(engine)
         sessions = sessionmaker(engine, expire_on_commit=False)
         schema = load_schema(settings.schema_file)
-        if store is None:
+        if store is None and settings.store == StoreKind.FILE:
+            store = CsvFileStore()
+        elif store is None:
             store = google_store(settings.google_credentials_file)
         syncer = Syncer(sessions, store, schema, settings.collections)
         syncer.prepare()
