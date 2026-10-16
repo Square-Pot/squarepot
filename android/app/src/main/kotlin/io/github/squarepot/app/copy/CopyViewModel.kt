@@ -105,7 +105,7 @@ class CopyViewModel(application: Application) : AndroidViewModel(application) {
             _check.value = try {
                 CheckResult.Reachable(container.check(settings)?.size ?: 0)
             } catch (e: IOException) {
-                CheckResult.Failed(SyncFailure.of(e))
+                CheckResult.Failed(SyncFailure.of(e, settings.baseUrl?.isHttps == false))
             }
         }
     }

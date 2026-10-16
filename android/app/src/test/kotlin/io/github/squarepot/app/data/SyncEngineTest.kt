@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -231,6 +232,16 @@ class SyncEngineTest {
         val outcome = engine.sync(SquarepotApi(server.url("/"), "secret", blocked))
         assertEquals(SyncOutcome.Failed(SyncFailure.CLEARTEXT), outcome)
         assertEquals("CLEARTEXT", db.copy().state()!!.failure)
+    }
+
+    @Test
+    fun `a TLS mismatch over https is a network failure, not cleartext`() = runTest {
+        val tlsMismatch = OkHttpClient.Builder()
+            .addInterceptor { throw UnknownServiceException("Unable to find acceptable protocols") }
+            .build()
+        val https = "https://plants.example.org/".toHttpUrl()
+        val outcome = engine.sync(SquarepotApi(https, "secret", tlsMismatch))
+        assertEquals(SyncOutcome.Failed(SyncFailure.NETWORK), outcome)
     }
 
     @Test
