@@ -20,6 +20,9 @@ import java.io.IOException
 class SquarepotApi(server: HttpUrl, private val token: String, private val client: OkHttpClient) {
     private val base = server.newBuilder().addPathSegments("api/v1").build()
 
+    /** Whether requests go over plain HTTP. */
+    val isCleartext: Boolean = !server.isHttps
+
     /** Changes since [cursor], or a full copy when [cursor] is null or can no longer be served. */
     suspend fun sync(cursor: String?): SyncResponse = get(
         "sync",

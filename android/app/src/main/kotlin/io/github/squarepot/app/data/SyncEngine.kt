@@ -39,12 +39,14 @@ enum class SyncFailure {
     ;
 
     companion object {
-        fun of(e: IOException) = when {
+        /** The failure behind [e], from a request sent over plain HTTP when [cleartext]. */
+        fun of(e: IOException, cleartext: Boolean) = when {
             e is ApiException && e.isUnauthorized -> UNAUTHORIZED
             e is ApiException && e.status == SquarepotApi.BAD_RESPONSE -> BAD_RESPONSE
             e is ApiException -> SERVER
-            // Thrown by OkHttp when the network security config forbids cleartext traffic.
-            e is UnknownServiceException -> CLEARTEXT
+            // OkHttp throws this when the network security config forbids cleartext traffic, and
+            // also when TLS versions or cipher suites don't match: only the first is CLEARTEXT.
+            e is UnknownServiceException && cleartext -> CLEARTEXT
             else -> NETWORK
         }
     }
@@ -82,7 +84,7 @@ class SyncEngine(private val db: CopyDatabase, private val clock: () -> Long = S
             apply(state, changes, schema)
             SyncOutcome.Updated(changes.kind)
         } catch (e: IOException) {
-            fail(state, SyncFailure.of(e))
+            fail(state, SyncFailure.of(e, api.isCleartext))
         }
     }
 
