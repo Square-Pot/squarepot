@@ -87,6 +87,14 @@ cultivars). The sheet holds plain values: `subspecies` contains `gracile`, not
 - A number is never reused, even after its row is deleted, because a printed
   label may still exist.
 
+## The label type
+
+The optional `label_type` column chooses the label template a plant is
+printed with: `h` for the horizontal label, empty or `v` for the vertical
+one, the default. It is read case-insensitively, and any other value is
+reported as invalid, so the plant gets the default. Choosing a template when
+printing overrides it.
+
 ## How Square-Pot writes
 
 Square-Pot writes to the sheet only when a user acts, never on its own.
