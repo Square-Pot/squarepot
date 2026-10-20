@@ -21,13 +21,16 @@ from squarepot_server.fields import load_schema
 from squarepot_server.labels import datamatrix
 from squarepot_server.labels.caption import caption
 from squarepot_server.labels.layout import (
+    COMFORT,
     CUT_GREY,
+    MAX_FONT,
     MIN_FONT,
     TEMPLATES,
     Item,
     LayoutError,
     Page,
     Rect,
+    comfortable_fit,
     fit,
     geometry,
     layout_pages,
@@ -316,6 +319,23 @@ def test_svg_and_pdf_are_well_formed() -> None:
     width, height = document[0].get_size()
     assert (width, height) == (pytest.approx(595.276, abs=0.01), pytest.approx(841.89, abs=0.01))
     assert b"/ViewerPreferences << /PrintScaling /None >>" in to_pdf(pages, "Labels")
+
+
+@pytest.mark.parametrize("key", ["horizontal", "vertical"])
+def test_a_short_caption_gets_room_and_a_long_one_takes_it_back(key: str) -> None:
+    template = layout(key)
+    left, right = COMFORT[template.orientation]
+    text = geometry(template).text
+    short = [[Run("SB 12", Style.BOLD)], [Run("Lithops", Style.ITALIC)]]
+    area, size, _ = comfortable_fit(short, text, template.max_lines, template.orientation)
+    assert size == MAX_FONT
+    assert area.x == pytest.approx(text.x + left)
+    assert area.x + area.width == pytest.approx(text.x + text.width - right)
+    long = [[Run("Conophytum " * 4, Style.ITALIC)]] * 3
+    area, size, _ = comfortable_fit(long, text, template.max_lines, template.orientation)
+    assert area.x < text.x + left
+    # It loses no font size to the extra room.
+    assert size == fit(long, text, template.max_lines)[0]
 
 
 @pytest.mark.parametrize("key", ["vertical", "horizontal"])
