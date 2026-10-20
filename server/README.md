@@ -135,7 +135,8 @@ reads as one column and is reported as missing its `genus` column.
   the spreadsheet's `modifiedTime`, a cheap call, and reads the tab, in one
   Sheets call, only when that has changed; that stays well within the default
   quotas. When Google cannot be reached, the server keeps serving its last
-  copy and reports the error.
+  copy and reports the error. A change to the field schema makes it read
+  every sheet again.
 - **Storage adapter.** The sync talks to a `CollectionStore` interface
   ([ADR 0003](../docs/adr/0003-spreadsheet-as-source-of-truth.md)). It has
   three implementations, chosen with `SQUAREPOT_STORE`: a Google Sheet by

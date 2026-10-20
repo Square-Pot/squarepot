@@ -157,6 +157,24 @@ def test_a_new_schema_version_rereads_sheets_and_resets_cursors(
     assert body["schema_version"] == 2
 
 
+def test_a_changed_field_rereads_sheets_without_resetting_cursors(
+    client: TestClient, store: FakeStore
+) -> None:
+    cursor = sync(client)["cursor"]
+    syncer = runtime(client).syncer
+    schema = syncer.schema.model_dump(by_alias=True)
+    for field in schema["fields"]:
+        if field["key"] == "species":
+            field["display"]["case"] = "as-is"
+    syncer.schema = FieldSchema.model_validate(schema)
+    reads = store.reads
+    syncer.run_once()
+    assert store.reads == reads + 1
+    assert sync(client, cursor)["kind"] == "delta"
+    syncer.run_once()
+    assert store.reads == reads + 1
+
+
 def test_untagged_rows_have_ids_too(client: TestClient) -> None:
     [untagged] = [plant for plant in sync(client)["plants"] if plant["tag"] is None]
     assert untagged["id"].startswith("main:h")
