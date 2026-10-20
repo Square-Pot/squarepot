@@ -42,6 +42,46 @@ jobs:
       - name: Scan full history
         run: gitleaks git --redact --verbose .
 
+  authors:
+    name: Commit authors
+    # Pull requests from this repository's own branches; outside contributors work from forks.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check every commit's author and committer
+        # The owner's identity, Dependabot, and GitHub itself (web edits, merges, signed bot commits).
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          ALLOWED: |-
+            596713+spalk@users.noreply.github.com
+            49699333+dependabot[bot]@users.noreply.github.com
+            noreply@github.com
+        run: |
+          # Written first, so that a failing git log stops the step instead of checking nothing.
+          commits="${RUNNER_TEMP}/commits.tsv"
+          git log --format='%h%x09%ae%x09%ce%x09%s' "${BASE}..${HEAD}" > "${commits}"
+          test -s "${commits}"
+          status=0
+          while IFS=$'\t' read -r commit author committer subject; do
+            for email in "${author}" "${committer}"; do
+              if ! grep --quiet --line-regexp --fixed-strings -- "${email}" <<< "${ALLOWED}"; then
+                echo "::error::${commit} ${subject}: ${email} is not an allowed author or committer"
+                status=1
+              fi
+            done
+          done < "${commits}"
+          if [ "${status}" -ne 0 ]; then
+            echo "Set the identity with git config user.email, then rewrite the commits, e.g."
+            echo "git rebase --exec 'git commit --amend --no-edit --reset-author' ${BASE}"
+          fi
+          exit "${status}"
+
   lint:
     name: Lint
     runs-on: ubuntu-24.04
