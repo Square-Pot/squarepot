@@ -1,0 +1,14 @@
+# Adds the service account's key to compose.yaml, for private sheets
+# (SQUAREPOT_STORE=google). Use both files, for example with
+# COMPOSE_FILE=compose.yaml:compose.google.yaml in .env.
+services:
+  server:
+    environment:
+      SQUAREPOT_GOOGLE_CREDENTIALS_FILE: /run/secrets/google-service-account
+    secrets:
+      - google-service-account
+
+secrets:
+  google-service-account:
+    # The service account's JSON key. Keep it out of the repository.
+    file: ${SQUAREPOT_GOOGLE_KEY_FILE:-./service-account.json}

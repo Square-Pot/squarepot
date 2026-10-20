@@ -9,11 +9,12 @@ PostgreSQL (SQLite for a minimal install).
 
 ## Status
 
-A working prototype for one owner. It reads collections from Google Sheets
-through a service account, keeps a copy in its database, checks the sheets for
-changes in the background, serves lookups by tag and the phone's sync, and
-prints label sheets. Photo captions and assigning numbers come later. A demo
-mode reads fictional plants from a CSV file instead, without a Google account.
+A working prototype for one owner. It reads collections from Google Sheets,
+shared by link or through a service account, keeps a copy in its database,
+checks the sheets for changes in the background, serves lookups by tag and the
+phone's sync, and prints label sheets. Photo captions and assigning numbers
+come later. A demo mode reads fictional plants from a CSV file instead,
+without a Google account.
 
 ## API contract
 
@@ -38,22 +39,20 @@ when the client accepts it.
 
 ## Running it
 
-You need Docker with Compose, and a Google Cloud project.
+You need Docker with Compose.
 
-1. **Create a service account.** In the
-   [Google Cloud console](https://console.cloud.google.com/), enable the
-   **Google Sheets API** and the **Google Drive API** for your project. Create
-   a service account and a JSON key for it. Save the key as
-   `deploy/service-account.json`, which git ignores. Never commit it.
-2. **Share the sheet.** In Google Sheets, share each collection's spreadsheet
-   with the service account's email (`…@….iam.gserviceaccount.com`) as
-   **Viewer**. The tab's layout is described in
-   [docs/sheet-format.md](../docs/sheet-format.md).
-3. **Configure.** In `deploy/`, copy `.env.example` to `.env`. Set
+1. **Share the sheet.** In Google Sheets, choose **Share**, then under
+   **General access** choose **Anyone with the link**, as **Viewer**. The
+   tab's layout is described in [docs/sheet-format.md](../docs/sheet-format.md).
+   Anyone who learns the sheet's id can then read it; for a private sheet, see
+   [A private sheet](#a-private-sheet) below.
+2. **Configure.** In `deploy/`, copy `.env.example` to `.env`. Set
    `SQUAREPOT_API_TOKEN` (for example, `openssl rand -hex 32`) and list your
    collections in `SQUAREPOT_COLLECTIONS`, with the spreadsheet id from the
-   sheet's URL and the tab's name.
-4. **Start.** From `deploy/`:
+   sheet's URL (`docs.google.com/spreadsheets/d/<id>/edit`). The first tab is
+   read; to read another, add its `gid`, the number after `#gid=` in the URL
+   when that tab is open.
+3. **Start.** From `deploy/`:
 
    ```sh
    docker compose up -d --build
@@ -67,8 +66,10 @@ curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/v1/collections
 ```
 
 Each collection's `error` explains a failed sync, such as a sheet that is not
-shared with the service account or a tab without a `genus` column. Problems
-with single cells do not stop the import.
+shared by link or a tab without a `genus` column. Problems with single cells
+do not stop the import. A sheet read by link is downloaded with its values as
+displayed, so a date must display as `YYYY-MM-DD` or `DD.MM.YYYY` and a
+decimal with a dot ([docs/sheet-format.md](../docs/sheet-format.md#values)).
 
 The database lives in the `data` volume. With the default SQLite, back it up
 with `docker compose cp server:/data/squarepot.db .`: it holds the registry of
@@ -78,6 +79,26 @@ issued numbers, which the sheets cannot fully restore
 The prototype speaks plain HTTP. To reach it from a phone on your network, set
 `SQUAREPOT_LISTEN=0.0.0.0:8000`, but do not expose it to the internet until
 HTTPS is in place.
+
+### A private sheet
+
+A sheet that is not shared by link is read with a Google service account
+instead, through the Sheets and Drive APIs.
+
+1. **Create a service account.** In the
+   [Google Cloud console](https://console.cloud.google.com/), enable the
+   **Google Sheets API** and the **Google Drive API** for your project. Create
+   a service account and a JSON key for it. Save the key as
+   `deploy/service-account.json`, which git ignores. Never commit it.
+2. **Share the sheet** with the service account's email
+   (`…@….iam.gserviceaccount.com`) as **Viewer**.
+3. **Configure.** In `.env`, set `SQUAREPOT_STORE=google` and
+   `COMPOSE_FILE=compose.yaml:compose.google.yaml`, which passes the key to the
+   server. Each collection in `SQUAREPOT_COLLECTIONS` names its tab with
+   `sheet` instead of `gid`.
+
+Assigning numbers, when it comes, will write to the sheet, and so will need a
+service account: a link gives read-only access.
 
 ### Demo mode
 
@@ -108,16 +129,19 @@ reads as one column and is reported as missing its `genus` column.
 ## How it works
 
 - **Sync.** Every `SQUAREPOT_SYNC_INTERVAL_SECONDS` (60 by default), the
-  server asks Drive for each spreadsheet's `modifiedTime`, a cheap call. Only
-  when that has changed does it read the tab, in one Sheets call, and apply the
-  differences to its copy. That stays well within the default quotas. When
-  Google cannot be reached, the server keeps serving its last copy and reports
-  the error.
+  server checks each collection for changes and applies only the differences
+  to its copy. A sheet shared by link is downloaded as CSV, and its version is
+  a hash of the download. With a service account, the server asks Drive for
+  the spreadsheet's `modifiedTime`, a cheap call, and reads the tab, in one
+  Sheets call, only when that has changed; that stays well within the default
+  quotas. When Google cannot be reached, the server keeps serving its last
+  copy and reports the error.
 - **Storage adapter.** The sync talks to a `CollectionStore` interface
   ([ADR 0003](../docs/adr/0003-spreadsheet-as-source-of-truth.md)). It has
-  two implementations, chosen with `SQUAREPOT_STORE`: Google Sheets, and CSV
-  files for the demo, whose version is a hash of the file's content. The tests
-  also use an in-memory one.
+  three implementations, chosen with `SQUAREPOT_STORE`: a Google Sheet by
+  link (`link`, the default), a Google Sheet through a service account
+  (`google`), and CSV files for the demo (`file`), whose version is a hash of
+  the file's content. The tests also use an in-memory one.
 - **Change sequence.** Every change to a collection or plant takes the next
   number of one sequence, and removed rows are kept as tombstones. A sync
   cursor is a position in that sequence, so a delta is everything after it.

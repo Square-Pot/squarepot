@@ -15,17 +15,21 @@ DEFAULT_SCHEMA_FILE = Path(__file__).resolve().parents[3] / "schema" / "fields.y
 
 
 class StoreKind(StrEnum):
+    LINK = "link"
     GOOGLE = "google"
     FILE = "file"
 
 
 class CollectionConfig(BaseModel):
-    """One collection: a tab of a spreadsheet shared with the service account, or a CSV file."""
+    """One collection: a tab of a Google Sheet, or a CSV file laid out as one."""
 
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]*$")
     name: str = Field(min_length=1)
     spreadsheet_id: str | None = Field(default=None, min_length=1)
-    sheet: str | None = Field(default=None, min_length=1, description="Tab name.")
+    sheet: str | None = Field(
+        default=None, min_length=1, description="Tab name, for the google store."
+    )
+    gid: int | None = Field(default=None, ge=0, description="Tab id, for a sheet read by link.")
     file: Path | None = Field(default=None, description="CSV file, laid out as a tab.")
 
 
@@ -34,7 +38,7 @@ class Settings(BaseSettings):
 
     api_token: SecretStr = Field(min_length=16)
     database_url: str = "sqlite:///data/squarepot.db"
-    store: StoreKind = StoreKind.GOOGLE
+    store: StoreKind = StoreKind.LINK
     google_credentials_file: Path | None = None
     collections: list[CollectionConfig] = []
     sync_interval_seconds: float = Field(default=60, ge=0)
@@ -43,6 +47,21 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def collections_match_the_store(self) -> Settings:
         for collection in self.collections:
+            if self.store == StoreKind.LINK and not collection.spreadsheet_id:
+                raise ValueError(
+                    f"collection {collection.id!r} needs a spreadsheet_id with the link store"
+                )
+            if self.store == StoreKind.LINK and collection.sheet is not None:
+                raise ValueError(
+                    f"collection {collection.id!r} names a sheet, which the link store cannot "
+                    "choose by name: give the tab's gid (the number after #gid= in its URL) "
+                    "instead, or neither for the first tab"
+                )
+            if self.store == StoreKind.GOOGLE and collection.gid is not None:
+                raise ValueError(
+                    f"collection {collection.id!r} has a gid, which the google store does not "
+                    "use: name the tab with sheet instead"
+                )
             if self.store == StoreKind.GOOGLE and not (
                 collection.spreadsheet_id and collection.sheet
             ):

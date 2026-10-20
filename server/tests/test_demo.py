@@ -65,6 +65,7 @@ def test_an_unreadable_file_is_a_store_error(tmp_path: Path) -> None:
     [
         (StoreKind.FILE, {"id": "demo", "name": "Demo"}, "needs a file"),
         (StoreKind.GOOGLE, {"id": "demo", "name": "Demo", "file": "a.csv"}, "spreadsheet_id"),
+        (StoreKind.LINK, {"id": "demo", "name": "Demo", "file": "a.csv"}, "spreadsheet_id"),
     ],
 )
 def test_collections_must_suit_the_store(

@@ -1,6 +1,8 @@
 # Square-Pot, self-hosted. From this directory:
 #   cp .env.example .env    # then fill it in
 #   docker compose up -d --build
+# This reads sheets shared by link. For a private sheet read with a service
+# account, add compose.google.yaml (see COMPOSE_FILE in .env.example).
 name: squarepot
 
 services:
@@ -9,20 +11,11 @@ services:
       context: ..
       dockerfile: server/Dockerfile
     env_file: .env
-    environment:
-      SQUAREPOT_GOOGLE_CREDENTIALS_FILE: /run/secrets/google-service-account
-    secrets:
-      - google-service-account
     volumes:
       - data:/data
     ports:
       - "${SQUAREPOT_LISTEN:-127.0.0.1:8000}:8000"
     restart: unless-stopped
-
-secrets:
-  google-service-account:
-    # The service account's JSON key. Keep it out of the repository.
-    file: ${SQUAREPOT_GOOGLE_KEY_FILE:-./service-account.json}
 
 volumes:
   data:
