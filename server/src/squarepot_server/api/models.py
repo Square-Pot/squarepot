@@ -231,6 +231,11 @@ class LabelFormat(StrEnum):
     SVG = "svg"
 
 
+class LabelOrientation(StrEnum):
+    VERTICAL = "vertical"
+    HORIZONTAL = "horizontal"
+
+
 # Most printers cannot print the outer 3-5 mm of a sheet.
 MIN_MARGIN_MM = 5
 
@@ -238,8 +243,30 @@ MIN_MARGIN_MM = 5
 class LabelLayout(ApiModel):
     """Label size and sheet layout. Lengths are in millimetres."""
 
+    orientation: LabelOrientation = Field(
+        description=(
+            "`vertical`: the code on top and the caption under it. `horizontal`: the caption "
+            "on the left and the code on the right."
+        )
+    )
     width_mm: float = Field(gt=0, le=300, description="Label width.")
-    height_mm: float = Field(gt=0, le=300, description="Label height.")
+    height_mm: float = Field(gt=0, le=300, description="Label height, burial zone included.")
+    burial_mm: float = Field(
+        ge=0,
+        le=300,
+        description=(
+            "Height of the white zone at the bottom of the label that goes into the substrate. "
+            "Nothing is printed in it, and a dashed grey line marks the soil level."
+        ),
+    )
+    chamfer_mm: float = Field(
+        ge=0,
+        le=50,
+        description=(
+            "How far the burial zone's bottom corners are cut in, so that the label goes into "
+            "the substrate easily; drawn as grey cutting lines. Needs `burial_mm`."
+        ),
+    )
     module_mm: float = Field(
         ge=0.5,
         le=5,
@@ -249,7 +276,7 @@ class LabelLayout(ApiModel):
         ),
     )
     max_lines: int = Field(
-        ge=0, le=20, description="Most caption lines under the code; `0` prints the code only."
+        ge=0, le=20, description="Most caption lines beside the code; `0` prints the code only."
     )
     caption_box: bool = Field(description="Draw a frame around the caption.")
     show_number: bool = Field(
@@ -273,8 +300,11 @@ class LabelLayout(ApiModel):
 class LabelLayoutOverrides(ApiModel):
     """Values that replace those of the template; omitted ones keep the template's."""
 
+    orientation: LabelOrientation | None = None
     width_mm: float | None = Field(default=None, gt=0, le=300)
     height_mm: float | None = Field(default=None, gt=0, le=300)
+    burial_mm: float | None = Field(default=None, ge=0, le=300)
+    chamfer_mm: float | None = Field(default=None, ge=0, le=50)
     module_mm: float | None = Field(default=None, ge=0.5, le=5)
     max_lines: int | None = Field(default=None, ge=0, le=20)
     caption_box: bool | None = None
@@ -286,7 +316,7 @@ class LabelLayoutOverrides(ApiModel):
 
 
 class LabelTemplate(ApiModel):
-    key: Key = Field(examples=["strip"])
+    key: Key = Field(examples=["vertical"])
     label: Label
     description: str
     layout: LabelLayout
@@ -299,7 +329,7 @@ class LabelRequest(ApiModel):
         description="Ids of the plants to label, in print order. Every plant must have a tag.",
     )
     template: Key = Field(
-        default="strip", description="Key of a template from `/labels/templates`."
+        default="vertical", description="Key of a template from `/labels/templates`."
     )
     preset: Key = Field(default="label", description="Key of the preset that makes the caption.")
     layout: LabelLayoutOverrides = Field(default_factory=LabelLayoutOverrides)

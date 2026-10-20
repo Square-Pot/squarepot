@@ -5,6 +5,9 @@ The one rule that is never bent: every symbol is printed whole, with a white
 quiet zone of at least one module on the label around it. A label too small
 for that is an error, never a crop; only the caption gives way, by shrinking
 and then being cut short.
+
+A label has a visible part, which holds the code and the caption, and may
+have a white burial zone under it that goes into the substrate.
 """
 
 from __future__ import annotations
@@ -13,7 +16,13 @@ import math
 from dataclasses import dataclass, field
 from itertools import pairwise
 
-from squarepot_server.api.models import Label, LabelLayout, LabelTemplate, PageSize
+from squarepot_server.api.models import (
+    Label,
+    LabelLayout,
+    LabelOrientation,
+    LabelTemplate,
+    PageSize,
+)
 from squarepot_server.labels import datamatrix
 from squarepot_server.labels.text import Command, Run, font, truncate, width, words, wrap
 
@@ -30,6 +39,7 @@ TEXT_PAD = 0.4
 BOX_LINE = 0.15
 CUT_LINE = 0.1
 CUT_GREY = 0.6
+SOIL_DASH = 1.0
 # Tolerance for lengths given in decimal millimetres.
 EPSILON = 1e-9
 
@@ -37,12 +47,18 @@ TEMPLATES = {
     template.key: template
     for template in [
         LabelTemplate(
-            key="strip",
-            label=Label(en="Strip", ru="Полоска"),
-            description="An upright strip for a pot: the code on top, the caption under it.",
+            key="vertical",
+            label=Label(en="Vertical", ru="Вертикальная"),
+            description=(
+                "An upright label for a pot: the code on top, the caption under it, and a "
+                "white zone at the bottom that goes into the substrate."
+            ),
             layout=LabelLayout(
+                orientation=LabelOrientation.VERTICAL,
                 width_mm=15,
-                height_mm=35,
+                height_mm=60,
+                burial_mm=25,
+                chamfer_mm=0,
                 module_mm=1.2,
                 max_lines=8,
                 caption_box=True,
@@ -54,19 +70,22 @@ TEMPLATES = {
             ),
         ),
         LabelTemplate(
-            key="compact",
-            label=Label(en="Compact", ru="Компактная"),
+            key="horizontal",
+            label=Label(en="Horizontal", ru="Горизонтальная"),
             description=(
-                "The code and one line of caption, for the smallest pots; the line is the "
-                "caption, so the number is not printed."
+                "A wide, low label for low plants: the caption and the code side by side above "
+                "the soil, and a white zone with cut corners that goes into the substrate."
             ),
             layout=LabelLayout(
-                width_mm=15,
-                height_mm=20,
+                orientation=LabelOrientation.HORIZONTAL,
+                width_mm=76,
+                height_mm=30,
+                burial_mm=15,
+                chamfer_mm=5,
                 module_mm=1.2,
-                max_lines=1,
+                max_lines=4,
                 caption_box=True,
-                show_number=False,
+                show_number=True,
                 page=PageSize.A4,
                 margin_mm=10,
                 gap_mm=2,
@@ -89,11 +108,12 @@ class Rect:
     height: float
 
     def contains(self, other: Rect) -> bool:
+        # Within EPSILON: positions on a page carry float error from adding lengths.
         return (
-            self.x <= other.x
-            and self.y <= other.y
-            and other.x + other.width <= self.x + self.width
-            and other.y + other.height <= self.y + self.height
+            self.x <= other.x + EPSILON
+            and self.y <= other.y + EPSILON
+            and other.x + other.width <= self.x + self.width + EPSILON
+            and other.y + other.height <= self.y + self.height + EPSILON
         )
 
 
@@ -105,6 +125,8 @@ class Line:
     y2: float
     width: float
     grey: float
+    # Length of each dash and of each space between them; 0 draws a solid line.
+    dash: float = 0
 
 
 @dataclass(frozen=True)
@@ -136,36 +158,60 @@ class Item:
 
 @dataclass(frozen=True)
 class Geometry:
-    symbol_top: float
-    symbol_left: float
-    symbol_size: float
-    caption_top: float
+    """Where things go on a label, relative to its top left corner."""
+
+    symbol: Rect
+    # Outer edge of the caption's frame; the text sits inside it.
+    frame: Rect
+    text: Rect
+    # Height of the visible part, above the burial zone.
+    visible: float
 
 
 def geometry(layout: LabelLayout) -> Geometry:
     """Where the symbol goes on a label; raises LayoutError when it cannot go whole."""
     module = layout.module_mm
     size = datamatrix.SIZE * module
-    needed = size + 2 * QUIET_MODULES * module
-    side = (layout.width_mm - size) / 2
-    top = min(side, 2 * QUIET_MODULES * module)
-    if (
-        layout.width_mm < needed - EPSILON
-        or layout.height_mm < top + size + QUIET_MODULES * module - EPSILON
-    ):
+    quiet = QUIET_MODULES * module
+    needed = size + 2 * quiet
+    visible = layout.height_mm - layout.burial_mm
+    horizontal = layout.orientation == LabelOrientation.HORIZONTAL
+    name = f"A {layout.width_mm:g}x{layout.height_mm:g} mm label"
+    if layout.burial_mm and visible <= EPSILON:
+        raise LayoutError(f"{name} has no visible part above its {layout.burial_mm:g} mm burial.")
+    if horizontal:
+        top = (visible - size) / 2
+        side = min(top, 2 * quiet)
+        symbol = Rect(layout.width_mm - side - size, top, size, size)
+        fits = visible >= needed - EPSILON and layout.width_mm >= needed - EPSILON
+        frame = Rect(EDGE, EDGE, symbol.x - quiet - EDGE, visible - 2 * EDGE)
+    else:
+        side = (layout.width_mm - size) / 2
+        top = min(side, 2 * quiet)
+        symbol = Rect(side, top, size, size)
+        fits = layout.width_mm >= needed - EPSILON and visible >= top + size + quiet - EPSILON
+        caption_top = top + size + quiet
+        frame = Rect(EDGE, caption_top, layout.width_mm - 2 * EDGE, visible - EDGE - caption_top)
+    if not fits:
+        burial = f" above a {layout.burial_mm:g} mm burial" if layout.burial_mm else ""
         raise LayoutError(
-            f"A {layout.width_mm:g}x{layout.height_mm:g} mm label cannot hold a "
-            f"{size:g} mm code with its quiet zone: it needs at least "
-            f"{needed:g}x{needed:g} mm, or a smaller module_mm."
+            f"{name} cannot hold a {size:g} mm code with its quiet zone{burial}: it needs "
+            f"at least {needed:g}x{needed:g} mm visible, or a smaller module_mm."
         )
-    caption_top = top + size + QUIET_MODULES * module
-    if (
-        layout.max_lines
-        and caption_area(layout, caption_top).height < MIN_FONT * LINE_HEIGHT - EPSILON
+    pad = TEXT_PAD if layout.caption_box else 0
+    text = Rect(
+        frame.x + pad,
+        frame.y + pad,
+        max(frame.width - 2 * pad, 0),
+        max(frame.height - 2 * pad, 0),
+    )
+    if layout.max_lines and (
+        text.height < MIN_FONT * LINE_HEIGHT - EPSILON or text.width < MIN_FONT - EPSILON
     ):
+        where = "beside" if horizontal else "under"
         raise LayoutError(
-            f"A {layout.width_mm:g}x{layout.height_mm:g} mm label has no room for a caption "
-            f"under the code: make it taller, or set max_lines to 0."
+            f"{name} has no room for a caption {where} the code: make it "
+            f"{'wider' if horizontal else 'taller'}, or set max_lines to 0."
         )
     if layout.show_number and not layout.max_lines:
         raise LayoutError(
@@ -177,15 +223,16 @@ def geometry(layout: LabelLayout) -> Geometry:
             f"Cut lines need a gap of at least {CUT_LINE:g} mm between labels, or they would "
             f"run over the labels: widen gap_mm, or set cut_lines to false."
         )
-    return Geometry(top, side, size, caption_top)
-
-
-def caption_area(layout: LabelLayout, caption_top: float) -> Rect:
-    """The text area of the caption, relative to the label's top left corner."""
-    inset = EDGE + (TEXT_PAD if layout.caption_box else 0)
-    top = caption_top + (TEXT_PAD if layout.caption_box else 0)
-    bottom = layout.height_mm - inset
-    return Rect(inset, top, layout.width_mm - 2 * inset, max(bottom - top, 0))
+    if layout.chamfer_mm and not layout.burial_mm:
+        raise LayoutError(
+            "Only a burial zone has corners to cut: set burial_mm, or chamfer_mm to 0."
+        )
+    if 2 * layout.chamfer_mm > layout.width_mm + EPSILON:
+        raise LayoutError(
+            f"A {layout.chamfer_mm:g} mm chamfer on each corner is wider than the "
+            f"{layout.width_mm:g} mm label: make chamfer_mm smaller."
+        )
+    return Geometry(symbol, frame, text, visible)
 
 
 def fit(items: list[list[Run]], area: Rect, max_lines: int) -> tuple[float, list[list[Run]]]:
@@ -244,7 +291,7 @@ def symbol_path(tag: str, x: float, y: float, module: float) -> list[Command]:
 def draw_label(page: Page, x: float, y: float, layout: LabelLayout, item: Item) -> None:
     shape = geometry(layout)
     module = layout.module_mm
-    symbol = Rect(x + shape.symbol_left, y + shape.symbol_top, shape.symbol_size, shape.symbol_size)
+    symbol = Rect(x + shape.symbol.x, y + shape.symbol.y, shape.symbol.width, shape.symbol.height)
     quiet = QUIET_MODULES * module
     page.symbols.append(
         Symbol(
@@ -260,29 +307,47 @@ def draw_label(page: Page, x: float, y: float, layout: LabelLayout, item: Item) 
         )
     )
     page.paths.append(symbol_path(item.tag, symbol.x, symbol.y, module))
+    if layout.burial_mm:
+        draw_burial(page, x, y, layout, shape.visible)
 
     items = ([[Run(item.tag)]] if layout.show_number else []) + item.caption
     if not layout.max_lines or not items:
         return
-    area = caption_area(layout, shape.caption_top)
+    area = shape.text
     size, lines = fit(items, area, layout.max_lines)
     if layout.caption_box:
-        top = y + shape.caption_top + BOX_LINE / 2
-        left = x + EDGE + BOX_LINE / 2
-        right = x + layout.width_mm - EDGE - BOX_LINE / 2
-        bottom = y + layout.height_mm - EDGE - BOX_LINE / 2
+        frame = shape.frame
+        top = y + frame.y + BOX_LINE / 2
+        left = x + frame.x + BOX_LINE / 2
+        right = x + frame.x + frame.width - BOX_LINE / 2
+        bottom = y + frame.y + frame.height - BOX_LINE / 2
         corners = [(left, top), (right, top), (right, bottom), (left, bottom), (left, top)]
         for (x1, y1), (x2, y2) in pairwise(corners):
             page.lines.append(Line(x1, y1, x2, y2, BOX_LINE, 0.0))
+    horizontal = layout.orientation == LabelOrientation.HORIZONTAL
+    # Beside the code, the lines are centred in the height and start on the left.
+    first = (area.height - len(lines) * size * LINE_HEIGHT) / 2 if horizontal else 0
     commands: list[Command] = []
     for index, line in enumerate(lines):
-        baseline = y + area.y + index * size * LINE_HEIGHT + size * BASELINE
-        cursor = x + area.x + (area.width - width(line, size)) / 2
+        baseline = y + area.y + first + index * size * LINE_HEIGHT + size * BASELINE
+        cursor = x + area.x + (0 if horizontal else (area.width - width(line, size)) / 2)
         for run in line:
             commands += font(run.style).outline(run.text, size, cursor, baseline)
             cursor += font(run.style).width(run.text, size)
     if commands:
         page.paths.append(commands)
+
+
+def draw_burial(page: Page, x: float, y: float, layout: LabelLayout, visible: float) -> None:
+    """The soil line, just inside the burial zone, and the cut corners under it."""
+    soil = y + visible + CUT_LINE / 2
+    page.lines.append(Line(x, soil, x + layout.width_mm, soil, CUT_LINE, CUT_GREY, dash=SOIL_DASH))
+    if layout.chamfer_mm:
+        # Started a line's width down, so that the stroke stays out of the quiet zone.
+        top, bottom = y + visible + CUT_LINE, y + layout.height_mm
+        right = x + layout.width_mm
+        page.lines.append(Line(x, top, x + layout.chamfer_mm, bottom, CUT_LINE, CUT_GREY))
+        page.lines.append(Line(right, top, right - layout.chamfer_mm, bottom, CUT_LINE, CUT_GREY))
 
 
 def grid(layout: LabelLayout) -> tuple[int, int]:
