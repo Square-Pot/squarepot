@@ -105,8 +105,8 @@ service account: a link gives read-only access.
 To try the server, or to test a client end to end, without a Google account:
 the server reads [`demo/plants.csv`](demo/plants.csv), 80 fictional plants
 laid out like a sheet's tab. 77 of them have the numbers `000001` to `000077`,
-the same as an A4 sheet of `strip` labels, so a printed sample sheet scans to
-real plants. The other three have no number yet. From `deploy/`:
+so labels printed for them scan to real plants. The other three have no
+number yet. From `deploy/`:
 
 ```sh
 export SQUAREPOT_API_TOKEN=$(openssl rand -hex 32)
@@ -152,7 +152,11 @@ reads as one column and is reported as missing its `genus` column.
 - **Migrations.** The server applies its Alembic migrations at startup.
 - **Labels.** Each label holds the plant's number in a 10×10 Data Matrix
   ([ADR 0001](../docs/adr/0001-label-code-format.md)) and a caption from the
-  `label` preset. The code is always printed whole, with a white quiet zone of
+  `label` preset. The `vertical` template has the code on top and the caption
+  under it, the `horizontal` one the caption beside the code; both end in a
+  white burial zone that goes into the substrate, under a dashed soil line.
+  By default (`auto`), each plant gets the template its `label_type` names,
+  and each template's labels start on a page of their own. The code is always printed whole, with a white quiet zone of
   at least one module on the label: a layout too small for that is refused,
   never cropped, and only the caption shrinks or is cut short. Text is
   converted to outlines with the bundled [fonts](src/squarepot_server/labels/fonts/),

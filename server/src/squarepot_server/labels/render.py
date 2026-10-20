@@ -37,10 +37,11 @@ def to_svg(page: Page, title: str) -> bytes:
     ]
     for line in page.lines:
         grey = round(line.grey * 255)
+        dash = f' stroke-dasharray="{number(line.dash)}"' if line.dash else ""
         parts.append(
             f'<line x1="{number(line.x1)}" y1="{number(line.y1)}" x2="{number(line.x2)}" '
             f'y2="{number(line.y2)}" stroke="rgb({grey},{grey},{grey})" '
-            f'stroke-width="{number(line.width)}" stroke-linecap="square"/>\n'
+            f'stroke-width="{number(line.width)}" stroke-linecap="square"{dash}/>\n'
         )
     for path in page.paths:
         parts.append(f'<path d={quoteattr(svg_path_data(path))} fill="#000"/>\n')
@@ -53,9 +54,11 @@ def pdf_content(page: Page) -> bytes:
     scale = number(POINTS_PER_MM)
     ops = [f"{scale} 0 0 -{scale} 0 {number(page.height * POINTS_PER_MM)} cm", "2 J"]
     for line in page.lines:
+        dash = f"[{number(line.dash)}] 0 d " if line.dash else ""
         ops.append(
-            f"{number(line.width)} w {number(line.grey)} G {number(line.x1)} {number(line.y1)} m "
-            f"{number(line.x2)} {number(line.y2)} l S"
+            f"{dash}{number(line.width)} w {number(line.grey)} G "
+            f"{number(line.x1)} {number(line.y1)} m {number(line.x2)} {number(line.y2)} l S"
+            + (" [] 0 d" if line.dash else "")
         )
     ops.append("0 g")
     for path in page.paths:

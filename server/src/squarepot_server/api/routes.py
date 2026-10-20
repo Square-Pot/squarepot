@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from squarepot_server import __version__
 from squarepot_server.api.models import (
+    AUTO_TEMPLATE,
     Collection,
     Error,
     FieldSchema,
@@ -29,7 +30,7 @@ from squarepot_server.api.models import (
 )
 from squarepot_server.db import CollectionRow, PlantRow, current_seq, get_meta
 from squarepot_server.labels.caption import caption
-from squarepot_server.labels.layout import TEMPLATES, Item, LayoutError, layout_pages
+from squarepot_server.labels.layout import TEMPLATES, Item, LayoutError, Page, layout_pages
 from squarepot_server.labels.render import to_pdf, to_svg
 from squarepot_server.runtime import Runtime
 
@@ -234,6 +235,13 @@ def list_label_templates() -> list[LabelTemplate]:
     return list(TEMPLATES.values())
 
 
+def chosen_template(template: str, fields: dict[str, str]) -> str:
+    """The template a plant is printed with: its `label_type` decides with `auto`."""
+    if template != AUTO_TEMPLATE:
+        return template
+    return "horizontal" if fields.get("label_type") == "h" else "vertical"
+
+
 def listed(values: list[str]) -> str:
     shown = ", ".join(values[:10])
     return shown + (f" and {len(values) - 10} more" if len(values) > 10 else "")
@@ -268,16 +276,13 @@ def listed(values: list[str]) -> str:
     },
 )
 def create_labels(body: LabelRequest, session: SessionDep, runtime: RuntimeDep) -> Response:
-    template = TEMPLATES.get(body.template)
-    if template is None:
+    if body.template != AUTO_TEMPLATE and body.template not in TEMPLATES:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, f"No label template {body.template!r}."
         )
     preset = next((p for p in runtime.schema.presets if p.key == body.preset), None)
     if preset is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No preset {body.preset!r}.")
-    layout = template.layout.model_copy(update=body.layout.model_dump(exclude_none=True))
-
     rows = {
         row.id: row
         for row in session.scalars(
@@ -291,12 +296,19 @@ def create_labels(body: LabelRequest, session: SessionDep, runtime: RuntimeDep) 
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             f"These plants have no number to print: {listed(untagged)}.",
         )
-    items = [
-        Item(cast(str, rows[plant_id].tag), caption(runtime.schema, preset, rows[plant_id].fields))
-        for plant_id in body.plants
-    ]
+    batches: dict[str, list[Item]] = {}
+    for plant_id in body.plants:
+        fields = rows[plant_id].fields
+        batches.setdefault(chosen_template(body.template, fields), []).append(
+            Item(cast(str, rows[plant_id].tag), caption(runtime.schema, preset, fields))
+        )
+    overrides = body.layout.model_dump(exclude_none=True)
+    pages: list[Page] = []
     try:
-        pages = layout_pages(layout, items, body.skip)
+        # A partly used sheet is the first one fed in.
+        for key in sorted(batches, key=list(TEMPLATES).index):
+            layout = TEMPLATES[key].layout.model_copy(update=overrides)
+            pages += layout_pages(layout, batches[key], 0 if pages else body.skip)
     except LayoutError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
 
