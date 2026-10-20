@@ -40,7 +40,8 @@ BOX_LINE = 0.15
 CUT_LINE = 0.1
 CUT_GREY = 0.6
 SOIL_DASH = 1.0
-# Beside a horizontal label's code, the number runs down a strip as wide as its font size.
+# The number is a backup for the code, set small next to it in a strip as deep as its font
+# size: under the code on a vertical label, down its side on a horizontal one.
 NUMBER_FONT = MIN_FONT
 # Tolerance for lengths given in decimal millimetres.
 EPSILON = 1e-9
@@ -168,7 +169,7 @@ class Geometry:
     text: Rect
     # Height of the visible part, above the burial zone.
     visible: float
-    # The strip beside a horizontal label's code that holds the number, read top down.
+    # The strip next to the code that holds the number, when it is shown.
     number: Rect | None = None
 
 
@@ -191,7 +192,6 @@ def geometry(layout: LabelLayout) -> Geometry:
         fits = visible >= needed - EPSILON and layout.width_mm >= needed - EPSILON
         right = symbol.x - quiet
         if layout.show_number:
-            # A backup for the code, so it stays out of the caption and next to the code.
             number = Rect(right - NUMBER_FONT, symbol.y, NUMBER_FONT, size)
             right = number.x - TEXT_PAD
         frame = Rect(EDGE, EDGE, max(right - EDGE, 0), visible - 2 * EDGE)
@@ -201,6 +201,9 @@ def geometry(layout: LabelLayout) -> Geometry:
         symbol = Rect(side, top, size, size)
         fits = layout.width_mm >= needed - EPSILON and visible >= top + size + quiet - EPSILON
         caption_top = top + size + quiet
+        if layout.show_number:
+            number = Rect(symbol.x, caption_top, size, NUMBER_FONT)
+            caption_top = number.y + number.height
         frame = Rect(EDGE, caption_top, layout.width_mm - 2 * EDGE, visible - EDGE - caption_top)
     if not fits:
         burial = f" above a {layout.burial_mm:g} mm burial" if layout.burial_mm else ""
@@ -223,15 +226,13 @@ def geometry(layout: LabelLayout) -> Geometry:
             f"{name} has no room for a caption {where} the code: make it "
             f"{'wider' if horizontal else 'taller'}, or set max_lines to 0."
         )
-    if number is not None and number.x < EDGE - EPSILON:
+    if number is not None and (
+        number.x < EDGE - EPSILON or number.y + number.height > visible - EDGE + EPSILON
+    ):
+        where = "beside" if horizontal else "under"
         raise LayoutError(
-            f"{name} has no room for the number beside the code: make it wider, "
-            "or set show_number to false."
-        )
-    if layout.show_number and not horizontal and not layout.max_lines:
-        raise LayoutError(
-            "The number is printed as the caption's first line: set max_lines to 1 or more, "
-            "or show_number to false."
+            f"{name} has no room for the number {where} the code: make it "
+            f"{'wider' if horizontal else 'taller'}, or set show_number to false."
         )
     if layout.cut_lines and layout.gap_mm < CUT_LINE - EPSILON:
         raise LayoutError(
@@ -327,8 +328,7 @@ def draw_label(page: Page, x: float, y: float, layout: LabelLayout, item: Item) 
 
     if shape.number is not None:
         draw_number(page, x + shape.number.x, y + shape.number.y, shape.number, item.tag)
-    first_line = layout.show_number and shape.number is None
-    items = ([[Run(item.tag)]] if first_line else []) + item.caption
+    items = item.caption
     if not layout.max_lines or not items:
         return
     area = shape.text
@@ -357,9 +357,17 @@ def draw_label(page: Page, x: float, y: float, layout: LabelLayout, item: Item) 
 
 
 def draw_number(page: Page, x: float, y: float, strip: Rect, tag: str) -> None:
-    """The number down the strip, centred, turned a quarter clockwise with its top to the code."""
+    """The number in its strip, centred across it.
+
+    Under the code it ends at the code's right edge. Down the side of the code it is centred
+    and turned a quarter clockwise, with its top to the code.
+    """
     regular = font(Style.REGULAR)
     length = regular.width(tag, NUMBER_FONT)
+    if strip.width > strip.height:
+        baseline = y + (strip.height + regular.digit_height(NUMBER_FONT)) / 2
+        page.paths.append(regular.outline(tag, NUMBER_FONT, x + strip.width - length, baseline))
+        return
     baseline = x + (strip.width - regular.digit_height(NUMBER_FONT)) / 2
     start = y + (strip.height - length) / 2
     commands: list[Command] = []

@@ -283,9 +283,9 @@ class LabelLayout(ApiModel):
     caption_box: bool = Field(description="Draw a frame around the caption.")
     show_number: bool = Field(
         description=(
-            "Print the six-digit number, a backup for the code: on a vertical label as the "
-            "caption's first line, which needs `max_lines`; on a horizontal one small, down a "
-            "strip beside the code."
+            "Print the six-digit number, a backup for the code, small next to it: under the "
+            "code on a vertical label, down its side on a horizontal one. It is never part of "
+            "the caption."
         )
     )
     page: PageSize
