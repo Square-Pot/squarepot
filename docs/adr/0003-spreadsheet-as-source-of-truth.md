@@ -1,7 +1,7 @@
 # 0003. The spreadsheet is the source of truth, behind a storage adapter
 
 - **Status:** Proposed
-- **Date:** 2026-10-08
+- **Date:** 2026-10-08, revised 2026-10-20
 
 ## Context
 
@@ -23,8 +23,10 @@ milliseconds, so it cannot sit on the path of every request.
   every connected collection in its own database and serves all reads from
   there.
 - **Sync is incremental by change detection.** The worker polls each
-  spreadsheet's Drive `modifiedTime`, a cheap call. It reads the tab only when
-  that has changed, then applies the differences to its copy. Recently used
+  collection for a sign of change, and applies only the differences to its
+  copy. With a service account, the sign is the spreadsheet's Drive
+  `modifiedTime`, a cheap call, and the tab is read only when it has changed.
+  Through a link, it is a hash of the downloaded tab. Recently used
   collections are polled more often than idle ones.
 - **Writes go to the sheet first.** Anything Square-Pot writes goes to the
   sheet through the Sheets API, and the copy is updated from the result.
@@ -40,10 +42,19 @@ milliseconds, so it cannot sit on the path of every request.
   `CollectionStore` interface: read the collection, report whether it changed,
   and update cells (in the first release, only to assign numbers). Google
   Sheets is the first implementation.
-- **Access through a service account.** The instance belongs to one collector
-  (personal deployment), who shares the sheet with a Google service account.
-  This needs no Google OAuth app. If a multi-user service is ever built,
-  Google OAuth will be added as a second way to grant access.
+- **Access by link by default, a service account for a private sheet.** The
+  instance belongs to one collector (personal deployment). By default the
+  owner shares the sheet as "anyone with the link can view", and the server
+  downloads the tab as CSV from its export link
+  (`https://docs.google.com/spreadsheets/d/<id>/export?format=csv`). This
+  needs no Google Cloud project at all. An owner who keeps the sheet private
+  shares it with a Google service account instead, and the server reads it
+  through the Sheets and Drive APIs. Neither needs a Google OAuth app. If a
+  multi-user service is ever built, Google OAuth will be added as a third way
+  to grant access.
+- **Writing needs the service account.** A link gives read-only access, so
+  assigning numbers is available only to a sheet shared with the service
+  account. A collection read by link is otherwise complete.
 
 ## Consequences
 
@@ -53,6 +64,14 @@ milliseconds, so it cannot sit on the path of every request.
   unreachable the server keeps serving its last copy, and says how old it is.
 - Edits made in the sheet appear in the app after the next poll, not at once.
   The polling interval is a trade-off between freshness and API quota.
+- Through a link, every poll downloads the whole tab, about 100 bytes per
+  plant. This is outside the Sheets API quotas, but Google may serve an
+  export a little behind the latest edit. The export carries values as
+  displayed, so dates and numbers depend on the sheet's format
+  ([sheet-format.md](../sheet-format.md#values)).
+- Anyone who learns a link-shared sheet's id can read the collection. The
+  id is kept in the server's configuration like a secret, and an owner who
+  does not accept this uses the service account.
 - A whole tab is read on each change. For collections of a few thousand rows
   this is one API call and well within quotas. Much larger collections would
   need a finer scheme.
@@ -72,5 +91,11 @@ milliseconds, so it cannot sit on the path of every request.
   public HTTPS callback and channel renewal, which many self-hosted installs
   behind home routers cannot provide. They can be added later as an
   optimisation.
+- **Only the service account.** One way to set up and test, but every owner
+  would need a Google Cloud project, the hardest step of self-hosting, even
+  for a collection they are happy to share by link.
+- **A sheet published to the web** (File, Share, Publish to web). It also
+  gives a CSV link, but publishing is a separate, easily forgotten setting,
+  and the published copy can lag the sheet by minutes.
 - **Server wins on conflict.** Would make app edits feel more reliable, but it
   would silently discard changes the owner made by hand in their own sheet.

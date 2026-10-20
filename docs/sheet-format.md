@@ -15,8 +15,10 @@ page says how they are laid out in a sheet.
 ## Layout
 
 - **One collection is one tab.** When a collection is connected, the owner
-  chooses the spreadsheet and the tab. Other tabs are ignored and never
-  modified.
+  chooses the spreadsheet and the tab: by its name with a service account, or
+  by its `gid` (the number after `#gid=` in the tab's URL) when the sheet is
+  read by link; without a `gid`, the first tab is read. Other tabs are
+  ignored and never modified.
 - **Row 1 is the header.** Each header cell holds a field `key` from the schema,
   such as `genus` or `seeding_date`. Matching ignores case and surrounding
   whitespace.
@@ -47,8 +49,15 @@ An example with a few columns:
 
 ## Values
 
-Values are read with the Sheets API's unformatted values and serial-number
-dates, so they do not depend on the sheet's locale or display format.
+With a service account, values are read with the Sheets API's unformatted
+values and serial-number dates, so they do not depend on the sheet's locale or
+display format. A sheet read by link
+([ADR 0003](adr/0003-spreadsheet-as-source-of-truth.md)) is downloaded as CSV,
+which holds every value as the sheet displays it: a date cell must then
+display as `YYYY-MM-DD` or `DD.MM.YYYY`, and a decimal with a dot (`12.50`),
+or the cell is reported as invalid. A sheet whose locale writes decimals with
+a comma, such as Russian (`12,50`), must keep its decimal columns, such as
+`price`, as plain text written with a dot (Format, Number, Plain text).
 
 | Type | In the sheet | Notes |
 | --- | --- | --- |
@@ -82,7 +91,9 @@ cultivars). The sheet holds plain values: `subspecies` contains `gracile`, not
 
 Square-Pot writes to the sheet only when a user acts, never on its own.
 
-In the first release there is exactly one write: **assigning numbers**. In the
+In the first release there is exactly one write: **assigning numbers**. It
+needs a sheet shared with the service account; a sheet read by link is
+read-only. In the
 web app's label designer, the owner selects plants that have no number and
 asks for numbers before printing their labels. Square-Pot writes each new
 number into the empty `tag` cell of that plant's row, and sets that cell's
