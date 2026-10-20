@@ -133,7 +133,8 @@ class GoogleSheetsStore:
         try:
             response = self.session.get(url, params=params, timeout=TIMEOUT_SECONDS)
         except Exception as error:
-            raise StoreError(f"Google is unreachable: {error}") from error
+            # The class name only: requests puts the URL, and so the sheet id, in the text.
+            raise StoreError(f"Google is unreachable ({type(error).__name__})") from error
         if not response.ok:
             try:
                 message = response.json()["error"]["message"]

@@ -95,8 +95,11 @@ def test_an_empty_tab_has_no_values() -> None:
             "Google answered 502: Bad Gateway",
         ),
         (response(404, {"error": "not an object"}, "Not Found"), "Google answered 404: Not Found"),
-        (requests.ConnectionError("no route to host"), "Google is unreachable: no route to host"),
-        (requests.Timeout("timed out"), "Google is unreachable: timed out"),
+        (
+            requests.ConnectionError("no route to host"),
+            r"Google is unreachable \(ConnectionError\)",
+        ),
+        (requests.Timeout("timed out"), r"Google is unreachable \(Timeout\)"),
     ],
 )
 def test_failures_become_store_errors(answer: requests.Response | Exception, message: str) -> None:
@@ -125,11 +128,15 @@ def test_connection_errors_do_not_reveal_the_sheet_id(
         "HTTPSConnectionPool(host='docs.google.com', port=443): Max retries exceeded with url: "
         "/spreadsheets/d/abc%2F123%3Fx/export?format=csv"
     )
-    sheets, _ = link_store(answer)
-    with pytest.raises(StoreError) as caught:
-        sheets.read(LINKED)
-    assert "abc" not in str(caught.value)
-    assert str(caught.value) == f"Google is unreachable ({error.__name__})"
+    stores: list[tuple[SheetLinkStore | GoogleSheetsStore, CollectionConfig]] = [
+        (link_store(answer)[0], LINKED),
+        (store(answer)[0], CONFIG),
+    ]
+    for sheets, collection in stores:
+        with pytest.raises(StoreError) as caught:
+            sheets.read(collection)
+        assert "abc" not in str(caught.value)
+        assert str(caught.value) == f"Google is unreachable ({error.__name__})"
 
 
 def test_a_linked_sheet_is_downloaded_as_csv_from_its_first_tab() -> None:
