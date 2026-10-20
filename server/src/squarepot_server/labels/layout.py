@@ -24,7 +24,7 @@ from squarepot_server.api.models import (
     PageSize,
 )
 from squarepot_server.labels import datamatrix
-from squarepot_server.labels.text import Command, Run, font, truncate, width, words, wrap
+from squarepot_server.labels.text import Command, Run, Style, font, truncate, width, words, wrap
 
 PAGE_SIZES = {PageSize.A4: (210.0, 297.0), PageSize.LETTER: (215.9, 279.4)}
 QUIET_MODULES = 1
@@ -40,6 +40,9 @@ BOX_LINE = 0.15
 CUT_LINE = 0.1
 CUT_GREY = 0.6
 SOIL_DASH = 1.0
+# The number is a backup for the code, set small next to it in a strip as deep as its font
+# size: under the code on a vertical label, down its side on a horizontal one.
+NUMBER_FONT = MIN_FONT
 # Tolerance for lengths given in decimal millimetres.
 EPSILON = 1e-9
 
@@ -166,6 +169,8 @@ class Geometry:
     text: Rect
     # Height of the visible part, above the burial zone.
     visible: float
+    # The strip next to the code that holds the number, when it is shown.
+    number: Rect | None = None
 
 
 def geometry(layout: LabelLayout) -> Geometry:
@@ -177,6 +182,7 @@ def geometry(layout: LabelLayout) -> Geometry:
     visible = layout.height_mm - layout.burial_mm
     horizontal = layout.orientation == LabelOrientation.HORIZONTAL
     name = f"A {layout.width_mm:g}x{layout.height_mm:g} mm label"
+    number = None
     if layout.burial_mm and visible <= EPSILON:
         raise LayoutError(f"{name} has no visible part above its {layout.burial_mm:g} mm burial.")
     if horizontal:
@@ -184,13 +190,20 @@ def geometry(layout: LabelLayout) -> Geometry:
         side = min(top, 2 * quiet)
         symbol = Rect(layout.width_mm - side - size, top, size, size)
         fits = visible >= needed - EPSILON and layout.width_mm >= needed - EPSILON
-        frame = Rect(EDGE, EDGE, symbol.x - quiet - EDGE, visible - 2 * EDGE)
+        right = symbol.x - quiet
+        if layout.show_number:
+            number = Rect(right - NUMBER_FONT, symbol.y, NUMBER_FONT, size)
+            right = number.x - TEXT_PAD
+        frame = Rect(EDGE, EDGE, max(right - EDGE, 0), visible - 2 * EDGE)
     else:
         side = (layout.width_mm - size) / 2
         top = min(side, 2 * quiet)
         symbol = Rect(side, top, size, size)
         fits = layout.width_mm >= needed - EPSILON and visible >= top + size + quiet - EPSILON
         caption_top = top + size + quiet
+        if layout.show_number:
+            number = Rect(symbol.x, caption_top, size, NUMBER_FONT)
+            caption_top = number.y + number.height
         frame = Rect(EDGE, caption_top, layout.width_mm - 2 * EDGE, visible - EDGE - caption_top)
     if not fits:
         burial = f" above a {layout.burial_mm:g} mm burial" if layout.burial_mm else ""
@@ -213,10 +226,13 @@ def geometry(layout: LabelLayout) -> Geometry:
             f"{name} has no room for a caption {where} the code: make it "
             f"{'wider' if horizontal else 'taller'}, or set max_lines to 0."
         )
-    if layout.show_number and not layout.max_lines:
+    if number is not None and (
+        number.x < EDGE - EPSILON or number.y + number.height > visible - EDGE + EPSILON
+    ):
+        where = "beside" if horizontal else "under"
         raise LayoutError(
-            "The number is printed as the caption's first line: set max_lines to 1 or more, "
-            "or show_number to false."
+            f"{name} has no room for the number {where} the code: make it "
+            f"{'wider' if horizontal else 'taller'}, or set show_number to false."
         )
     if layout.cut_lines and layout.gap_mm < CUT_LINE - EPSILON:
         raise LayoutError(
@@ -232,7 +248,7 @@ def geometry(layout: LabelLayout) -> Geometry:
             f"A {layout.chamfer_mm:g} mm chamfer on each corner is wider than the "
             f"{layout.width_mm:g} mm label: make chamfer_mm smaller."
         )
-    return Geometry(symbol, frame, text, visible)
+    return Geometry(symbol, frame, text, visible, number)
 
 
 def fit(items: list[list[Run]], area: Rect, max_lines: int) -> tuple[float, list[list[Run]]]:
@@ -310,7 +326,9 @@ def draw_label(page: Page, x: float, y: float, layout: LabelLayout, item: Item) 
     if layout.burial_mm:
         draw_burial(page, x, y, layout, shape.visible)
 
-    items = ([[Run(item.tag)]] if layout.show_number else []) + item.caption
+    if shape.number is not None:
+        draw_number(page, x + shape.number.x, y + shape.number.y, shape.number, item.tag)
+    items = item.caption
     if not layout.max_lines or not items:
         return
     area = shape.text
@@ -336,6 +354,31 @@ def draw_label(page: Page, x: float, y: float, layout: LabelLayout, item: Item) 
             cursor += font(run.style).width(run.text, size)
     if commands:
         page.paths.append(commands)
+
+
+def draw_number(page: Page, x: float, y: float, strip: Rect, tag: str) -> None:
+    """The number in its strip, centred across it.
+
+    Under the code it ends at the code's right edge. Down the side of the code it is centred
+    and turned a quarter clockwise, with its top to the code.
+    """
+    regular = font(Style.REGULAR)
+    length = regular.width(tag, NUMBER_FONT)
+    if strip.width > strip.height:
+        baseline = y + (strip.height + regular.digit_height(NUMBER_FONT)) / 2
+        page.paths.append(regular.outline(tag, NUMBER_FONT, x + strip.width - length, baseline))
+        return
+    baseline = x + (strip.width - regular.digit_height(NUMBER_FONT)) / 2
+    start = y + (strip.height - length) / 2
+    commands: list[Command] = []
+    # Set on a baseline at the origin, then (along, down) becomes (baseline - down, start + along).
+    for command in regular.outline(tag, NUMBER_FONT, 0, 0):
+        points = command[1:]
+        turned: list[float] = []
+        for along, down in zip(points[::2], points[1::2], strict=True):
+            turned += [baseline - down, start + along]
+        commands.append((command[0], *turned))
+    page.paths.append(commands)
 
 
 def draw_burial(page: Page, x: float, y: float, layout: LabelLayout, visible: float) -> None:
