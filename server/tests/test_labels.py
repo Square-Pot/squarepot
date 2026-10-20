@@ -29,6 +29,7 @@ from squarepot_server.labels.layout import (
     Page,
     Rect,
     fit,
+    geometry,
     layout_pages,
     symbol_path,
 )
@@ -237,7 +238,10 @@ def overlaps(a: Rect, b: Rect) -> bool:
         ({"width_mm": 200, "height_mm": 280}, "does not fit on a a4 page"),
         ({"width_mm": 14.4, "gap_mm": 0}, "Cut lines need a gap of at least 0.1 mm"),
         ({"gap_mm": 0.05}, "Cut lines need a gap"),
-        ({"show_number": True, "max_lines": 0}, "set max_lines to 1"),
+        (
+            {"width_mm": 14.4, "height_mm": 40.3, "max_lines": 0},
+            "no room for the number under the code: make it taller",
+        ),
     ],
 )
 def test_a_layout_too_small_is_an_error_not_a_crop(
@@ -252,6 +256,7 @@ def test_a_layout_too_small_is_an_error_not_a_crop(
     [
         ({"height_mm": 29.3}, "cannot hold a 12 mm code with its quiet zone above a 15 mm"),
         ({"width_mm": 14.4}, "no room for a caption beside the code: make it wider"),
+        ({"width_mm": 16, "max_lines": 0}, "no room for the number beside the code"),
     ],
 )
 def test_a_horizontal_layout_too_small_is_an_error(
@@ -311,6 +316,45 @@ def test_svg_and_pdf_are_well_formed() -> None:
     width, height = document[0].get_size()
     assert (width, height) == (pytest.approx(595.276, abs=0.01), pytest.approx(841.89, abs=0.01))
     assert b"/ViewerPreferences << /PrintScaling /None >>" in to_pdf(pages, "Labels")
+
+
+@pytest.mark.parametrize("key", ["vertical", "horizontal"])
+def test_the_number_is_printed_next_to_the_code_not_in_the_caption(key: str) -> None:
+    template = layout(key)
+    [item] = items(1)
+    [page] = layout_pages(template, [item])
+    [symbol] = page.symbols
+    shape = geometry(template)
+    assert shape.number is not None
+    strip = Rect(
+        symbol.label.x + shape.number.x,
+        symbol.label.y + shape.number.y,
+        shape.number.width,
+        shape.number.height,
+    )
+    if key == "horizontal":
+        assert strip.x + strip.width <= symbol.quiet.x + 1e-9
+        assert shape.frame.x + shape.frame.width < shape.number.x
+    else:
+        assert strip.y >= symbol.quiet.y + symbol.quiet.height - 1e-9
+        assert shape.frame.y >= shape.number.y + shape.number.height - 1e-9
+
+    def ink(path: list[Command]) -> Rect:
+        return bounds([point for contour in contours(path) for point in contour])
+
+    [number] = [path for path in page.paths if strip.contains(ink(path))]
+    assert number == page.paths[1]
+    # Down the side of the code it is turned a quarter, so taller than wide.
+    assert (ink(number).height > ink(number).width) == (key == "horizontal")
+    # The code, the number and the caption, which stays in its frame.
+    assert len(page.paths) == 3
+    frame = Rect(
+        symbol.label.x + shape.frame.x,
+        symbol.label.y + shape.frame.y,
+        shape.frame.width,
+        shape.frame.height,
+    )
+    assert frame.contains(ink(page.paths[2]))
 
 
 @pytest.mark.parametrize("key", ["vertical", "horizontal"])

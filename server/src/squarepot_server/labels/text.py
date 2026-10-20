@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from fontTools.pens.basePen import BasePen
+from fontTools.pens.boundsPen import BoundsPen
 from fontTools.ttLib import TTFont
 
 FONTS = Path(__file__).with_name("fonts")
@@ -96,6 +97,12 @@ class Font:
 
     def glyph(self, char: str) -> str:
         return self.cmap.get(ord(char)) or self.cmap.get(ord("?"), ".notdef")
+
+    def digit_height(self, size: float) -> float:
+        """Height in millimetres of a digit set at `size` millimetres per em, from the ink of 0."""
+        pen = BoundsPen(self.glyphs)
+        self.glyphs[self.glyph("0")].draw(pen)
+        return float(pen.bounds[3] * size / self.units)
 
     def width(self, text: str, size: float) -> float:
         """Advance width in millimetres of `text` set at `size` millimetres per em."""
