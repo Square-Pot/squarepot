@@ -158,6 +158,16 @@ fields:
     aliases: [information]
     description: Free-form notes.
 
+  - key: label_type
+    type: text
+    label: {en: Label type, ru: Тип бирки}
+    group: extra
+    description: >-
+      Label template the plant is printed with: "h" for horizontal, empty or
+      "v" for vertical, the default. Read case-insensitively and stored in
+      lower case. Choosing a template when printing overrides it.
+    pattern: "^[hv]$"
+
 computed:
   - key: name
     label: {en: Name, ru: Название}

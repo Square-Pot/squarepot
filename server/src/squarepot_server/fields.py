@@ -113,6 +113,8 @@ def read_text(definition: FieldDefinition, cell: Cell) -> str:
     text = number_text(cell) if isinstance(cell, int | float) else str(cell).strip()
     if definition.key == "currency":
         text = text.upper()
+    elif definition.key == "label_type":
+        text = text.lower()
     if definition.pattern and not re.fullmatch(definition.pattern, text):
         raise InvalidValue(f"does not match {definition.pattern}")
     return text

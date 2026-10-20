@@ -50,6 +50,7 @@ def test_every_imported_key_comes_from_the_schema(schema: FieldSchema) -> None:
         values[keys.index(key)] = "2024-03-15"
     values[keys.index("price")] = 12.5
     values[keys.index("currency")] = "eur"
+    values[keys.index("label_type")] = "h"
     parsed = parse_tab(schema, [list(keys), values])
     assert parsed.issues == []
     [row] = parsed.rows
@@ -137,6 +138,17 @@ def test_currency_is_upper_case(schema: FieldSchema) -> None:
 
 def test_an_invalid_currency_is_reported(schema: FieldSchema) -> None:
     parsed = parse_tab(schema, [["genus", "currency"], ["Lithops", "euro"]])
+    assert parsed.rows[0].fields == {"genus": "Lithops"}
+    assert [issue.column for issue in parsed.issues] == ["B"]
+
+
+@pytest.mark.parametrize(("cell", "label_type"), [("h", "h"), (" H ", "h"), ("V", "v")])
+def test_the_label_type_is_lower_case(schema: FieldSchema, cell: str, label_type: str) -> None:
+    assert one(schema, ["genus", "label_type"], ["Lithops", cell])["label_type"] == label_type
+
+
+def test_an_unknown_label_type_is_reported(schema: FieldSchema) -> None:
+    parsed = parse_tab(schema, [["genus", "label_type"], ["Lithops", "horizontal"]])
     assert parsed.rows[0].fields == {"genus": "Lithops"}
     assert [issue.column for issue in parsed.issues] == ["B"]
 
