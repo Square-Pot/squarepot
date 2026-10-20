@@ -43,6 +43,12 @@ SOIL_DASH = 1.0
 # The number is a backup for the code, set small next to it in a strip as deep as its font
 # size: under the code on a vertical label, down its side on a horizontal one.
 NUMBER_FONT = MIN_FONT
+# Extra room inside the caption's frame, left and right, that a caption gets when it costs no
+# font size: more on the left of a horizontal label's caption, which starts there, the same on
+# both sides of a vertical one's, which is centred. It shrinks in steps, both sides together,
+# down to none, as a longer caption needs the room.
+COMFORT = {LabelOrientation.HORIZONTAL: (2.0, 1.0), LabelOrientation.VERTICAL: (1.0, 1.0)}
+COMFORT_STEPS = 4
 # Tolerance for lengths given in decimal millimetres.
 EPSILON = 1e-9
 
@@ -285,6 +291,29 @@ def fit(items: list[list[Run]], area: Rect, max_lines: int) -> tuple[float, list
     return size, lines
 
 
+def comfortable_fit(
+    items: list[list[Run]], text: Rect, max_lines: int, orientation: LabelOrientation
+) -> tuple[Rect, float, list[list[Run]]]:
+    """The caption's area, font size and lines, with the most extra room that costs no size.
+
+    When even the smallest size does not fit, the caption gets all of the room, so that as
+    little as possible is cut.
+    """
+    left, right = COMFORT[orientation]
+    # Never so much that not even one character fits.
+    scale = min(1.0, max(text.width - MIN_FONT, 0) / (left + right))
+    best: tuple[Rect, float, list[list[Run]]] | None = None
+    for step in range(COMFORT_STEPS, -1, -1):
+        share = scale * step / COMFORT_STEPS
+        area = Rect(text.x + left * share, text.y, text.width - (left + right) * share, text.height)
+        size, lines = fit(items, area, max_lines)
+        # Ties keep the larger inset, met first, except at the smallest size.
+        if best is None or size > best[1] + EPSILON or (size <= MIN_FONT + EPSILON and step == 0):
+            best = (area, size, lines)
+    assert best is not None
+    return best
+
+
 def symbol_path(tag: str, x: float, y: float, module: float) -> list[Command]:
     """The dark modules as one path, with each row's runs merged into rectangles."""
     commands: list[Command] = []
@@ -331,8 +360,8 @@ def draw_label(page: Page, x: float, y: float, layout: LabelLayout, item: Item) 
     items = item.caption
     if not layout.max_lines or not items:
         return
-    area = shape.text
-    size, lines = fit(items, area, layout.max_lines)
+    area, size, lines = comfortable_fit(items, shape.text, layout.max_lines, layout.orientation)
+    horizontal = layout.orientation == LabelOrientation.HORIZONTAL
     if layout.caption_box:
         frame = shape.frame
         top = y + frame.y + BOX_LINE / 2
@@ -342,7 +371,6 @@ def draw_label(page: Page, x: float, y: float, layout: LabelLayout, item: Item) 
         corners = [(left, top), (right, top), (right, bottom), (left, bottom), (left, top)]
         for (x1, y1), (x2, y2) in pairwise(corners):
             page.lines.append(Line(x1, y1, x2, y2, BOX_LINE, 0.0))
-    horizontal = layout.orientation == LabelOrientation.HORIZONTAL
     # Beside the code, the lines are centred in the height and start on the left.
     first = (area.height - len(lines) * size * LINE_HEIGHT) / 2 if horizontal else 0
     commands: list[Command] = []
