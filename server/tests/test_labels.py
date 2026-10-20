@@ -15,7 +15,7 @@ import zxingcpp
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from squarepot_server.api.models import LabelLayout, PageSize
+from squarepot_server.api.models import LabelLayout, LabelOrientation, PageSize
 from squarepot_server.config import DEFAULT_SCHEMA_FILE
 from squarepot_server.fields import load_schema
 from squarepot_server.labels import datamatrix
@@ -32,7 +32,7 @@ from squarepot_server.labels.layout import (
     layout_pages,
     symbol_path,
 )
-from squarepot_server.labels.render import to_pdf, to_svg
+from squarepot_server.labels.render import pdf_content, to_pdf, to_svg
 from squarepot_server.labels.text import ELLIPSIS, Command, Run, Style
 
 SCHEMA = load_schema(DEFAULT_SCHEMA_FILE)
@@ -68,21 +68,55 @@ def layout(template: str, **changes: object) -> LabelLayout:
 
 # Every template, and each at the edges of what it allows: the smallest label that holds the
 # symbol, the smallest module, no caption, no frame, with and without the number, Letter paper.
-CHANGES: dict[str, dict[str, Any]] = {
+UPRIGHT: dict[str, dict[str, Any]] = {
     "default": {},
-    "smallest-module": {"module_mm": 0.5, "width_mm": 6, "height_mm": 12},
+    "smallest-module": {"module_mm": 0.5, "width_mm": 6, "height_mm": 12, "burial_mm": 0},
     "tightest-width": {"width_mm": 14.4},
-    "large-module": {"module_mm": 2.0, "width_mm": 25, "height_mm": 45},
-    "code-only": {"max_lines": 0, "show_number": False, "height_mm": 14.4, "width_mm": 14.4},
+    "large-module": {"module_mm": 2.0, "width_mm": 25, "height_mm": 70},
+    "code-only-over-burial": {
+        "max_lines": 0,
+        "show_number": False,
+        "width_mm": 14.4,
+        "height_mm": 24.4,
+        "burial_mm": 10,
+        "chamfer_mm": 7.2,
+    },
     "no-frame-with-number": {"caption_box": False, "show_number": True},
     "no-number": {"show_number": False},
     "letter-no-gap": {"page": PageSize.LETTER, "gap_mm": 0, "cut_lines": False},
     "tightest-gap": {"width_mm": 14.4, "gap_mm": 0.1, "cut_lines": True},
 }
+SIDE_BY_SIDE: dict[str, dict[str, Any]] = {
+    "default": {},
+    "smallest-module": {
+        "module_mm": 0.5,
+        "width_mm": 30,
+        "height_mm": 12,
+        "burial_mm": 6,
+        "chamfer_mm": 2,
+    },
+    "tightest-height": {"height_mm": 29.4},
+    "large-module": {"module_mm": 2.0, "width_mm": 120, "height_mm": 40},
+    "code-only": {
+        "max_lines": 0,
+        "show_number": False,
+        "width_mm": 14.4,
+        "height_mm": 24.4,
+        "burial_mm": 10,
+        "chamfer_mm": 7.2,
+    },
+    "no-burial": {"height_mm": 15, "burial_mm": 0, "chamfer_mm": 0},
+    "no-frame-with-number": {"caption_box": False, "show_number": True},
+    "no-number": {"show_number": False},
+    "letter-no-gap": {"page": PageSize.LETTER, "gap_mm": 0, "cut_lines": False},
+    "tightest-gap": {"gap_mm": 0.1, "cut_lines": True},
+}
 VARIANTS = [
     pytest.param(layout(key, **changes), id=f"{key}-{name}")
-    for key in TEMPLATES
-    for name, changes in CHANGES.items()
+    for key, template in TEMPLATES.items()
+    for name, changes in (
+        SIDE_BY_SIDE if template.layout.orientation == LabelOrientation.HORIZONTAL else UPRIGHT
+    ).items()
 ]
 
 
@@ -195,8 +229,11 @@ def overlaps(a: Rect, b: Rect) -> bool:
     ("changes", "message"),
     [
         ({"width_mm": 14.3}, "cannot hold a 12 mm code with its quiet zone"),
-        ({"width_mm": 14.4, "height_mm": 14.3, "max_lines": 0}, "cannot hold"),
-        ({"height_mm": 16}, "no room for a caption"),
+        ({"width_mm": 14.4, "height_mm": 39.3, "max_lines": 0}, "above a 25 mm burial"),
+        ({"height_mm": 41}, "no room for a caption under the code: make it taller"),
+        ({"burial_mm": 60}, "has no visible part above its 60 mm burial"),
+        ({"burial_mm": 0, "chamfer_mm": 2}, "Only a burial zone has corners to cut"),
+        ({"chamfer_mm": 7.6}, "wider than the 15 mm label"),
         ({"width_mm": 200, "height_mm": 280}, "does not fit on a a4 page"),
         ({"width_mm": 14.4, "gap_mm": 0}, "Cut lines need a gap of at least 0.1 mm"),
         ({"gap_mm": 0.05}, "Cut lines need a gap"),
@@ -207,44 +244,63 @@ def test_a_layout_too_small_is_an_error_not_a_crop(
     changes: dict[str, object], message: str
 ) -> None:
     with pytest.raises(LayoutError, match=message):
-        layout_pages(layout("strip", **changes), items(1))
+        layout_pages(layout("vertical", **changes), items(1))
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"height_mm": 29.3}, "cannot hold a 12 mm code with its quiet zone above a 15 mm"),
+        ({"width_mm": 14.4}, "no room for a caption beside the code: make it wider"),
+    ],
+)
+def test_a_horizontal_layout_too_small_is_an_error(
+    changes: dict[str, object], message: str
+) -> None:
+    with pytest.raises(LayoutError, match=message):
+        layout_pages(layout("horizontal", **changes), items(1))
 
 
 def test_the_smallest_label_that_holds_the_symbol_is_accepted() -> None:
     [page] = layout_pages(
-        layout("strip", width_mm=14.4, height_mm=14.4, max_lines=0, show_number=False), items(1)
+        layout(
+            "vertical", width_mm=14.4, height_mm=14.4, burial_mm=0, max_lines=0, show_number=False
+        ),
+        items(1),
     )
     [symbol] = page.symbols
     assert symbol.quiet == pytest.approx(symbol.label)
 
 
 def test_pages_hold_full_rows_and_columns() -> None:
-    pages = layout_pages(layout("strip"), items(80))
-    # A4 minus 10 mm margins: 11 columns of 15 + 2 mm, 7 rows of 35 + 2 mm.
-    assert [len(page.symbols) for page in pages] == [77, 3]
-    assert pages[1].symbols[0].label == Rect(10, 10, 15, 35)
+    pages = layout_pages(layout("vertical"), items(50))
+    # A4 minus 10 mm margins: 11 columns of 15 + 2 mm, 4 rows of 60 + 2 mm.
+    assert [len(page.symbols) for page in pages] == [44, 6]
+    assert pages[1].symbols[0].label == Rect(10, 10, 15, 60)
+    # 2 columns of 76 + 2 mm, 8 rows of 30 + 2 mm.
+    assert [len(page.symbols) for page in layout_pages(layout("horizontal"), items(17))] == [16, 1]
 
 
 def test_skipped_positions_stay_empty() -> None:
-    [page] = layout_pages(layout("strip"), items(1), skip=12)
-    assert page.symbols[0].label == Rect(10 + 17, 10 + 37, 15, 35)
+    [page] = layout_pages(layout("vertical"), items(1), skip=12)
+    assert page.symbols[0].label == Rect(10 + 17, 10 + 62, 15, 60)
 
 
 def test_cut_lines_run_through_the_middle_of_the_gaps() -> None:
-    [page] = layout_pages(layout("strip"), items(1))
+    [page] = layout_pages(layout("vertical"), items(1))
     xs = sorted({line.x1 for line in page.lines if line.x1 == line.x2 and line.grey == CUT_GREY})
     assert xs[:2] == [pytest.approx(9), pytest.approx(26)]
     assert len(xs) == 12
 
 
 def test_output_is_deterministic() -> None:
-    pages = layout_pages(layout("strip"), items(10))
-    assert to_pdf(pages, "x") == to_pdf(layout_pages(layout("strip"), items(10)), "x")
-    assert to_svg(pages[0], "x") == to_svg(layout_pages(layout("strip"), items(10))[0], "x")
+    pages = layout_pages(layout("horizontal"), items(10))
+    assert to_pdf(pages, "x") == to_pdf(layout_pages(layout("horizontal"), items(10)), "x")
+    assert to_svg(pages[0], "x") == to_svg(layout_pages(layout("horizontal"), items(10))[0], "x")
 
 
 def test_svg_and_pdf_are_well_formed() -> None:
-    pages = layout_pages(layout("compact"), items(200))
+    pages = layout_pages(layout("vertical"), items(60))
     svg = to_svg(pages[0], "Labels & more").decode()
     assert svg.startswith('<?xml version="1.0" encoding="UTF-8"?>')
     assert 'width="210mm" height="297mm"' in svg
@@ -257,15 +313,43 @@ def test_svg_and_pdf_are_well_formed() -> None:
     assert b"/ViewerPreferences << /PrintScaling /None >>" in to_pdf(pages, "Labels")
 
 
+@pytest.mark.parametrize("key", ["vertical", "horizontal"])
+def test_the_burial_zone_holds_only_the_soil_line_and_the_cut_corners(key: str) -> None:
+    template = layout(key)
+    [page] = layout_pages(template, items(1))
+    [symbol] = page.symbols
+    soil = symbol.label.y + template.height_mm - template.burial_mm
+    burial = Rect(symbol.label.x, soil, symbol.label.width, template.burial_mm)
+    for path in page.paths:
+        for contour in contours(path):
+            assert bounds(contour).y + bounds(contour).height <= soil + 1e-6
+    inside = [line for line in page.lines if burial.contains(Rect(line.x1, line.y1, 0, 0))]
+    assert all(line.grey == CUT_GREY for line in inside)
+    [soil_line] = [line for line in inside if line.dash]
+    assert (soil_line.x1, soil_line.x2) == (burial.x, burial.x + burial.width)
+    chamfers = [line for line in inside if line.y1 != line.y2]
+    assert len(chamfers) == (2 if template.chamfer_mm else 0)
+    for line in chamfers:
+        assert abs(line.x2 - line.x1) == pytest.approx(template.chamfer_mm)
+        assert line.y1 == pytest.approx(soil + 0.1)
+        assert line.y2 == pytest.approx(burial.y + burial.height)
+
+
+def test_dashed_lines_are_dashed_in_svg_and_pdf() -> None:
+    [page] = layout_pages(layout("vertical"), items(1))
+    assert to_svg(page, "x").decode().count('stroke-dasharray="1"') == 1
+    assert pdf_content(page).decode().count("[1] 0 d ") == 1
+
+
 def test_skip_is_less_than_a_page() -> None:
-    layout_pages(layout("strip"), items(1), skip=76)
-    with pytest.raises(LayoutError, match="A page holds 77 labels"):
-        layout_pages(layout("strip"), items(1), skip=77)
+    layout_pages(layout("vertical"), items(1), skip=43)
+    with pytest.raises(LayoutError, match="A page holds 44 labels"):
+        layout_pages(layout("vertical"), items(1), skip=44)
 
 
 def test_a_huge_word_is_wrapped_quickly() -> None:
     started = time.perf_counter()
-    [page] = layout_pages(layout("strip"), [Item("004217", [[Run("x" * 2000)]])])
+    [page] = layout_pages(layout("vertical"), [Item("004217", [[Run("x" * 2000)]])])
     assert time.perf_counter() - started < 2
     assert len(page.symbols) == 1
 
@@ -362,7 +446,7 @@ def test_words_are_kept_whole_when_a_smaller_size_allows() -> None:
 
 def test_templates_are_listed(client: TestClient) -> None:
     body = client.get("/api/v1/labels/templates").json()
-    assert [template["key"] for template in body] == ["strip", "compact"]
+    assert [template["key"] for template in body] == ["vertical", "horizontal"]
     assert body[0]["layout"]["module_mm"] == 1.2
     assert body[0]["layout"]["show_number"] is True
     assert body[0]["layout"]["margin_mm"] == 10
@@ -370,7 +454,7 @@ def test_templates_are_listed(client: TestClient) -> None:
 
 def test_labels_as_pdf(client: TestClient) -> None:
     response = client.post(
-        "/api/v1/labels", json={"plants": ["main:004218", "main:004217"], "skip": 76}
+        "/api/v1/labels", json={"plants": ["main:004218", "main:004217"], "skip": 43}
     )
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
@@ -383,7 +467,7 @@ def test_labels_as_pdf(client: TestClient) -> None:
 
 
 def test_labels_as_svg_page_by_page(client: TestClient) -> None:
-    request = {"plants": ["main:004217"] * 78, "format": "svg", "page": 2}
+    request = {"plants": ["main:004217"] * 45, "format": "svg", "page": 2}
     response = client.post("/api/v1/labels", json=request)
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/svg+xml"
@@ -395,7 +479,7 @@ def test_labels_as_svg_page_by_page(client: TestClient) -> None:
 def test_layout_overrides_apply(client: TestClient) -> None:
     request = {
         "plants": ["main:004217"],
-        "template": "compact",
+        "template": "vertical",
         "layout": {"page": "letter", "module_mm": 1.0, "width_mm": 12},
         "format": "svg",
     }
@@ -413,7 +497,7 @@ def test_layout_overrides_apply(client: TestClient) -> None:
         (
             {"plants": ["main:004217"], "layout": {"width_mm": 10}},
             422,
-            "A 10x35 mm label cannot hold a 12 mm code with its quiet zone",
+            "A 10x60 mm label cannot hold a 12 mm code with its quiet zone",
         ),
         ({"plants": ["main:004217"], "format": "svg", "page": 2}, 422, "There is no page 2"),
         ({"plants": []}, 422, "plants"),

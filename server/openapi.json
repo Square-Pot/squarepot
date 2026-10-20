@@ -745,6 +745,10 @@
       },
       "LabelLayout": {
         "properties": {
+          "orientation": {
+            "$ref": "#/components/schemas/LabelOrientation",
+            "description": "`vertical`: the code on top and the caption under it. `horizontal`: the caption on the left and the code on the right."
+          },
           "width_mm": {
             "type": "number",
             "maximum": 300.0,
@@ -757,7 +761,21 @@
             "maximum": 300.0,
             "exclusiveMinimum": 0.0,
             "title": "Height Mm",
-            "description": "Label height."
+            "description": "Label height, burial zone included."
+          },
+          "burial_mm": {
+            "type": "number",
+            "maximum": 300.0,
+            "minimum": 0.0,
+            "title": "Burial Mm",
+            "description": "Height of the white zone at the bottom of the label that goes into the substrate. Nothing is printed in it, and a dashed grey line marks the soil level."
+          },
+          "chamfer_mm": {
+            "type": "number",
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Chamfer Mm",
+            "description": "How far the burial zone's bottom corners are cut in, so that the label goes into the substrate easily; drawn as grey cutting lines. Needs `burial_mm`."
           },
           "module_mm": {
             "type": "number",
@@ -771,7 +789,7 @@
             "maximum": 20.0,
             "minimum": 0.0,
             "title": "Max Lines",
-            "description": "Most caption lines under the code; `0` prints the code only."
+            "description": "Most caption lines beside the code; `0` prints the code only."
           },
           "caption_box": {
             "type": "boolean",
@@ -809,8 +827,11 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "orientation",
           "width_mm",
           "height_mm",
+          "burial_mm",
+          "chamfer_mm",
           "module_mm",
           "max_lines",
           "caption_box",
@@ -825,6 +846,16 @@
       },
       "LabelLayoutOverrides": {
         "properties": {
+          "orientation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LabelOrientation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "width_mm": {
             "anyOf": [
               {
@@ -850,6 +881,32 @@
               }
             ],
             "title": "Height Mm"
+          },
+          "burial_mm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 300.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Burial Mm"
+          },
+          "chamfer_mm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chamfer Mm"
           },
           "module_mm": {
             "anyOf": [
@@ -952,6 +1009,14 @@
         "title": "LabelLayoutOverrides",
         "description": "Values that replace those of the template; omitted ones keep the template's."
       },
+      "LabelOrientation": {
+        "type": "string",
+        "enum": [
+          "vertical",
+          "horizontal"
+        ],
+        "title": "LabelOrientation"
+      },
       "LabelRequest": {
         "properties": {
           "plants": {
@@ -969,7 +1034,7 @@
             "pattern": "^[a-z][a-z0-9_]*$",
             "title": "Template",
             "description": "Key of a template from `/labels/templates`.",
-            "default": "strip",
+            "default": "vertical",
             "examples": [
               "genus"
             ]
@@ -1021,7 +1086,7 @@
             "pattern": "^[a-z][a-z0-9_]*$",
             "title": "Key",
             "examples": [
-              "strip"
+              "vertical"
             ]
           },
           "label": {
