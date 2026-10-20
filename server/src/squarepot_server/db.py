@@ -54,7 +54,7 @@ class Base(DeclarativeBase):
 
 
 class Meta(Base):
-    """Server-wide values: `epoch`, `seq` and `schema_version`."""
+    """Server-wide values: `epoch`, `seq`, `schema_version` and `schema_fields`."""
 
     __tablename__ = "meta"
 

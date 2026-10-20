@@ -69,6 +69,12 @@ def plant_ids(collection_id: str, rows: list[Row]) -> list[str]:
     return ids
 
 
+def fields_fingerprint(schema: FieldSchema) -> str:
+    """Changes whenever the way rows are read changes, even within one schema version."""
+    fields = [field.model_dump(mode="json") for field in schema.fields]
+    return hashlib.sha256(json.dumps(fields, sort_keys=True).encode()).hexdigest()
+
+
 class Syncer:
     def __init__(
         self,
@@ -92,6 +98,12 @@ class Syncer:
             if get_meta(session, "schema_version") != str(self.schema.version):
                 # Field keys may have changed: re-read every sheet, and clients get a full copy.
                 set_meta(session, "schema_version", str(self.schema.version))
+                session.execute(update(CollectionRow).values(store_version=None))
+            fields = fields_fingerprint(self.schema)
+            if get_meta(session, "schema_fields") != fields:
+                # A field was added or its rules changed: re-read every sheet, and
+                # clients get the differences as usual.
+                set_meta(session, "schema_fields", fields)
                 session.execute(update(CollectionRow).values(store_version=None))
             configured = {collection.id for collection in self.collections}
             for row in session.scalars(select(CollectionRow).where(~CollectionRow.removed)):
