@@ -29,6 +29,7 @@ from squarepot_server.labels.layout import (
     Page,
     Rect,
     fit,
+    geometry,
     layout_pages,
     symbol_path,
 )
@@ -253,6 +254,7 @@ def test_a_layout_too_small_is_an_error_not_a_crop(
     [
         ({"height_mm": 29.3}, "cannot hold a 12 mm code with its quiet zone above a 15 mm"),
         ({"width_mm": 14.4}, "no room for a caption beside the code: make it wider"),
+        ({"width_mm": 16, "max_lines": 0}, "no room for the number beside the code"),
     ],
 )
 def test_a_horizontal_layout_too_small_is_an_error(
@@ -312,6 +314,33 @@ def test_svg_and_pdf_are_well_formed() -> None:
     width, height = document[0].get_size()
     assert (width, height) == (pytest.approx(595.276, abs=0.01), pytest.approx(841.89, abs=0.01))
     assert b"/ViewerPreferences << /PrintScaling /None >>" in to_pdf(pages, "Labels")
+
+
+def test_a_horizontal_label_prints_its_number_beside_the_code_not_in_the_caption() -> None:
+    template = layout("horizontal")
+    [item] = items(1)
+    [page] = layout_pages(template, [item])
+    [symbol] = page.symbols
+    shape = geometry(template)
+    assert shape.number is not None
+    strip = Rect(
+        symbol.label.x + shape.number.x,
+        symbol.label.y + shape.number.y,
+        shape.number.width,
+        shape.number.height,
+    )
+    assert strip.x + strip.width <= symbol.quiet.x + 1e-9
+    assert shape.frame.x + shape.frame.width < strip.x
+
+    def ink(path: list[Command]) -> Rect:
+        return bounds([point for contour in contours(path) for point in contour])
+
+    [number] = [path for path in page.paths if strip.contains(ink(path))]
+    assert number == page.paths[1]
+    # Turned a quarter, it is taller than wide.
+    assert ink(number).height > 3 * ink(number).width
+    vertical = layout("vertical")
+    assert geometry(vertical).number is None
 
 
 @pytest.mark.parametrize("key", ["vertical", "horizontal"])

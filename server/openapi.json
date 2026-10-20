@@ -799,7 +799,7 @@
           "show_number": {
             "type": "boolean",
             "title": "Show Number",
-            "description": "Print the six-digit number as the caption's first line; needs `max_lines`."
+            "description": "Print the six-digit number, a backup for the code: on a vertical label as the caption's first line, which needs `max_lines`; on a horizontal one small, down a strip beside the code."
           },
           "page": {
             "$ref": "#/components/schemas/PageSize"
