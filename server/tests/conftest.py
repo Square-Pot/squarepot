@@ -48,9 +48,7 @@ class FakeStore:
 
 
 def collection(collection_id: str) -> CollectionConfig:
-    return CollectionConfig(
-        id=collection_id, name=collection_id.title(), spreadsheet_id="sheet", sheet="Plants"
-    )
+    return CollectionConfig(id=collection_id, name=collection_id.title(), spreadsheet_id="sheet")
 
 
 @pytest.fixture

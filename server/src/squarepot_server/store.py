@@ -22,6 +22,9 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.metadata.readonly",
 ]
 TIMEOUT_SECONDS = 30
+EXPORT_URL = "https://docs.google.com/spreadsheets/d/{}/export"
+# A tab of plants is about 100 bytes a row; more than this is not a collection.
+MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024
 
 
 class StoreError(Exception):
@@ -36,6 +39,82 @@ class CollectionStore(Protocol):
     def read(self, collection: CollectionConfig) -> list[list[Cell]]:
         """Every row of the collection's tab, header first."""
         ...
+
+
+def parse_csv(data: bytes, where: object) -> list[list[Cell]]:
+    """Rows of a CSV file in UTF-8, with or without a byte order mark; every cell is text."""
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError as error:
+        raise StoreError(f"{where} is not UTF-8: {error}") from error
+    return [list[Cell](row) for row in csv.reader(io.StringIO(text, newline=""))]
+
+
+class SheetLinkStore:
+    """Downloads tabs of sheets shared as "anyone with the link can view", as CSV.
+
+    The export link needs no credentials and no Google Cloud project, but
+    gives no modification time: the version is a hash of the download. Each
+    check therefore downloads the tab, and a read right after it reuses that
+    download.
+    """
+
+    def __init__(self, session: requests.Session) -> None:
+        self.session = session
+        self.downloads: dict[str, bytes] = {}
+
+    def download(self, collection: CollectionConfig) -> bytes:
+        # Settings make sure of it with this store.
+        if not collection.spreadsheet_id:
+            raise StoreError(f"collection {collection.id!r} has no spreadsheet_id")
+        params = {"format": "csv"}
+        if collection.gid is not None:
+            params["gid"] = str(collection.gid)
+        url = EXPORT_URL.format(quote(collection.spreadsheet_id, safe=""))
+        try:
+            response = self.session.get(url, params=params, timeout=TIMEOUT_SECONDS, stream=True)
+        except Exception as error:
+            # The class name only: requests puts the URL, and so the sheet id, in the text.
+            raise StoreError(f"Google is unreachable ({type(error).__name__})") from error
+        with response:
+            return self.body(response)
+
+    @staticmethod
+    def body(response: requests.Response) -> bytes:
+        if response.status_code in (401, 403, 404):
+            raise StoreError(
+                f"Google answered {response.status_code}: no such sheet or tab, "
+                "or the sheet is not shared by link"
+            )
+        if not response.ok:
+            raise StoreError(f"Google answered {response.status_code}: {response.reason}")
+        if not response.headers.get("Content-Type", "").startswith("text/csv"):
+            # A private sheet sends the browser to a sign-in page instead.
+            raise StoreError(
+                'Google did not send CSV: share the sheet as "anyone with the link can view"'
+            )
+        data = bytearray()
+        try:
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                data += chunk
+                if len(data) > MAX_DOWNLOAD_BYTES:
+                    raise StoreError(
+                        f"the sheet is larger than {MAX_DOWNLOAD_BYTES // (1024 * 1024)} MB"
+                    )
+        except requests.RequestException as error:
+            raise StoreError(f"Google is unreachable ({type(error).__name__})") from error
+        return bytes(data)
+
+    def version(self, collection: CollectionConfig) -> str:
+        data = self.download(collection)
+        self.downloads[collection.id] = data
+        return hashlib.sha256(data).hexdigest()
+
+    def read(self, collection: CollectionConfig) -> list[list[Cell]]:
+        data = self.downloads.pop(collection.id, None)
+        if data is None:
+            data = self.download(collection)
+        return parse_csv(data, "the sheet")
 
 
 class GoogleSheetsStore:
@@ -115,8 +194,4 @@ class CsvFileStore:
         return hashlib.sha256(self.load(collection)).hexdigest()
 
     def read(self, collection: CollectionConfig) -> list[list[Cell]]:
-        try:
-            text = self.load(collection).decode("utf-8-sig")
-        except UnicodeDecodeError as error:
-            raise StoreError(f"{collection.file} is not UTF-8: {error}") from error
-        return [list[Cell](row) for row in csv.reader(io.StringIO(text, newline=""))]
+        return parse_csv(self.load(collection), collection.file)
