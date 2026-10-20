@@ -21,8 +21,7 @@ from squarepot_server.fields import load_schema
 from squarepot_server.labels import datamatrix
 from squarepot_server.labels.caption import caption
 from squarepot_server.labels.layout import (
-    COMFORT_LEFT,
-    COMFORT_SIDES,
+    COMFORT,
     CUT_GREY,
     MAX_FONT,
     MIN_FONT,
@@ -323,22 +322,19 @@ def test_svg_and_pdf_are_well_formed() -> None:
     assert b"/ViewerPreferences << /PrintScaling /None >>" in to_pdf(pages, "Labels")
 
 
-@pytest.mark.parametrize(
-    ("key", "comfort"), [("horizontal", COMFORT_LEFT), ("vertical", COMFORT_SIDES)]
-)
-def test_a_short_caption_gets_room_and_a_long_one_takes_it_back(key: str, comfort: float) -> None:
+@pytest.mark.parametrize("key", ["horizontal", "vertical"])
+def test_a_short_caption_gets_room_and_a_long_one_takes_it_back(key: str) -> None:
     template = layout(key)
+    left, right = COMFORT[template.orientation]
     text = geometry(template).text
     short = [[Run("SB 12", Style.BOLD)], [Run("Lithops", Style.ITALIC)]]
-    area, size, _ = comfortable_fit(short, text, template.max_lines, key == "horizontal")
+    area, size, _ = comfortable_fit(short, text, template.max_lines, template.orientation)
     assert size == MAX_FONT
-    assert area.x == pytest.approx(text.x + comfort)
-    assert area.x + area.width == pytest.approx(
-        text.x + text.width - (0 if key == "horizontal" else comfort)
-    )
+    assert area.x == pytest.approx(text.x + left)
+    assert area.x + area.width == pytest.approx(text.x + text.width - right)
     long = [[Run("Conophytum " * 4, Style.ITALIC)]] * 3
-    area, size, _ = comfortable_fit(long, text, template.max_lines, key == "horizontal")
-    assert area.x < text.x + comfort
+    area, size, _ = comfortable_fit(long, text, template.max_lines, template.orientation)
+    assert area.x < text.x + left
     # It loses no font size to the extra room.
     assert size == fit(long, text, template.max_lines)[0]
 

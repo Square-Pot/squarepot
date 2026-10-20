@@ -43,12 +43,12 @@ SOIL_DASH = 1.0
 # The number is a backup for the code, set small next to it in a strip as deep as its font
 # size: under the code on a vertical label, down its side on a horizontal one.
 NUMBER_FONT = MIN_FONT
-# Extra room inside the caption's frame that a caption gets when it costs no font size: on
-# the left of a horizontal label's caption, on both sides of a vertical one's. It shrinks in
-# steps, down to none, as a longer caption needs the room.
-COMFORT_LEFT = 2.0
-COMFORT_SIDES = 1.0
-COMFORT_STEP = 0.5
+# Extra room inside the caption's frame, left and right, that a caption gets when it costs no
+# font size: more on the left of a horizontal label's caption, which starts there, the same on
+# both sides of a vertical one's, which is centred. It shrinks in steps, both sides together,
+# down to none, as a longer caption needs the room.
+COMFORT = {LabelOrientation.HORIZONTAL: (2.0, 1.0), LabelOrientation.VERTICAL: (1.0, 1.0)}
+COMFORT_STEPS = 4
 # Tolerance for lengths given in decimal millimetres.
 EPSILON = 1e-9
 
@@ -292,22 +292,20 @@ def fit(items: list[list[Run]], area: Rect, max_lines: int) -> tuple[float, list
 
 
 def comfortable_fit(
-    items: list[list[Run]], text: Rect, max_lines: int, horizontal: bool
+    items: list[list[Run]], text: Rect, max_lines: int, orientation: LabelOrientation
 ) -> tuple[Rect, float, list[list[Run]]]:
     """The caption's area, font size and lines, with the most extra room that costs no size.
 
     When even the smallest size does not fit, the caption gets all of the room, so that as
     little as possible is cut.
     """
-    most = COMFORT_LEFT if horizontal else COMFORT_SIDES
+    left, right = COMFORT[orientation]
+    # Never so much that not even one character fits.
+    scale = min(1.0, max(text.width - MIN_FONT, 0) / (left + right))
     best: tuple[Rect, float, list[list[Run]]] | None = None
-    steps = round(most / COMFORT_STEP)
-    for step in range(steps, -1, -1):
-        inset = min(step * COMFORT_STEP, max(text.width - MIN_FONT, 0) / (1 if horizontal else 2))
-        if horizontal:
-            area = Rect(text.x + inset, text.y, text.width - inset, text.height)
-        else:
-            area = Rect(text.x + inset, text.y, text.width - 2 * inset, text.height)
+    for step in range(COMFORT_STEPS, -1, -1):
+        share = scale * step / COMFORT_STEPS
+        area = Rect(text.x + left * share, text.y, text.width - (left + right) * share, text.height)
         size, lines = fit(items, area, max_lines)
         # Ties keep the larger inset, met first, except at the smallest size.
         if best is None or size > best[1] + EPSILON or (size <= MIN_FONT + EPSILON and step == 0):
@@ -362,8 +360,8 @@ def draw_label(page: Page, x: float, y: float, layout: LabelLayout, item: Item) 
     items = item.caption
     if not layout.max_lines or not items:
         return
+    area, size, lines = comfortable_fit(items, shape.text, layout.max_lines, layout.orientation)
     horizontal = layout.orientation == LabelOrientation.HORIZONTAL
-    area, size, lines = comfortable_fit(items, shape.text, layout.max_lines, horizontal)
     if layout.caption_box:
         frame = shape.frame
         top = y + frame.y + BOX_LINE / 2
