@@ -7,7 +7,8 @@ for that is an error, never a crop; only the caption gives way, by shrinking
 and then being cut short.
 
 A label has a visible part, which holds the code and the caption, and may
-have a white burial zone under it that goes into the substrate.
+have a white burial zone under it that goes into the substrate, blank or
+with more about the plant.
 """
 
 from __future__ import annotations
@@ -49,6 +50,11 @@ NUMBER_FONT = MIN_FONT
 # down to none, as a longer caption needs the room.
 COMFORT = {LabelOrientation.HORIZONTAL: (2.0, 1.0), LabelOrientation.VERTICAL: (1.0, 1.0)}
 COMFORT_STEPS = 4
+# Burial text: at most this font size, and its box's inset from the cut corners at the sides
+# and from the soil line and the bottom edge.
+BURIAL_MAX_FONT = 2.5
+BURIAL_SIDE = 1.0
+BURIAL_TOP = 0.5
 # Tolerance for lengths given in decimal millimetres.
 EPSILON = 1e-9
 
@@ -68,6 +74,7 @@ TEMPLATES = {
                 height_mm=60,
                 burial_mm=25,
                 chamfer_mm=0,
+                burial_text=False,
                 module_mm=1.2,
                 max_lines=8,
                 caption_box=True,
@@ -91,6 +98,7 @@ TEMPLATES = {
                 height_mm=30,
                 burial_mm=15,
                 chamfer_mm=5,
+                burial_text=True,
                 module_mm=1.2,
                 max_lines=4,
                 caption_box=True,
@@ -159,10 +167,11 @@ class Page:
 
 @dataclass(frozen=True)
 class Item:
-    """One label to print: its number and caption items."""
+    """One label to print: its number, caption items and burial text items."""
 
     tag: str
     caption: list[list[Run]]
+    burial: list[list[Run]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -177,6 +186,8 @@ class Geometry:
     visible: float
     # The strip next to the code that holds the number, when it is shown.
     number: Rect | None = None
+    # The box in the burial zone for its text, when it has one.
+    burial: Rect | None = None
 
 
 def geometry(layout: LabelLayout) -> Geometry:
@@ -254,10 +265,26 @@ def geometry(layout: LabelLayout) -> Geometry:
             f"A {layout.chamfer_mm:g} mm chamfer on each corner is wider than the "
             f"{layout.width_mm:g} mm label: make chamfer_mm smaller."
         )
-    return Geometry(symbol, frame, text, visible, number)
+    box = None
+    if layout.burial_text:
+        inset = layout.chamfer_mm + BURIAL_SIDE
+        box = Rect(
+            inset,
+            visible + BURIAL_TOP,
+            layout.width_mm - 2 * inset,
+            layout.burial_mm - 2 * BURIAL_TOP,
+        )
+        if box.width < MIN_FONT - EPSILON or box.height < MIN_FONT * LINE_HEIGHT - EPSILON:
+            raise LayoutError(
+                f"{name} has no room for text in its burial zone: make burial_mm larger or "
+                f"chamfer_mm smaller, or set burial_text to false."
+            )
+    return Geometry(symbol, frame, text, visible, number, box)
 
 
-def fit(items: list[list[Run]], area: Rect, max_lines: int) -> tuple[float, list[list[Run]]]:
+def fit(
+    items: list[list[Run]], area: Rect, max_lines: int, largest: float = MAX_FONT
+) -> tuple[float, list[list[Run]]]:
     """The largest font size at which the caption fits, and its lines; cut short if none does."""
 
     def lines_at(size: float) -> list[list[Run]]:
@@ -271,7 +298,7 @@ def fit(items: list[list[Run]], area: Rect, max_lines: int) -> tuple[float, list
 
     # Words are broken only when no size keeps them whole.
     for whole_words in (True, False):
-        size = MAX_FONT
+        size = largest
         while size >= MIN_FONT - EPSILON:
             lines = lines_at(size)
             fits = (
@@ -354,12 +381,17 @@ def draw_label(page: Page, x: float, y: float, layout: LabelLayout, item: Item) 
     page.paths.append(symbol_path(item.tag, symbol.x, symbol.y, module))
     if layout.burial_mm:
         draw_burial(page, x, y, layout, shape.visible)
-
     if shape.number is not None:
         draw_number(page, x + shape.number.x, y + shape.number.y, shape.number, item.tag)
-    items = item.caption
-    if not layout.max_lines or not items:
-        return
+    if layout.max_lines and item.caption:
+        draw_caption(page, x, y, layout, shape, item.caption)
+    if shape.burial is not None and item.burial:
+        draw_burial_text(page, x, y, shape.burial, item.burial)
+
+
+def draw_caption(
+    page: Page, x: float, y: float, layout: LabelLayout, shape: Geometry, items: list[list[Run]]
+) -> None:
     area, size, lines = comfortable_fit(items, shape.text, layout.max_lines, layout.orientation)
     horizontal = layout.orientation == LabelOrientation.HORIZONTAL
     if layout.caption_box:
@@ -373,15 +405,37 @@ def draw_label(page: Page, x: float, y: float, layout: LabelLayout, item: Item) 
             page.lines.append(Line(x1, y1, x2, y2, BOX_LINE, 0.0))
     # Beside the code, the lines are centred in the height and start on the left.
     first = (area.height - len(lines) * size * LINE_HEIGHT) / 2 if horizontal else 0
+    draw_lines(
+        page, x + area.x, y + area.y + first, area.width, size, lines, centred=not horizontal
+    )
+
+
+def draw_lines(
+    page: Page,
+    x: float,
+    y: float,
+    available: float,
+    size: float,
+    lines: list[list[Run]],
+    centred: bool,
+) -> None:
+    """Lines of text from (x, y), their top left, each started on the left or centred."""
     commands: list[Command] = []
     for index, line in enumerate(lines):
-        baseline = y + area.y + first + index * size * LINE_HEIGHT + size * BASELINE
-        cursor = x + area.x + (0 if horizontal else (area.width - width(line, size)) / 2)
+        baseline = y + index * size * LINE_HEIGHT + size * BASELINE
+        cursor = x + ((available - width(line, size)) / 2 if centred else 0)
         for run in line:
             commands += font(run.style).outline(run.text, size, cursor, baseline)
             cursor += font(run.style).width(run.text, size)
     if commands:
         page.paths.append(commands)
+
+
+def draw_burial_text(page: Page, x: float, y: float, box: Rect, items: list[list[Run]]) -> None:
+    """The burial text at the top left of its box, as large as fits, then cut short."""
+    room = math.floor(box.height / (MIN_FONT * LINE_HEIGHT) + EPSILON)
+    size, lines = fit(items, box, room, BURIAL_MAX_FONT)
+    draw_lines(page, x + box.x, y + box.y, box.width, size, lines, centred=False)
 
 
 def draw_number(page: Page, x: float, y: float, strip: Rect, tag: str) -> None:

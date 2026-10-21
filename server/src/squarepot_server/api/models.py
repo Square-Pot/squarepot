@@ -231,6 +231,11 @@ class LabelFormat(StrEnum):
     SVG = "svg"
 
 
+class LabelLanguage(StrEnum):
+    EN = "en"
+    RU = "ru"
+
+
 class LabelOrientation(StrEnum):
     VERTICAL = "vertical"
     HORIZONTAL = "horizontal"
@@ -268,6 +273,12 @@ class LabelLayout(ApiModel):
             "How far the burial zone's bottom corners are cut in, so that the label goes into "
             "the substrate easily; drawn as grey cutting lines. Needs `burial_mm`."
         ),
+    )
+    burial_text: bool = Field(
+        description=(
+            "Print the request's `burial_preset` in the burial zone, clear of the cut corners: "
+            "each field on its own line with its label in bold, shrunk and then cut short to fit."
+        )
     )
     module_mm: float = Field(
         ge=0.5,
@@ -311,6 +322,7 @@ class LabelLayoutOverrides(ApiModel):
     height_mm: float | None = Field(default=None, gt=0, le=300)
     burial_mm: float | None = Field(default=None, ge=0, le=300)
     chamfer_mm: float | None = Field(default=None, ge=0, le=50)
+    burial_text: bool | None = None
     module_mm: float | None = Field(default=None, ge=0.5, le=5)
     max_lines: int | None = Field(default=None, ge=0, le=20)
     caption_box: bool | None = None
@@ -344,6 +356,16 @@ class LabelRequest(ApiModel):
         ),
     )
     preset: Key = Field(default="label", description="Key of the preset that makes the caption.")
+    burial_preset: Key | None = Field(
+        default="burial",
+        description=(
+            "Key of the preset printed in the burial zone of a template with `burial_text`; "
+            "`null` leaves the zone blank."
+        ),
+    )
+    language: LabelLanguage = Field(
+        default=LabelLanguage.EN, description="Language of the field labels in the burial zone."
+    )
     layout: LabelLayoutOverrides = Field(default_factory=LabelLayoutOverrides)
     format: LabelFormat = LabelFormat.PDF
     page: int = Field(

@@ -743,6 +743,14 @@
         ],
         "title": "LabelFormat"
       },
+      "LabelLanguage": {
+        "type": "string",
+        "enum": [
+          "en",
+          "ru"
+        ],
+        "title": "LabelLanguage"
+      },
       "LabelLayout": {
         "properties": {
           "orientation": {
@@ -776,6 +784,11 @@
             "minimum": 0.0,
             "title": "Chamfer Mm",
             "description": "How far the burial zone's bottom corners are cut in, so that the label goes into the substrate easily; drawn as grey cutting lines. Needs `burial_mm`."
+          },
+          "burial_text": {
+            "type": "boolean",
+            "title": "Burial Text",
+            "description": "Print the request's `burial_preset` in the burial zone, clear of the cut corners: each field on its own line with its label in bold, shrunk and then cut short to fit."
           },
           "module_mm": {
             "type": "number",
@@ -832,6 +845,7 @@
           "height_mm",
           "burial_mm",
           "chamfer_mm",
+          "burial_text",
           "module_mm",
           "max_lines",
           "caption_box",
@@ -907,6 +921,17 @@
               }
             ],
             "title": "Chamfer Mm"
+          },
+          "burial_text": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Burial Text"
           },
           "module_mm": {
             "anyOf": [
@@ -1048,6 +1073,28 @@
             "examples": [
               "genus"
             ]
+          },
+          "burial_preset": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "examples": [
+                  "genus"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Burial Preset",
+            "description": "Key of the preset printed in the burial zone of a template with `burial_text`; `null` leaves the zone blank.",
+            "default": "burial"
+          },
+          "language": {
+            "$ref": "#/components/schemas/LabelLanguage",
+            "description": "Language of the field labels in the burial zone.",
+            "default": "en"
           },
           "layout": {
             "$ref": "#/components/schemas/LabelLayoutOverrides"

@@ -15,12 +15,13 @@ import zxingcpp
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from squarepot_server.api.models import LabelLayout, LabelOrientation, PageSize
+from squarepot_server.api.models import LabelLanguage, LabelLayout, LabelOrientation, PageSize
 from squarepot_server.config import DEFAULT_SCHEMA_FILE
 from squarepot_server.fields import load_schema
 from squarepot_server.labels import datamatrix
-from squarepot_server.labels.caption import caption
+from squarepot_server.labels.caption import burial_text, caption
 from squarepot_server.labels.layout import (
+    BURIAL_MAX_FONT,
     COMFORT,
     CUT_GREY,
     MAX_FONT,
@@ -42,11 +43,19 @@ from tests.conftest import FakeStore, runtime
 
 SCHEMA = load_schema(DEFAULT_SCHEMA_FILE)
 LABEL = next(preset for preset in SCHEMA.presets if preset.key == "label")
+BURIAL = next(preset for preset in SCHEMA.presets if preset.key == "burial")
 DPI = 300
 DATA_MATRIX = zxingcpp.BarcodeFormats(zxingcpp.BarcodeFormat.DataMatrix)
 PX_PER_MM = DPI / 25.4
 PLANTS = [
-    {"field_number": "SB 1234", "genus": "lithops", "species": "lesliei", "ex": "Mesa Garden"},
+    {
+        "field_number": "SB 1234",
+        "genus": "lithops",
+        "species": "lesliei",
+        "ex": "Mesa Garden",
+        "source": "Mesa Garden",
+        "seeding_date": "2024-03-15",
+    },
     {"genus": "Conophytum", "affinity": "minimum"},
     {
         "field_number": "VG 671",
@@ -55,6 +64,9 @@ PLANTS = [
         "subspecies": "cardenasianum",
         "cultivar": "Big Red",
         "ex": "a seller whose name is far too long for any small label",
+        "synonym": "Gymnocalycium cardenasianum",
+        "locality": "Tupiza, Potosí, Bolivia, on rocky slopes at about three thousand metres",
+        "notes": "repotted in spring; keep dry in winter and give full sun all summer long",
     },
 ]
 TAGS = ["000001", "004217", "999999", "123456", "100000", "054321", "777777"]
@@ -62,7 +74,11 @@ TAGS = ["000001", "004217", "999999", "123456", "100000", "054321", "777777"]
 
 def items(count: int) -> list[Item]:
     return [
-        Item(TAGS[index % len(TAGS)], caption(SCHEMA, LABEL, PLANTS[index % len(PLANTS)]))
+        Item(
+            TAGS[index % len(TAGS)],
+            caption(SCHEMA, LABEL, PLANTS[index % len(PLANTS)]),
+            burial_text(SCHEMA, BURIAL, PLANTS[index % len(PLANTS)], LabelLanguage.EN),
+        )
         for index in range(count)
     ]
 
@@ -109,8 +125,10 @@ SIDE_BY_SIDE: dict[str, dict[str, Any]] = {
         "height_mm": 24.4,
         "burial_mm": 10,
         "chamfer_mm": 7.2,
+        "burial_text": False,
     },
-    "no-burial": {"height_mm": 15, "burial_mm": 0, "chamfer_mm": 0},
+    "no-burial": {"height_mm": 15, "burial_mm": 0, "chamfer_mm": 0, "burial_text": False},
+    "blank-burial": {"burial_text": False},
     "no-frame-with-number": {"caption_box": False, "show_number": True},
     "no-number": {"show_number": False},
     "letter-no-gap": {"page": PageSize.LETTER, "gap_mm": 0, "cut_lines": False},
@@ -367,8 +385,8 @@ def test_the_number_is_printed_next_to_the_code_not_in_the_caption(key: str) -> 
     assert number == page.paths[1]
     # Down the side of the code it is turned a quarter, so taller than wide.
     assert (ink(number).height > ink(number).width) == (key == "horizontal")
-    # The code, the number and the caption, which stays in its frame.
-    assert len(page.paths) == 3
+    # The code, the number and the caption, which stays in its frame, then any burial text.
+    assert len(page.paths) == 3 + template.burial_text
     frame = Rect(
         symbol.label.x + shape.frame.x,
         symbol.label.y + shape.frame.y,
@@ -379,15 +397,27 @@ def test_the_number_is_printed_next_to_the_code_not_in_the_caption(key: str) -> 
 
 
 @pytest.mark.parametrize("key", ["vertical", "horizontal"])
-def test_the_burial_zone_holds_only_the_soil_line_and_the_cut_corners(key: str) -> None:
+def test_the_burial_zone_holds_its_text_the_soil_line_and_the_cut_corners(key: str) -> None:
     template = layout(key)
     [page] = layout_pages(template, items(1))
     [symbol] = page.symbols
     soil = symbol.label.y + template.height_mm - template.burial_mm
     burial = Rect(symbol.label.x, soil, symbol.label.width, template.burial_mm)
+    box = geometry(template).burial
+    assert (box is not None) == template.burial_text
+    buried = 0
     for path in page.paths:
         for contour in contours(path):
-            assert bounds(contour).y + bounds(contour).height <= soil + 1e-6
+            if bounds(contour).y + bounds(contour).height <= soil + 1e-6:
+                continue
+            # Below the soil line, only the burial text, inside its box.
+            assert box is not None
+            ink = bounds(contour)
+            assert Rect(
+                symbol.label.x + box.x, symbol.label.y + box.y, box.width, box.height
+            ).contains(ink)
+            buried += 1
+    assert (buried > 0) == template.burial_text
     inside = [line for line in page.lines if burial.contains(Rect(line.x1, line.y1, 0, 0))]
     assert all(line.grey == CUT_GREY for line in inside)
     [soil_line] = [line for line in inside if line.dash]
@@ -398,6 +428,15 @@ def test_the_burial_zone_holds_only_the_soil_line_and_the_cut_corners(key: str) 
         assert abs(line.x2 - line.x1) == pytest.approx(template.chamfer_mm)
         assert line.y1 == pytest.approx(soil + 0.1)
         assert line.y2 == pytest.approx(burial.y + burial.height)
+
+
+def test_the_burial_text_box_keeps_clear_of_the_cut_corners() -> None:
+    template = layout("horizontal")
+    box = geometry(template).burial
+    assert box == Rect(6, 15.5, 64, 14)
+    with pytest.raises(LayoutError, match="no room for text in its burial zone"):
+        geometry(layout("horizontal", burial_mm=2, height_mm=17))
+    assert geometry(layout("horizontal", burial_mm=2, height_mm=17, burial_text=False))
 
 
 def test_dashed_lines_are_dashed_in_svg_and_pdf() -> None:
@@ -500,6 +539,34 @@ def test_a_long_caption_shrinks_then_is_cut_short() -> None:
     assert text(lines[-1]).endswith(ELLIPSIS)
 
 
+def test_burial_text_names_each_field_in_bold_in_the_chosen_language() -> None:
+    english = burial_text(SCHEMA, BURIAL, PLANTS[0], LabelLanguage.EN)
+    assert [text(item) for item in english] == [
+        "Source: Mesa Garden",
+        "Seeding date: 2024-03-15",
+    ]
+    assert [run.style for run in english[0]] == [Style.BOLD, Style.REGULAR]
+    russian = burial_text(SCHEMA, BURIAL, PLANTS[0], LabelLanguage.RU)
+    assert [text(item) for item in russian] == ["Источник: Mesa Garden", "Дата посева: 2024-03-15"]
+    synonym = burial_text(SCHEMA, BURIAL, PLANTS[2], LabelLanguage.EN)[0]
+    assert synonym[1] == Run("Gymnocalycium cardenasianum", Style.ITALIC)
+
+
+def test_burial_text_is_set_large_when_short_and_cut_short_when_long() -> None:
+    box = geometry(layout("horizontal")).burial
+    assert box is not None
+    size, lines = fit(
+        burial_text(SCHEMA, BURIAL, PLANTS[0], LabelLanguage.EN), box, 6, BURIAL_MAX_FONT
+    )
+    assert size == BURIAL_MAX_FONT
+    assert len(lines) == 2
+    long = burial_text(SCHEMA, BURIAL, PLANTS[2], LabelLanguage.EN) * 3
+    size, lines = fit(long, box, 6, BURIAL_MAX_FONT)
+    assert size == MIN_FONT
+    assert len(lines) == 6
+    assert text(lines[-1]).endswith(ELLIPSIS)
+
+
 def test_words_are_kept_whole_when_a_smaller_size_allows() -> None:
     area = Rect(0, 0, 14, 20)
     _, lines = fit(caption(SCHEMA, LABEL, PLANTS[2]), area, max_lines=6)
@@ -559,6 +626,7 @@ def test_layout_overrides_apply(client: TestClient) -> None:
         ({"plants": ["main:nope"]}, 404, "No plant with the id main:nope."),
         ({"plants": ["main:004217"], "template": "huge"}, 422, "No label template 'huge'."),
         ({"plants": ["main:004217"], "preset": "nope"}, 422, "No preset 'nope'."),
+        ({"plants": ["main:004217"], "burial_preset": "nope"}, 422, "No preset 'nope'."),
         (
             {"plants": ["main:004217"], "layout": {"width_mm": 10}},
             422,
@@ -608,6 +676,24 @@ def test_auto_prints_each_plant_with_its_label_type(client: TestClient, store: F
     ]
     forced = client.post("/api/v1/labels", json={"plants": plants, "template": "vertical"})
     assert forced.headers["x-page-count"] == "1"
+
+
+def test_the_burial_preset_and_language_are_chosen_per_request(
+    client: TestClient, store: FakeStore
+) -> None:
+    store.put("main", [["tag", "genus", "source"], [1, "Lithops", "Mesa Garden"]])
+    runtime(client).syncer.run_once()
+
+    def paths(**options: object) -> int:
+        request = {"plants": ["main:000001"], "template": "horizontal", "format": "svg"}
+        response = client.post("/api/v1/labels", json=request | options)
+        assert response.status_code == 200
+        return response.text.count("<path ")
+
+    # The code, the number, the caption and the burial text, unless the zone is left blank.
+    assert paths() == 4
+    assert paths(burial_preset=None) == 3
+    assert paths(language="ru") == 4
 
 
 def test_plants_without_a_number_cannot_be_labelled(client: TestClient) -> None:

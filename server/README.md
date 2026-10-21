@@ -155,6 +155,9 @@ reads as one column and is reported as missing its `genus` column.
   `label` preset. The `vertical` template has the code on top and the caption
   under it, the `horizontal` one the caption beside the code; both end in a
   white burial zone that goes into the substrate, under a dashed soil line.
+  The horizontal one prints the `burial` preset there, each field with its
+  label in bold (`language`: English by default, or Russian); the vertical
+  one leaves it blank.
   By default (`auto`), each plant gets the template its `label_type` names,
   and each template's labels start on a page of their own.
   The code is always printed whole, with a white quiet zone of at least one

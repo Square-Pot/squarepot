@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from squarepot_server.api.models import Display, FieldSchema, Preset
+from squarepot_server.api.models import Display, FieldSchema, LabelLanguage, Preset
 from squarepot_server.labels.text import Run, Style
 
 NAME = "name"
@@ -60,4 +60,22 @@ def caption(schema: FieldSchema, preset: Preset, fields: dict[str, str]) -> list
         items[0] = [
             Run(run.text, Style.BOLD) if run.style == Style.REGULAR else run for run in items[0]
         ]
+    return items
+
+
+def burial_text(
+    schema: FieldSchema, preset: Preset, fields: dict[str, str], language: LabelLanguage
+) -> list[list[Run]]:
+    """One item per non-empty preset field: its label in bold, then its value.
+
+    Computed fields are left out: the name is on the visible part, and age changes over time.
+    """
+    definitions = {definition.key: definition for definition in schema.fields}
+    items: list[list[Run]] = []
+    for key in preset.fields:
+        definition = definitions.get(key)
+        if definition is None or not fields.get(key, "").strip():
+            continue
+        label = getattr(definition.label, language.value)
+        items.append([Run(f"{label}: ", Style.BOLD), *styled(fields[key], definition.display)])
     return items

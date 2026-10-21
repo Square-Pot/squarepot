@@ -196,6 +196,9 @@ presets:
   - key: label
     label: {en: Label, ru: Бирка}
     fields: [field_number, name, ex]
+  - key: burial
+    label: {en: Burial zone, ru: Зона в грунте}
+    fields: [synonym, locality, source, seeding_date, purchase_date, notes]
   - key: overlay
     label: {en: Camera overlay, ru: Подпись в кадре}
     fields: [name]

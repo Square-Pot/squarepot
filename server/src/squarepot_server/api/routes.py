@@ -29,7 +29,7 @@ from squarepot_server.api.models import (
     TagLookup,
 )
 from squarepot_server.db import CollectionRow, PlantRow, current_seq, get_meta
-from squarepot_server.labels.caption import caption
+from squarepot_server.labels.caption import burial_text, caption
 from squarepot_server.labels.layout import TEMPLATES, Item, LayoutError, Page, layout_pages
 from squarepot_server.labels.render import to_pdf, to_svg
 from squarepot_server.runtime import Runtime
@@ -283,6 +283,15 @@ def create_labels(body: LabelRequest, session: SessionDep, runtime: RuntimeDep) 
     preset = next((p for p in runtime.schema.presets if p.key == body.preset), None)
     if preset is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No preset {body.preset!r}.")
+    burial_preset = None
+    if body.burial_preset is not None:
+        burial_preset = next(
+            (p for p in runtime.schema.presets if p.key == body.burial_preset), None
+        )
+        if burial_preset is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, f"No preset {body.burial_preset!r}."
+            )
     rows = {
         row.id: row
         for row in session.scalars(
@@ -300,7 +309,13 @@ def create_labels(body: LabelRequest, session: SessionDep, runtime: RuntimeDep) 
     for plant_id in body.plants:
         fields = rows[plant_id].fields
         batches.setdefault(chosen_template(body.template, fields), []).append(
-            Item(cast(str, rows[plant_id].tag), caption(runtime.schema, preset, fields))
+            Item(
+                cast(str, rows[plant_id].tag),
+                caption(runtime.schema, preset, fields),
+                burial_text(runtime.schema, burial_preset, fields, body.language)
+                if burial_preset
+                else [],
+            )
         )
     overrides = body.layout.model_dump(exclude_none=True)
     pages: list[Page] = []
