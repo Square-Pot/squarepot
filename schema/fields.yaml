@@ -158,6 +158,12 @@ fields:
     aliases: [information]
     description: Free-form notes.
 
+  - key: description
+    type: text
+    label: {en: Description, ru: Описание}
+    group: extra
+    description: Free-form description of the plant, kept apart from the notes.
+
   - key: label_type
     type: text
     label: {en: Label type, ru: Тип бирки}
@@ -198,4 +204,4 @@ presets:
     fields: [tag, field_number, name, ex, locality, age]
   - key: full
     label: {en: Full, ru: Полная}
-    fields: [tag, field_number, name, synonym, ex, locality, source, seeding_date, purchase_date, price, currency, age, notes]
+    fields: [tag, field_number, name, synonym, ex, locality, source, seeding_date, purchase_date, price, currency, age, notes, description]

@@ -42,6 +42,12 @@ def test_headers_match_keys_and_aliases_ignoring_case(schema: FieldSchema) -> No
     assert row.fields == {"genus": "Echeveria", "cultivar": "Perle von Nürnberg", "notes": "gift"}
 
 
+def test_description_is_a_field_of_its_own_beside_notes(schema: FieldSchema) -> None:
+    assert one(
+        schema, ["genus", "information", "Description"], ["Lithops", "gift", "from seed"]
+    ) == {"genus": "Lithops", "notes": "gift", "description": "from seed"}
+
+
 def test_every_imported_key_comes_from_the_schema(schema: FieldSchema) -> None:
     keys = [field.key for field in schema.fields]
     values: list[Cell] = ["x"] * len(keys)
