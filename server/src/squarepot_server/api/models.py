@@ -238,6 +238,8 @@ class LabelOrientation(StrEnum):
 
 # Most printers cannot print the outer 3-5 mm of a sheet.
 MIN_MARGIN_MM = 5
+# The template that picks each plant's template from its `label_type`.
+AUTO_TEMPLATE = "auto"
 
 
 class LabelLayout(ApiModel):
@@ -333,7 +335,13 @@ class LabelRequest(ApiModel):
         description="Ids of the plants to label, in print order. Every plant must have a tag.",
     )
     template: Key = Field(
-        default="vertical", description="Key of a template from `/labels/templates`."
+        default=AUTO_TEMPLATE,
+        description=(
+            "Key of a template from `/labels/templates`, or `auto`: each plant gets the "
+            "`horizontal` template when its `label_type` is `h`, and the `vertical` one "
+            "otherwise. Each template's labels start on a page of their own, vertical first, "
+            "and `layout` applies to both."
+        ),
     )
     preset: Key = Field(default="label", description="Key of the preset that makes the caption.")
     layout: LabelLayoutOverrides = Field(default_factory=LabelLayoutOverrides)

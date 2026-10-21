@@ -38,6 +38,7 @@ from squarepot_server.labels.layout import (
 )
 from squarepot_server.labels.render import pdf_content, to_pdf, to_svg
 from squarepot_server.labels.text import ELLIPSIS, Command, Run, Style
+from tests.conftest import FakeStore, runtime
 
 SCHEMA = load_schema(DEFAULT_SCHEMA_FILE)
 LABEL = next(preset for preset in SCHEMA.presets if preset.key == "label")
@@ -577,6 +578,36 @@ def test_labels_errors(
     body = response.json()
     assert body["code"] == ("not_found" if status == 404 else "invalid_request")
     assert message in body["message"]
+
+
+def test_auto_prints_each_plant_with_its_label_type(client: TestClient, store: FakeStore) -> None:
+    store.put(
+        "main",
+        [
+            ["tag", "genus", "label_type"],
+            [1, "Lithops", "h"],
+            [2, "Lithops", ""],
+            [3, "Lithops", "H"],
+            [4, "Lithops", "v"],
+        ],
+    )
+    runtime(client).syncer.run_once()
+    plants = [f"main:00000{tag}" for tag in (1, 2, 3, 4)]
+    response = client.post("/api/v1/labels", json={"plants": plants, "skip": 43})
+    assert response.status_code == 200
+    # The vertical labels come first, after the skipped positions; the horizontal ones
+    # start a page of their own.
+    pages = [
+        decode(page.render(scale=DPI / 72).to_pil().convert("L"))
+        for page in pypdfium2.PdfDocument(response.content)
+    ]
+    assert [sorted(text for text, _, _ in found) for found in pages] == [
+        ["000002"],
+        ["000004"],
+        ["000001", "000003"],
+    ]
+    forced = client.post("/api/v1/labels", json={"plants": plants, "template": "vertical"})
+    assert forced.headers["x-page-count"] == "1"
 
 
 def test_plants_without_a_number_cannot_be_labelled(client: TestClient) -> None:

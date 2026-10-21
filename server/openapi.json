@@ -1033,8 +1033,8 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]*$",
             "title": "Template",
-            "description": "Key of a template from `/labels/templates`.",
-            "default": "vertical",
+            "description": "Key of a template from `/labels/templates`, or `auto`: each plant gets the `horizontal` template when its `label_type` is `h`, and the `vertical` one otherwise. Each template's labels start on a page of their own, vertical first, and `layout` applies to both.",
+            "default": "auto",
             "examples": [
               "genus"
             ]
