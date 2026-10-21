@@ -1,0 +1,120 @@
+name: "Research: Data Matrix size"
+
+# research/datamatrix-size: 10x10 vs 12x12 symbols at the same label size.
+# A pull request that changes it gets the smoke run; the full run is started by hand.
+on:
+  pull_request:
+    paths:
+      - research/datamatrix-size/**
+      - .github/workflows/research-datamatrix.yml
+  workflow_dispatch:
+    inputs:
+      smoke:
+        description: "Smoke run: 3 frames per point"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: research/datamatrix-size
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  SHARDS: 6
+  # A pull request has no inputs: it runs the smoke test.
+  SMOKE: ${{ github.event_name == 'pull_request' || inputs.smoke }}
+
+jobs:
+  check:
+    name: Check the symbols
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: research/datamatrix-size/requirements.txt
+      - name: Install
+        run: |
+          sudo apt-get update -q && sudo apt-get install -yq libdmtx-dev
+          pip install -r requirements.txt
+      - name: Check
+        run: python run.py check
+
+  frames:
+    name: Frames ${{ matrix.index }}
+    needs: check
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        index: [0, 1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: research/datamatrix-size/requirements.txt
+      - name: Install
+        run: |
+          sudo apt-get update -q && sudo apt-get install -yq libdmtx-dev
+          pip install -r requirements.txt
+      - name: Draw and decode
+        env:
+          INDEX: ${{ matrix.index }}
+        run: |
+          options=()
+          if [ "${SMOKE}" = true ]; then options=(--smoke); fi
+          python run.py shard "${INDEX}" "${SHARDS}" "${options[@]}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: raw-${{ matrix.index }}
+          path: research/datamatrix-size/raw/
+          if-no-files-found: error
+
+  analyze:
+    name: Analyze
+    needs: frames
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: research/datamatrix-size/requirements.txt
+      - name: Install
+        run: |
+          sudo apt-get update -q && sudo apt-get install -yq libdmtx-dev
+          pip install -r requirements.txt
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: raw-*
+          path: research/datamatrix-size/raw/
+          merge-multiple: true
+      - name: Analyze
+        run: |
+          options=()
+          if [ "${SMOKE}" = true ]; then options=(--smoke); fi
+          python run.py analyze "${options[@]}"
+          cat results*/summary.md >> "${GITHUB_STEP_SUMMARY}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: results
+          path: |
+            research/datamatrix-size/results*/
+            research/datamatrix-size/raw/
+          if-no-files-found: error
