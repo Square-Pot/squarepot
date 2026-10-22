@@ -11,5 +11,7 @@ owner approves them.
 - [Field schema](../schema/fields.yaml): the single definition of plant fields,
   display rules and default presets.
 - [Architecture decision records](adr/): why the main decisions were made.
+- [Research](research/): experiments behind the decisions, each with the code
+  that reproduces it.
 
 The self-hosting guide will be added together with the deployment.

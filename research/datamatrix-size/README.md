@@ -3,7 +3,7 @@
 Which reads more reliably from a phone: today's 10x10 symbol with 1.2 mm
 modules, or a 12x12 symbol with 1.0 mm modules, both 12 mm wide? The
 question, method and results are written up in
-[docs/research](../../docs/research/); this folder reproduces them.
+[docs/research](../../docs/research/0001-datamatrix-size.md); this folder reproduces them.
 
 ## Run
 
