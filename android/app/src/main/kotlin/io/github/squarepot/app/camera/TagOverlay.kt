@@ -19,12 +19,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.squarepot.app.recognition.Detection
 import io.github.squarepot.app.recognition.FrameSize
+import io.github.squarepot.app.recognition.Point
+import io.github.squarepot.app.recognition.SingleTargetSelector
 import io.github.squarepot.app.recognition.SingleTargetSelector.State
 import kotlin.math.max
 
 /**
- * Draws every decoded label (thin, with its number in small type) and the selected one (yellow
- * while tracking, green when locked, with its number in large type).
+ * Draws the aim mark, every decoded label (thin, with its number in small type) and the selected
+ * one (yellow while tracking, green when locked, with its number in large type).
  *
  * Assumes the preview fills the view with centre crop (PreviewView FILL_CENTER) and shows the
  * same field of view as the analysis frame: both use a 16:9 resolution.
@@ -35,6 +37,7 @@ fun TagOverlay(state: CameraUiState, modifier: Modifier = Modifier) {
     Canvas(modifier) {
         val frame = state.frame ?: return@Canvas
         val map = FrameToView(frame, size.width, size.height)
+        drawAimMark(map(SingleTargetSelector.aimPoint(frame)))
 
         val (target, color) = when (val s = state.selection) {
             is State.Locked -> s.target to LOCKED
@@ -69,13 +72,26 @@ private fun DrawScope.drawCode(detection: Detection, map: FrameToView, label: Te
     )
 }
 
-/** Maps upright frame pixels to view pixels for a centre-cropped preview. */
-private class FrameToView(frame: FrameSize, viewWidth: Float, viewHeight: Float) {
-    private val scale = max(viewWidth / frame.width, viewHeight / frame.height)
+/** A small cross where the selector aims, so the collector knows what "nearest the centre" means. */
+private fun DrawScope.drawAimMark(at: Offset) {
+    val arm = 10.dp.toPx()
+    val width = 2.dp.toPx()
+    drawLine(OTHER, Offset(at.x - arm, at.y), Offset(at.x + arm, at.y), width)
+    drawLine(OTHER, Offset(at.x, at.y - arm), Offset(at.x, at.y + arm), width)
+}
+
+/** Maps upright frame pixels to view pixels for a centre-cropped preview, and back. */
+internal class FrameToView(frame: FrameSize, viewWidth: Float, viewHeight: Float) {
+    /** View pixels per frame pixel. */
+    val scale = max(viewWidth / frame.width, viewHeight / frame.height)
     private val dx = (viewWidth - frame.width * scale) / 2
     private val dy = (viewHeight - frame.height * scale) / 2
 
     operator fun invoke(x: Float, y: Float) = Offset(x * scale + dx, y * scale + dy)
+
+    operator fun invoke(p: Point) = invoke(p.x, p.y)
+
+    fun toFrame(view: Offset) = Point((view.x - dx) / scale, (view.y - dy) / scale)
 }
 
 private fun DrawScope.drawQuad(detection: Detection, map: FrameToView, color: Color, width: Float) {

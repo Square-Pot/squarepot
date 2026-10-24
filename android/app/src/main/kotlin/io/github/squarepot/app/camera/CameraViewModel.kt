@@ -42,6 +42,9 @@ class CameraViewModel : ViewModel() {
 
     @Volatile
     private var resetRequested = false
+
+    @Volatile
+    private var pendingTap: SingleTargetSelector.Tap? = null
     private var frameIndex = 0L
 
     fun setMode(mode: DecoderMode) {
@@ -54,6 +57,11 @@ class CameraViewModel : ViewModel() {
         if (resolution == _state.value.resolution) return
         resetRequested = true
         _state.update { it.copy(resolution = resolution) }
+    }
+
+    /** A tap on the preview; the selector takes it with the next frame. */
+    fun tap(tap: SingleTargetSelector.Tap) {
+        pendingTap = tap
     }
 
     fun nextDecoder(): TagDecoder = when (_state.value.mode) {
@@ -72,7 +80,9 @@ class CameraViewModel : ViewModel() {
             stats.values.forEach { it.clear() }
         }
         stats.getValue(result.decoderId).add(result.decodeMillis, hit = result.detections.isNotEmpty())
-        val selection = selector.update(result.detections, result.frame, result.timestampMillis)
+        val tap = pendingTap
+        pendingTap = null
+        val selection = selector.update(result.detections, result.frame, result.timestampMillis, tap)
         _state.update {
             it.copy(
                 frame = result.frame,

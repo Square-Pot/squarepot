@@ -17,7 +17,7 @@ import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -53,6 +54,7 @@ import io.github.squarepot.app.BuildConfig
 import io.github.squarepot.app.R
 import io.github.squarepot.app.recognition.RollingStats
 import io.github.squarepot.app.recognition.SingleTargetSelector
+import io.github.squarepot.app.recognition.isHit
 import java.util.Locale
 import java.util.concurrent.Executors
 
@@ -123,11 +125,21 @@ private fun LiveCamera(viewModel: CameraViewModel) {
         if (lockedCode != null) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
     }
 
+    // A tap on a label picks it as the target; a tap on the locked one also copies its number; a
+    // tap where there is no label goes back to choosing automatically.
     Box(
         Modifier
             .fillMaxSize()
-            .clickable(enabled = lockedCode != null) {
-                lockedCode?.let { context.copyToClipboard(it.value) }
+            .pointerInput(viewModel) {
+                detectTapGestures { offset ->
+                    val current = viewModel.state.value
+                    val frame = current.frame ?: return@detectTapGestures
+                    val map = FrameToView(frame, size.width.toFloat(), size.height.toFloat())
+                    val tap = SingleTargetSelector.Tap(map.toFrame(offset), TAP_REACH.toPx() / map.scale)
+                    val locked = (current.selection as? SingleTargetSelector.State.Locked)?.target
+                    if (locked != null && locked.isHit(tap)) context.copyToClipboard(locked.code.value)
+                    viewModel.tap(tap)
+                }
             },
     ) {
         AndroidView(
@@ -223,6 +235,9 @@ private val AnalysisResolution.label: Int
     }
 
 private const val PERCENT = 100f
+
+/** How far from a label a tap still picks it. */
+private val TAP_REACH = 32.dp
 
 private val BUILD = "${BuildConfig.VERSION_NAME} · ${BuildConfig.COMMIT.take(SHORT_COMMIT)}"
 private const val SHORT_COMMIT = 7
