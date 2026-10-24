@@ -6,8 +6,9 @@ full-resolution photo, for the largest label or for every label in the shot. It
 keeps a local copy of the collection so it works offline, in a greenhouse or on
 a balcony.
 
-Stack: Kotlin, Jetpack Compose, CameraX, ML Kit Barcode Scanning (zxing-cpp as
-the fallback decoder), Room.
+Stack: Kotlin, Jetpack Compose, CameraX, zxing-cpp, Room. The recognition spike
+compared zxing-cpp with ML Kit on real labels; ML Kit read none of them and
+needs Google Play services, so the app decodes with zxing-cpp only.
 
 ## Local copy and sync
 
@@ -49,8 +50,8 @@ open the photo bench and the local copy described above; Back returns to the
 camera.
 
 - **Live camera.** Analysis frames (720p by default; 1080p or the largest
-  16:9 size can be picked) are decoded by ML Kit, zxing-cpp, or both on
-  alternate frames. In single-plant mode the app picks one label:
+  16:9 size can be picked) are decoded by zxing-cpp. In single-plant mode the
+  app picks one label:
   1. **a tapped label**, whatever its size. It stays picked until you tap
      another label, tap where there is no label, or it is out of sight for
      more than 0.3 s. Tapping the picked label copies its number;
@@ -61,13 +62,11 @@ camera.
      counts half, since the label usually sits on the far rim, above the plant.
 
   It locks the label after a few stable frames (with a haptic tick). The
-  bottom panel shows each decoder's decode rate and latency over the last 120
-  frames.
+  bottom panel shows the decode rate and latency over the last 120 frames.
 - **Bench.** Pick a folder of label photos. Each photo is made upright (EXIF
   orientation), scaled to a long side of 1280, 1920 and 2560 px in turn (the
   720p, 1080p and a larger analysis frame, for the live mode), then taken at
-  full resolution (for the photo mode), and decoded by both decoders at each
-  size. The results are written as `squarepot-bench-<time>.json` in the
+  full resolution (for the photo mode), and decoded at each size. The results are written as `squarepot-bench-<time>.json` in the
   same folder.
 
 ### Bench ground truth
@@ -119,6 +118,6 @@ conventions, 120 columns (`.editorconfig`).
 | Package | What it holds |
 | --- | --- |
 | `recognition` | Pure Kotlin: label codes, detections, single-target selection, statistics. Unit tested on the JVM. |
-| `decoder` | ML Kit and zxing-cpp behind one `TagDecoder` interface. |
+| `decoder` | zxing-cpp behind the `TagDecoder` interface. |
 | `camera` | CameraX analysis, the live screen and the overlay. |
 | `bench` | The photo bench and its JSON report. |

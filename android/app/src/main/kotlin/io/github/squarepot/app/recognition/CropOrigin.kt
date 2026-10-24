@@ -7,9 +7,9 @@ package io.github.squarepot.app.recognition
  *
  * zxing-cpp decodes only a camera frame's crop rect (CameraController sets it to the preview's
  * aspect ratio) and reports positions relative to the upright crop; adding this origin puts them
- * in upright frame coordinates, like ML Kit's. [left], [top], [right] and [bottom] are the crop in
- * sensor buffer pixels, [width] and [height] the buffer size, [rotationDegrees] the clockwise
- * rotation that makes the buffer upright.
+ * in upright frame coordinates. [left], [top], [right] and [bottom] are the crop in sensor
+ * buffer pixels, [width] and [height] the buffer size, [rotationDegrees] the clockwise rotation
+ * that makes the buffer upright.
  */
 @Suppress("LongParameterList")
 fun uprightCropOrigin(

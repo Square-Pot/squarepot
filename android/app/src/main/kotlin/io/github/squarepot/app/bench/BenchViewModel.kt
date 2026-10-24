@@ -7,7 +7,6 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.squarepot.app.decoder.MlKitTagDecoder
 import io.github.squarepot.app.decoder.ZxingCppTagDecoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +29,7 @@ class BenchViewModel(application: Application) : AndroidViewModel(application) {
         if (_state.value is BenchUiState.Running) return
         _state.value = BenchUiState.Running(0, 0)
         viewModelScope.launch(Dispatchers.Default) {
-            val decoders = listOf(MlKitTagDecoder(), ZxingCppTagDecoder())
+            val decoders = listOf(ZxingCppTagDecoder())
             val result = runCatching {
                 BenchRunner(getApplication(), decoders).run(folder) { done, total ->
                     _state.value = BenchUiState.Running(done, total)

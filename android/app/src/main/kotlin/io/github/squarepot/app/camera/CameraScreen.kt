@@ -102,7 +102,7 @@ private fun LiveCamera(viewModel: CameraViewModel) {
     // The analysis thread lives exactly as long as the binding to this lifecycle owner.
     DisposableEffect(lifecycleOwner, controller) {
         val executor = Executors.newSingleThreadExecutor()
-        controller.setImageAnalysisAnalyzer(executor, TagAnalyzer(viewModel::nextDecoder, viewModel::onFrame))
+        controller.setImageAnalysisAnalyzer(executor, TagAnalyzer(viewModel.decoder, viewModel::onFrame))
         controller.bindToLifecycle(lifecycleOwner)
         onDispose {
             controller.unbind()
@@ -180,11 +180,6 @@ private fun Controls(
             if (s.frames > 0) Text(formatStats(id, s), color = Color.White, style = MaterialTheme.typography.bodySmall)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            ModeChip(state.mode, DecoderMode.MLKIT, stringResource(R.string.mode_mlkit), viewModel::setMode)
-            ModeChip(state.mode, DecoderMode.ZXING_CPP, stringResource(R.string.mode_zxing), viewModel::setMode)
-            ModeChip(state.mode, DecoderMode.ALTERNATE, stringResource(R.string.mode_alternate), viewModel::setMode)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             AnalysisResolution.entries.forEach { r ->
                 FilterChip(
                     selected = state.resolution == r,
@@ -198,15 +193,6 @@ private fun Controls(
             Button(onClick = onOpenCopy) { Text(stringResource(R.string.open_copy)) }
         }
     }
-}
-
-@Composable
-private fun ModeChip(current: DecoderMode, mode: DecoderMode, label: String, onSelect: (DecoderMode) -> Unit) {
-    FilterChip(
-        selected = current == mode,
-        onClick = { onSelect(mode) },
-        label = { Text(label, color = Color.White) },
-    )
 }
 
 private fun formatStats(id: String, s: RollingStats.Snapshot): String = String.format(

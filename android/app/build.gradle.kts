@@ -81,8 +81,6 @@ dependencies {
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.view)
 
-    implementation(libs.mlkit.barcode.scanning)
-    implementation(libs.play.services.tasks)
     implementation(libs.zxing.cpp)
 
     implementation(libs.androidx.documentfile)

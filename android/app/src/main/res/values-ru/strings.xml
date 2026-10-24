@@ -51,9 +51,6 @@
 
     <string name="camera_permission_needed">Square-Pot нужна камера, чтобы читать бирки растений.</string>
     <string name="copied">Скопировано: %1$s</string>
-    <string name="mode_mlkit">ML Kit</string>
-    <string name="mode_zxing">zxing-cpp</string>
-    <string name="mode_alternate">Оба</string>
     <string name="resolution_max">Макс</string>
     <string name="open_bench">Замер</string>
     <string name="open_copy">Локальная копия</string>

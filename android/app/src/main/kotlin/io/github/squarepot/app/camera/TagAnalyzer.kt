@@ -20,13 +20,12 @@ class FrameResult(
     val timestampMillis: Long,
 )
 
-/** Runs the decoder chosen for each frame and hands the result on, on the analysis thread. */
-class TagAnalyzer(private val nextDecoder: () -> TagDecoder, private val onFrame: (FrameResult) -> Unit) :
+/** Runs the decoder on each frame and hands the result on, on the analysis thread. */
+class TagAnalyzer(private val decoder: TagDecoder, private val onFrame: (FrameResult) -> Unit) :
     ImageAnalysis.Analyzer {
 
     override fun analyze(image: ImageProxy) {
         image.use {
-            val decoder = nextDecoder()
             val input = DecoderInput.Camera(it)
             val start = SystemClock.elapsedRealtimeNanos()
             val detections = runCatching { decoder.decode(input) }

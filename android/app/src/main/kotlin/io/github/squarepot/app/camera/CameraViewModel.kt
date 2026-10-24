@@ -3,7 +3,6 @@
 package io.github.squarepot.app.camera
 
 import androidx.lifecycle.ViewModel
-import io.github.squarepot.app.decoder.MlKitTagDecoder
 import io.github.squarepot.app.decoder.TagDecoder
 import io.github.squarepot.app.decoder.ZxingCppTagDecoder
 import io.github.squarepot.app.recognition.Detection
@@ -15,11 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-/** Which decoder runs on live frames. [ALTERNATE] runs both on every other frame, to compare them. */
-enum class DecoderMode { MLKIT, ZXING_CPP, ALTERNATE }
-
 data class CameraUiState(
-    val mode: DecoderMode = DecoderMode.MLKIT,
     val resolution: AnalysisResolution = AnalysisResolution.P720,
     val frame: FrameSize? = null,
     val detections: List<Detection> = emptyList(),
@@ -28,14 +23,13 @@ data class CameraUiState(
 )
 
 /**
- * Live single-plant recognition. [onFrame] and [nextDecoder] are called on the camera analysis
- * thread; everything the UI reads goes through [state].
+ * Live single-plant recognition. [decoder] and [onFrame] are used on the camera analysis thread;
+ * everything the UI reads goes through [state].
  */
 class CameraViewModel : ViewModel() {
-    private val mlKit = MlKitTagDecoder()
-    private val zxing = ZxingCppTagDecoder()
+    val decoder: TagDecoder = ZxingCppTagDecoder()
     private val selector = SingleTargetSelector()
-    private val stats = mapOf(mlKit.id to RollingStats(), zxing.id to RollingStats())
+    private val stats = RollingStats()
 
     private val _state = MutableStateFlow(CameraUiState())
     val state: StateFlow<CameraUiState> = _state.asStateFlow()
@@ -45,13 +39,6 @@ class CameraViewModel : ViewModel() {
 
     @Volatile
     private var pendingTap: SingleTargetSelector.Tap? = null
-    private var frameIndex = 0L
-
-    fun setMode(mode: DecoderMode) {
-        if (mode == _state.value.mode) return
-        resetRequested = true
-        _state.update { it.copy(mode = mode) }
-    }
 
     fun setResolution(resolution: AnalysisResolution) {
         if (resolution == _state.value.resolution) return
@@ -64,22 +51,13 @@ class CameraViewModel : ViewModel() {
         pendingTap = tap
     }
 
-    fun nextDecoder(): TagDecoder = when (_state.value.mode) {
-        DecoderMode.MLKIT -> mlKit
-        DecoderMode.ZXING_CPP -> zxing
-        DecoderMode.ALTERNATE -> if (frameIndex % 2 == 0L) mlKit else zxing
-    }
-
     fun onFrame(result: FrameResult) {
-        frameIndex++
-        // A frame decoded just before a mode switch belongs to the old mode: drop it.
-        if (result.decoderId !in decoderIds(_state.value.mode)) return
         if (resetRequested) {
             resetRequested = false
             selector.reset()
-            stats.values.forEach { it.clear() }
+            stats.clear()
         }
-        stats.getValue(result.decoderId).add(result.decodeMillis, hit = result.detections.isNotEmpty())
+        stats.add(result.decodeMillis, hit = result.detections.isNotEmpty())
         val tap = pendingTap
         pendingTap = null
         val selection = selector.update(result.detections, result.frame, result.timestampMillis, tap)
@@ -88,19 +66,12 @@ class CameraViewModel : ViewModel() {
                 frame = result.frame,
                 detections = result.detections,
                 selection = selection,
-                stats = stats.mapValues { (_, s) -> s.snapshot() },
+                stats = mapOf(result.decoderId to stats.snapshot()),
             )
         }
     }
 
-    private fun decoderIds(mode: DecoderMode): Set<String> = when (mode) {
-        DecoderMode.MLKIT -> setOf(mlKit.id)
-        DecoderMode.ZXING_CPP -> setOf(zxing.id)
-        DecoderMode.ALTERNATE -> setOf(mlKit.id, zxing.id)
-    }
-
     override fun onCleared() {
-        mlKit.close()
-        zxing.close()
+        decoder.close()
     }
 }
