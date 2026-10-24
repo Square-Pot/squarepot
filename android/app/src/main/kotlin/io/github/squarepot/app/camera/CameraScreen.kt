@@ -49,6 +49,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.squarepot.app.BuildConfig
 import io.github.squarepot.app.R
 import io.github.squarepot.app.recognition.RollingStats
 import io.github.squarepot.app.recognition.SingleTargetSelector
@@ -158,6 +159,8 @@ private fun Controls(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // Which build this is, so a phone run can be matched to its commit at a glance.
+        Text(BUILD, color = Color.White, style = MaterialTheme.typography.bodySmall)
         state.frame?.let {
             Text("${it.width}×${it.height}", color = Color.White, style = MaterialTheme.typography.bodySmall)
         }
@@ -220,3 +223,6 @@ private val AnalysisResolution.label: Int
     }
 
 private const val PERCENT = 100f
+
+private val BUILD = "${BuildConfig.VERSION_NAME} · ${BuildConfig.COMMIT.take(SHORT_COMMIT)}"
+private const val SHORT_COMMIT = 7
