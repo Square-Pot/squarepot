@@ -56,6 +56,28 @@
     <string name="open_copy">Локальная копия</string>
     <string name="back">Назад</string>
 
+    <string name="caption_app_pick">выбрана приложением</string>
+    <string name="caption_your_pick">ваш выбор</string>
+    <string name="caption_your_pick_copy">выбрана вами · тап ещё раз — копировать</string>
+    <string name="caption_not_in_copy">Нет в копии</string>
+    <string name="caption_not_in_copy_hint">Копия от %1$s. Обновите её на экране «Локальная копия».</string>
+    <string name="caption_no_copy_hint">Локальной копии ещё нет. Загрузите её на экране «Локальная копия».</string>
+    <string name="caption_collision">Этот номер у нескольких растений</string>
+    <string name="caption_copied">Подпись скопирована</string>
+    <string name="caption_nothing_to_copy">Нечего копировать: этой бирки нет в копии</string>
+    <plurals name="age_months">
+        <item quantity="one">%d мес.</item>
+        <item quantity="few">%d мес.</item>
+        <item quantity="many">%d мес.</item>
+        <item quantity="other">%d мес.</item>
+    </plurals>
+    <plurals name="age_years">
+        <item quantity="one">%d год</item>
+        <item quantity="few">%d года</item>
+        <item quantity="many">%d лет</item>
+        <item quantity="other">%d года</item>
+    </plurals>
+
     <string name="bench_title">Замер распознавания</string>
     <string name="bench_explanation">Выберите папку с фотографиями бирок. Каждое фото поворачивается как надо, уменьшается до размеров кадров живой камеры (720p, 1080p и больше) и в полном разрешении и распознаётся всеми декодерами; результаты сохраняются JSON-файлом в той же папке. Файл bench.csv в папке (file,codes,conditions) указывает, что на каждом фото, и тогда распознавания оцениваются: верно, пропущено, ошибочно.</string>
     <string name="bench_pick_folder">Выбрать папку с фото</string>

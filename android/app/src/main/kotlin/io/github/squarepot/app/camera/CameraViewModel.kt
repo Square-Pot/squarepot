@@ -6,7 +6,11 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.squarepot.app.SquarepotApplication
+import io.github.squarepot.app.data.CaptionField
+import io.github.squarepot.app.data.CaptionSettings
 import io.github.squarepot.app.data.PlantView
+import io.github.squarepot.app.data.api.FieldSchemaDto
+import io.github.squarepot.app.data.local.CollectionColumns
 import io.github.squarepot.app.decoder.TagDecoder
 import io.github.squarepot.app.decoder.ZxingCppTagDecoder
 import io.github.squarepot.app.recognition.CornerSmoother
@@ -41,7 +45,30 @@ data class CameraUiState(
     /** Plants in the local copy by label number, for the labels looked up so far. */
     val plants: Map<String, List<PlantView>> = emptyMap(),
     val stats: Map<String, RollingStats.Snapshot> = emptyMap(),
-)
+    val captions: CaptionSettings = CaptionSettings(),
+    /** The copy's field schema, for the captions' display rules; null before the first sync. */
+    val schema: FieldSchemaDto? = null,
+    /** Each collection's custom columns. */
+    val customColumns: List<CollectionColumns> = emptyList(),
+    /** When the local copy was last refreshed, epoch millis; null before the first sync. */
+    val refreshedAt: Long? = null,
+) {
+    /**
+     * The selected label, with its smoothed corners when it is on screen: locked by the selector
+     * or pinned by a tap. A label the selector is still making sure of is not selected yet.
+     */
+    val selected: Detection?
+        get() = (selection as? SingleTargetSelector.State.Locked)?.target?.let { target ->
+            detections.firstOrNull { it.code == target.code } ?: target
+        }
+
+    /** Whether [selected] was picked by a tap rather than by the app. */
+    val selectedByTap: Boolean get() = selected?.code?.let { it == pinned } ?: false
+
+    /** The fields captions show, given every collection's custom columns. */
+    val captionFields: List<CaptionField>
+        get() = captions.fieldsFor(customColumns.flatMap { it.customColumns }.distinct())
+}
 
 /**
  * Live single-plant recognition. [decoder] and [onFrame] are used on the camera analysis thread;
@@ -79,11 +106,25 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
             container.database.copy().observeState()
                 .map { it?.refreshedAt to it?.schemaVersion }
                 .distinctUntilChanged()
-                .collect {
+                .collect { (refreshedAt, _) ->
                     lookup.invalidate()
-                    publishPlants()
+                    val schema = container.localCopy.schema()
+                    _state.update { it.copy(plants = lookup.results, schema = schema, refreshedAt = refreshedAt) }
                 }
         }
+        viewModelScope.launch {
+            container.captions.settings.collect { settings -> _state.update { it.copy(captions = settings) } }
+        }
+        viewModelScope.launch {
+            container.localCopy.customColumns().collect { columns ->
+                _state.update { it.copy(customColumns = columns) }
+            }
+        }
+    }
+
+    /** Saves new caption settings; the state follows once they are stored. */
+    fun setCaptions(settings: CaptionSettings) {
+        viewModelScope.launch { container.captions.save(settings) }
     }
 
     fun setResolution(resolution: AnalysisResolution) {

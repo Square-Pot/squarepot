@@ -55,6 +55,24 @@
     <string name="open_copy">Local copy</string>
     <string name="back">Back</string>
 
+    <string name="caption_app_pick">picked by the app</string>
+    <string name="caption_your_pick">your pick</string>
+    <string name="caption_your_pick_copy">your pick · tap again to copy</string>
+    <string name="caption_not_in_copy">Not in the copy</string>
+    <string name="caption_not_in_copy_hint">Copy of %1$s. Refresh it on the Local copy screen.</string>
+    <string name="caption_no_copy_hint">There is no local copy yet. Download it on the Local copy screen.</string>
+    <string name="caption_collision">Several plants share this number</string>
+    <string name="caption_copied">Caption copied</string>
+    <string name="caption_nothing_to_copy">Nothing to copy: this label is not in the copy</string>
+    <plurals name="age_months">
+        <item quantity="one">%d mo</item>
+        <item quantity="other">%d mo</item>
+    </plurals>
+    <plurals name="age_years">
+        <item quantity="one">%d yr</item>
+        <item quantity="other">%d yr</item>
+    </plurals>
+
     <string name="bench_title">Recognition bench</string>
     <string name="bench_explanation">Pick a folder with label photos. Each photo is turned upright, scaled to the sizes of live camera frames (720p, 1080p and larger) and at full resolution and decoded by every decoder; the results are saved as a JSON file in the same folder. A bench.csv in the folder (file,codes,conditions) lists what each photo shows, so decodes are scored as correct, missed or wrong.</string>
     <string name="bench_pick_folder">Choose photo folder</string>

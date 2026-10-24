@@ -40,7 +40,8 @@ class LocalCopy(private val dao: CopyDao) {
     /** Each collection's custom columns, for choosing which of them a caption shows. */
     fun customColumns(): Flow<List<CollectionColumns>> = dao.observeCustomColumns()
 
-    private suspend fun schema(): FieldSchemaDto? = dao.state()?.schemaJson?.let {
+    /** The copy's field schema; null before the first sync. */
+    suspend fun schema(): FieldSchemaDto? = dao.state()?.schemaJson?.let {
         ApiJson.decodeFromString(FieldSchemaDto.serializer(), it)
     }
 }
