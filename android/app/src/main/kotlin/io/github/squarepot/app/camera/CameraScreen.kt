@@ -19,6 +19,7 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -38,6 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +64,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.squarepot.app.BuildConfig
 import io.github.squarepot.app.R
 import io.github.squarepot.app.data.PlantView
+import io.github.squarepot.app.recognition.CornerSmoother
 import io.github.squarepot.app.recognition.RollingStats
 import io.github.squarepot.app.recognition.SingleTargetSelector
 import io.github.squarepot.app.recognition.isHit
@@ -201,6 +205,24 @@ private fun PlantView.caption(): AnnotatedString = buildAnnotatedString {
     }
 }
 
+/** Hidden sliders for the overlay's 1€ filter, so the best values can be found on the phone. */
+@Composable
+private fun SmoothingTuner(params: CornerSmoother.Params, onChange: (CornerSmoother.Params) -> Unit) {
+    val style = MaterialTheme.typography.bodySmall
+    Text(String.format(Locale.ROOT, "1€ min cutoff %.2f Hz", params.minCutoff), color = Color.White, style = style)
+    Slider(
+        value = params.minCutoff,
+        onValueChange = { onChange(params.copy(minCutoff = it)) },
+        valueRange = 0.05f..5f,
+    )
+    Text(String.format(Locale.ROOT, "1€ beta %.3f", params.beta), color = Color.White, style = style)
+    Slider(
+        value = params.beta,
+        onValueChange = { onChange(params.copy(beta = it)) },
+        valueRange = 0f..0.5f,
+    )
+}
+
 @Composable
 private fun Controls(
     viewModel: CameraViewModel,
@@ -218,8 +240,16 @@ private fun Controls(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         TargetPlant(state)
-        // Which build this is, so a phone run can be matched to its commit at a glance.
-        Text(BUILD, color = Color.White, style = MaterialTheme.typography.bodySmall)
+        // Which build this is, so a phone run can be matched to its commit at a glance. A long
+        // press opens the hidden overlay tuning.
+        var tuning by rememberSaveable { mutableStateOf(false) }
+        Text(
+            BUILD,
+            color = Color.White,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.pointerInput(Unit) { detectTapGestures(onLongPress = { tuning = !tuning }) },
+        )
+        if (tuning) SmoothingTuner(state.smoothing, viewModel::setSmoothing)
         state.frame?.let {
             Text("${it.width}×${it.height}", color = Color.White, style = MaterialTheme.typography.bodySmall)
         }

@@ -36,6 +36,8 @@ data class CameraUiState(
     val selection: SingleTargetSelector.State = SingleTargetSelector.State.Searching,
     /** The label pinned by a tap, if any; the overlay draws it in its own colour. */
     val pinned: TagCode? = null,
+    /** The overlay's 1€ filter settings, adjustable from the hidden tuning panel. */
+    val smoothing: CornerSmoother.Params = CornerSmoother.Params(),
     /** Plants in the local copy by label number, for the labels looked up so far. */
     val plants: Map<String, List<PlantView>> = emptyMap(),
     val stats: Map<String, RollingStats.Snapshot> = emptyMap(),
@@ -68,6 +70,9 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     @Volatile
     private var pendingTap: SingleTargetSelector.Tap? = null
 
+    @Volatile
+    private var pendingSmoothing: CornerSmoother.Params? = null
+
     init {
         // A refreshed copy or a new schema can change any answer: look the labels up again.
         viewModelScope.launch {
@@ -87,6 +92,12 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         _state.update { it.copy(resolution = resolution) }
     }
 
+    /** New 1€ filter settings for the overlay, applied from the next frame. */
+    fun setSmoothing(params: CornerSmoother.Params) {
+        pendingSmoothing = params
+        _state.update { it.copy(smoothing = params) }
+    }
+
     /** A tap on the preview; the selector takes it with the next frame. */
     fun tap(tap: SingleTargetSelector.Tap) {
         pendingTap = tap
@@ -99,6 +110,10 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
             hold.clear()
             smoother.clear()
             stats.clear()
+        }
+        pendingSmoothing?.let {
+            pendingSmoothing = null
+            smoother.params = it
         }
         stats.add(result.decodeMillis, hit = result.detections.isNotEmpty())
         val tap = pendingTap
