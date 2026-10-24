@@ -48,6 +48,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -55,6 +60,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.squarepot.app.BuildConfig
 import io.github.squarepot.app.R
+import io.github.squarepot.app.data.PlantView
 import io.github.squarepot.app.recognition.RollingStats
 import io.github.squarepot.app.recognition.SingleTargetSelector
 import io.github.squarepot.app.recognition.isHit
@@ -167,6 +173,34 @@ private fun Modifier.pickOnTap(viewModel: CameraViewModel, context: Context) = p
     }
 }
 
+/**
+ * The selected label's plant from the local copy: its name, or why there is none. A plain line in
+ * the panel until the caption layout is settled.
+ */
+@Composable
+private fun TargetPlant(state: CameraUiState) {
+    val target = when (val s = state.selection) {
+        is SingleTargetSelector.State.Locked -> s.target
+        is SingleTargetSelector.State.Tracking -> s.target
+        SingleTargetSelector.State.Searching -> null
+    } ?: return
+    val plants = state.plants[target.code.value] ?: return
+    val text = when (plants.size) {
+        0 -> AnnotatedString(stringResource(R.string.lookup_none))
+        1 -> plants.single().caption()
+        else -> AnnotatedString(stringResource(R.string.lookup_collision))
+    }
+    Text(text, color = Color.White, style = MaterialTheme.typography.titleMedium)
+}
+
+/** The plant's botanical name with its italics, or its first field when it has no name. */
+private fun PlantView.caption(): AnnotatedString = buildAnnotatedString {
+    if (name.isEmpty()) append(fields.firstOrNull { it.key != TAG_FIELD }?.value ?: tag.orEmpty())
+    name.forEach { run ->
+        if (run.italic) withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(run.text) } else append(run.text)
+    }
+}
+
 @Composable
 private fun Controls(
     viewModel: CameraViewModel,
@@ -183,6 +217,7 @@ private fun Controls(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        TargetPlant(state)
         // Which build this is, so a phone run can be matched to its commit at a glance.
         Text(BUILD, color = Color.White, style = MaterialTheme.typography.bodySmall)
         state.frame?.let {
@@ -233,6 +268,8 @@ private val AnalysisResolution.label: Int
     }
 
 private const val PERCENT = 100f
+
+private const val TAG_FIELD = "tag"
 
 /** How far from a label a tap still picks it. */
 private val TAP_REACH = 32.dp

@@ -64,8 +64,10 @@ camera.
 
   It locks the label after a few stable frames (with a haptic tick). A label
   the decoder misses for a frame or two stays on screen for 0.3 s, so frames
-  and numbers do not blink. The bottom panel shows the decode rate and latency
-  over the last 120 frames.
+  and numbers do not blink. The bottom panel shows the selected label's plant
+  from the local copy (its botanical name, or that the copy has no plant or
+  several plants with that number), the decode rate and latency over the last
+  120 frames. Lookups read only the local copy, never the network.
 - **Bench.** Pick a folder of label photos. Each photo is made upright (EXIF
   orientation), scaled to a long side of 1280, 1920 and 2560 px in turn (the
   720p, 1080p and a larger analysis frame, for the live mode), then taken at
