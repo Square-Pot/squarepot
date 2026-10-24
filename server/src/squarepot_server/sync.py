@@ -177,22 +177,24 @@ class Syncer:
                         row=row.row,
                         fields=row.fields,
                         custom=row.custom,
+                        invalid=row.invalid,
                     )
                 )
                 continue
-            if not plant.removed and (plant.tag, plant.row, plant.fields, plant.custom) == (
-                row.tag,
-                row.row,
-                row.fields,
-                row.custom,
+            new = (row.tag, row.row, row.fields, row.custom, row.invalid)
+            if (
+                not plant.removed
+                and (
+                    plant.tag,
+                    plant.row,
+                    plant.fields,
+                    plant.custom,
+                    plant.invalid,
+                )
+                == new
             ):
                 continue
-            plant.tag, plant.row, plant.fields, plant.custom = (
-                row.tag,
-                row.row,
-                row.fields,
-                row.custom,
-            )
+            plant.tag, plant.row, plant.fields, plant.custom, plant.invalid = new
             plant.removed = False
             plant.seq = next_seq(session)
         for plant_id, plant in existing.items():

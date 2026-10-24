@@ -63,6 +63,7 @@ def test_lookup_by_tag(client: TestClient) -> None:
         "row": 2,
         "fields": {"genus": "Lithops", "species": "lesliei", "field_number": "SB 1234"},
         "custom": {},
+        "invalid": {},
     }
 
 
@@ -96,6 +97,7 @@ def test_a_colliding_number_finds_every_plant(settings: Settings, store: FakeSto
 
 def test_collections(client: TestClient) -> None:
     [main] = client.get("/api/v1/collections").json()
+    assert main["sheet_url"] == "https://docs.google.com/spreadsheets/d/sheet/edit"
     assert main["id"] == "main"
     assert main["name"] == "Main"
     assert main["plant_count"] == 3

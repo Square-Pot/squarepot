@@ -46,6 +46,7 @@ bearer = HTTPBearer(
 CURSOR_SEQ = re.compile(r"[0-9]{1,18}")
 LABEL_TYPES = {LabelFormat.PDF: "application/pdf", LabelFormat.SVG: "image/svg+xml"}
 LABELS_TITLE = "Square-Pot labels"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/{}/edit"
 
 
 def get_runtime(request: Request) -> Runtime:
@@ -90,7 +91,16 @@ def errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: {"model": Error} for code in codes}
 
 
-def to_collection(row: CollectionRow) -> Collection:
+def sheet_url(runtime: Runtime, collection_id: str) -> str | None:
+    """The collection's sheet in Google Sheets; only for clients holding the token."""
+    config = next((c for c in runtime.settings.collections if c.id == collection_id), None)
+    if config is None or config.spreadsheet_id is None:
+        return None
+    url = SHEET_URL.format(config.spreadsheet_id)
+    return url if config.gid is None else f"{url}#gid={config.gid}"
+
+
+def to_collection(row: CollectionRow, runtime: Runtime) -> Collection:
     return Collection(
         id=row.id,
         name=row.name,
@@ -98,6 +108,7 @@ def to_collection(row: CollectionRow) -> Collection:
         synced_at=row.synced_at,
         error=row.error,
         custom_columns=row.custom_columns,
+        sheet_url=sheet_url(runtime, row.id),
     )
 
 
@@ -109,6 +120,7 @@ def to_plant(row: PlantRow) -> Plant:
         row=row.row,
         fields=row.fields,
         custom=row.custom,
+        invalid=row.invalid,
     )
 
 
@@ -163,11 +175,11 @@ def get_schema(runtime: RuntimeDep) -> FieldSchema:
     tags=["collections"],
     summary="List collections and how fresh their copies are",
 )
-def list_collections(session: SessionDep) -> list[Collection]:
+def list_collections(session: SessionDep, runtime: RuntimeDep) -> list[Collection]:
     rows = session.scalars(
         select(CollectionRow).where(~CollectionRow.removed).order_by(CollectionRow.id)
     )
-    return [to_collection(row) for row in rows]
+    return [to_collection(row, runtime) for row in rows]
 
 
 @router.get(
@@ -238,7 +250,7 @@ def sync(
         kind=SyncKind.FULL if since is None else SyncKind.DELTA,
         cursor=make_cursor(session, seq),
         schema_version=runtime.schema.version,
-        collections=[to_collection(row) for row in collection_rows if not row.removed],
+        collections=[to_collection(row, runtime) for row in collection_rows if not row.removed],
         removed_collections=[row.id for row in collection_rows if row.removed],
         plants=[to_plant(row) for row in plant_rows if not row.removed],
         removed_plants=[row.id for row in plant_rows if row.removed],

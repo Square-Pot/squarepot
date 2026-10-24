@@ -28,6 +28,8 @@ ELLIPSIS = "…"
 MAX_CUSTOM_COLUMNS = 50
 MAX_CUSTOM_NAME = 64
 MAX_CUSTOM_VALUE = 1000
+# The longest rejected value kept to show the owner.
+MAX_INVALID_VALUE = 200
 
 
 def load_schema(path: Path) -> FieldSchema:
@@ -52,6 +54,8 @@ class Row:
     fields: dict[str, str]
     # Values of custom columns by name, in column order.
     custom: dict[str, str] = field(default_factory=dict)
+    # Cells the import rejected, by field: {"cell", "value", "reason"}.
+    invalid: dict[str, dict[str, str]] = field(default_factory=dict)
 
 
 @dataclass
@@ -246,6 +250,7 @@ def parse_tab(schema: FieldSchema, values: list[list[Cell]]) -> ParsedTab:
             continue
         tag: str | None = None
         fields: dict[str, str] = {}
+        invalid: dict[str, dict[str, str]] = {}
         for index, definition in columns.items():
             cell = cells[index] if index < len(cells) else None
             if is_empty(cell):
@@ -257,6 +262,14 @@ def parse_tab(schema: FieldSchema, values: list[list[Cell]]) -> ParsedTab:
                     fields[definition.key] = read_value(definition, cell)
             except InvalidValue as error:
                 result.issues.append(Issue(number, column_name(index), str(error)))
+                value = cell_text(cell)
+                if len(value) > MAX_INVALID_VALUE:
+                    value = value[: MAX_INVALID_VALUE - 1] + ELLIPSIS
+                invalid[definition.key] = {
+                    "cell": f"{column_name(index)}{number}",
+                    "value": value,
+                    "reason": str(error),
+                }
         extra: dict[str, str] = {}
         for index, name in custom.items():
             cell = cells[index] if index < len(cells) else None
@@ -278,5 +291,5 @@ def parse_tab(schema: FieldSchema, values: list[list[Cell]]) -> ParsedTab:
             if tag is not None:
                 result.skipped_tags.append(tag)
             continue
-        result.rows.append(Row(number, tag, fields, extra))
+        result.rows.append(Row(number, tag, fields, extra, invalid))
     return result

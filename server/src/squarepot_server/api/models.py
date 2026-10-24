@@ -122,6 +122,17 @@ class FieldSchema(ApiModel):
     )
 
 
+class InvalidCell(ApiModel):
+    """A cell the import rejected, for showing to the owner."""
+
+    cell: str = Field(description="Where it is in the sheet, such as `F12`.", examples=["F12"])
+    value: str = Field(
+        description="What the cell held, as text; cut short with `…` beyond 200 characters.",
+        examples=["March 2024"],
+    )
+    reason: str = Field(description="Why it was rejected.", examples=["not a date (YYYY-MM-DD)"])
+
+
 class Collection(ApiModel):
     """One collection: one tab of a Google Sheet."""
 
@@ -146,6 +157,15 @@ class Collection(ApiModel):
             "not a field key or alias. A client may let the owner choose which to show."
         ),
         examples=[["Marathon", "soil"]],
+    )
+    sheet_url: str | None = Field(
+        description=(
+            "Address of the collection's sheet in Google Sheets, opening its tab when the "
+            "server knows the tab's `gid`, and the first tab otherwise. To open a plant's row, "
+            "add `range=A<row>` to the fragment: `#range=A12`, or `&range=A12` when the "
+            "address already has a `#`. `null` for a collection read from a file."
+        ),
+        examples=["https://docs.google.com/spreadsheets/d/1AbC/edit#gid=0"],
     )
 
 
@@ -177,6 +197,21 @@ class Plant(ApiModel):
             "them. Empty cells are omitted."
         ),
         examples=[{"Marathon": "yes", "soil": "pumice 70%"}],
+    )
+    invalid: dict[str, InvalidCell] = Field(
+        description=(
+            "Cells of this row the import rejected, by field key, such as a `seeding_date` "
+            "that is not a date. The field is then missing from `fields`, or `tag` is `null`."
+        ),
+        examples=[
+            {
+                "seeding_date": {
+                    "cell": "F12",
+                    "value": "March 2024",
+                    "reason": "not a date (YYYY-MM-DD)",
+                }
+            }
+        ],
     )
 
 

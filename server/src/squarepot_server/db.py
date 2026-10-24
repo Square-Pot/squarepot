@@ -92,6 +92,8 @@ class PlantRow(Base):
     fields: Mapped[dict[str, Any]]
     # Values of custom columns by name.
     custom: Mapped[dict[str, Any]] = mapped_column(default=dict)
+    # Cells the import rejected, by field: {"cell", "value", "reason"}.
+    invalid: Mapped[dict[str, Any]] = mapped_column(default=dict)
 
 
 class RegisteredTag(Base):

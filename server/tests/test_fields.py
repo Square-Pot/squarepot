@@ -150,6 +150,29 @@ def test_invalid_tags_are_reported_and_the_row_is_kept(schema: FieldSchema, cell
     [row] = parsed.rows
     assert row.tag is None
     assert [(issue.row, issue.column) for issue in parsed.issues] == [(2, "B")]
+    assert row.invalid["tag"]["cell"] == "B2"
+
+
+def test_rejected_cells_are_kept_with_the_plant(schema: FieldSchema) -> None:
+    parsed = parse_tab(
+        schema,
+        [
+            ["genus", "species", "seeding_date", "price"],
+            ["Lithops", "lesliei", " March 2024 ", "x" * 500],
+            ["Conophytum", "", "2024-03-15"],
+        ],
+    )
+    first, second = parsed.rows
+    assert first.fields == {"genus": "Lithops", "species": "lesliei"}
+    assert first.invalid == {
+        "seeding_date": {
+            "cell": "C2",
+            "value": "March 2024",
+            "reason": "not a date (YYYY-MM-DD)",
+        },
+        "price": {"cell": "D2", "value": "x" * 199 + "…", "reason": "not a number"},
+    }
+    assert second.invalid == {}
 
 
 @pytest.mark.parametrize(

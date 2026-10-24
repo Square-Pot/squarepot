@@ -8,6 +8,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from squarepot_server.api.models import FieldSchema
+from squarepot_server.config import Settings
 from tests.conftest import HEADER, FakeStore, collection, runtime
 
 
@@ -90,6 +91,35 @@ def test_custom_columns_reach_the_phone_and_their_edits_the_delta(
     runtime(client).syncer.run_once()
     delta = sync(client, body["cursor"])
     assert [plant["custom"] for plant in delta["plants"]] == [{"Marathon": "no"}]
+
+
+def test_rejected_cells_reach_the_phone_and_go_when_fixed(
+    client: TestClient, store: FakeStore
+) -> None:
+    store.put("main", [["tag", "genus", "seeding_date"], [4217, "Lithops", "soon"]])
+    runtime(client).syncer.run_once()
+    body = sync(client)
+    [plant] = body["plants"]
+    assert plant["invalid"] == {
+        "seeding_date": {"cell": "C2", "value": "soon", "reason": "not a date (YYYY-MM-DD)"}
+    }
+    store.put("main", [["tag", "genus", "seeding_date"], [4217, "Lithops", "2024-03-15"]])
+    runtime(client).syncer.run_once()
+    [fixed] = sync(client, body["cursor"])["plants"]
+    assert fixed["invalid"] == {}
+    assert fixed["fields"]["seeding_date"] == "2024-03-15"
+
+
+def test_the_sheet_url_opens_the_tab_when_its_gid_is_known(
+    client: TestClient, settings: Settings
+) -> None:
+    settings.collections[0] = settings.collections[0].model_copy(update={"gid": 1234})
+    [main] = sync(client)["collections"]
+    assert main["sheet_url"] == "https://docs.google.com/spreadsheets/d/sheet/edit#gid=1234"
+    settings.collections[0] = settings.collections[0].model_copy(
+        update={"spreadsheet_id": None, "file": "plants.csv"}
+    )
+    assert sync(client)["collections"][0]["sheet_url"] is None
 
 
 def test_a_removed_row_that_comes_back_is_sent_again(client: TestClient, store: FakeStore) -> None:
