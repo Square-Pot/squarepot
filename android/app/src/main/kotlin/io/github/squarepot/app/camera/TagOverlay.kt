@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -22,8 +23,8 @@ import io.github.squarepot.app.recognition.SingleTargetSelector.State
 import kotlin.math.max
 
 /**
- * Draws every detected label (thin) and the selected one (yellow while tracking,
- * green when locked, with its number).
+ * Draws every decoded label (thin, with its number in small type) and the selected one (yellow
+ * while tracking, green when locked, with its number in large type).
  *
  * Assumes the preview fills the view with centre crop (PreviewView FILL_CENTER) and shows the
  * same field of view as the analysis frame: both use a 16:9 resolution.
@@ -35,25 +36,37 @@ fun TagOverlay(state: CameraUiState, modifier: Modifier = Modifier) {
         val frame = state.frame ?: return@Canvas
         val map = FrameToView(frame, size.width, size.height)
 
-        state.detections.forEach { drawQuad(it, map, Color.White.copy(alpha = 0.6f), 1.dp.toPx()) }
-
         val (target, color) = when (val s = state.selection) {
             is State.Locked -> s.target to LOCKED
             is State.Tracking -> s.target to TRACKING
-            State.Searching -> return@Canvas
+            State.Searching -> null to OTHER
         }
+
+        state.detections.forEach {
+            drawQuad(it, map, OTHER, 1.dp.toPx())
+            if (it.code != target?.code) {
+                drawCode(it, map, textMeasurer.measure(it.code.value, TextStyle(color = OTHER, fontSize = 13.sp)))
+            }
+        }
+
+        if (target == null) return@Canvas
         drawQuad(target, map, color, 3.dp.toPx())
-        val top = target.corners.minBy { it.y }
-        val anchor = map(top.x, top.y)
         val label = textMeasurer.measure(
             target.code.value,
             TextStyle(color = color, fontSize = 22.sp, fontWeight = FontWeight.Bold),
         )
-        drawText(
-            label,
-            topLeft = Offset(anchor.x - label.size.width / 2f, anchor.y - label.size.height - 8.dp.toPx()),
-        )
+        drawCode(target, map, label)
     }
+}
+
+/** Writes a label's number centred above its top corner. */
+private fun DrawScope.drawCode(detection: Detection, map: FrameToView, label: TextLayoutResult) {
+    val top = detection.corners.minBy { it.y }
+    val anchor = map(top.x, top.y)
+    drawText(
+        label,
+        topLeft = Offset(anchor.x - label.size.width / 2f, anchor.y - label.size.height - 8.dp.toPx()),
+    )
 }
 
 /** Maps upright frame pixels to view pixels for a centre-cropped preview. */
@@ -75,5 +88,6 @@ private fun DrawScope.drawQuad(detection: Detection, map: FrameToView, color: Co
     drawPath(path, color, style = Stroke(width))
 }
 
+private val OTHER = Color.White.copy(alpha = 0.6f)
 private val LOCKED = Color(0xFF4CAF50)
 private val TRACKING = Color(0xFFFFC107)
