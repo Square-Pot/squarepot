@@ -125,23 +125,7 @@ private fun LiveCamera(viewModel: CameraViewModel) {
         if (lockedCode != null) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
     }
 
-    // A tap on a label picks it as the target; a tap on the locked one also copies its number; a
-    // tap where there is no label goes back to choosing automatically.
-    Box(
-        Modifier
-            .fillMaxSize()
-            .pointerInput(viewModel) {
-                detectTapGestures { offset ->
-                    val current = viewModel.state.value
-                    val frame = current.frame ?: return@detectTapGestures
-                    val map = FrameToView(frame, size.width.toFloat(), size.height.toFloat())
-                    val tap = SingleTargetSelector.Tap(map.toFrame(offset), TAP_REACH.toPx() / map.scale)
-                    val locked = (current.selection as? SingleTargetSelector.State.Locked)?.target
-                    if (locked != null && locked.isHit(tap)) context.copyToClipboard(locked.code.value)
-                    viewModel.tap(tap)
-                }
-            },
-    ) {
+    Box(Modifier.fillMaxSize().pickOnTap(viewModel, context)) {
         AndroidView(
             factory = { ctx ->
                 PreviewView(ctx).apply {
@@ -152,6 +136,22 @@ private fun LiveCamera(viewModel: CameraViewModel) {
             modifier = Modifier.fillMaxSize(),
         )
         TagOverlay(state, Modifier.fillMaxSize())
+    }
+}
+
+/**
+ * A tap on a label picks it as the target; a tap on the locked one also copies its number; a tap
+ * where there is no label goes back to choosing automatically.
+ */
+private fun Modifier.pickOnTap(viewModel: CameraViewModel, context: Context) = pointerInput(viewModel) {
+    detectTapGestures { offset ->
+        val current = viewModel.state.value
+        val frame = current.frame ?: return@detectTapGestures
+        val map = FrameToView(frame, size.width.toFloat(), size.height.toFloat())
+        val tap = SingleTargetSelector.Tap(map.toFrame(offset), TAP_REACH.toPx() / map.scale)
+        val locked = (current.selection as? SingleTargetSelector.State.Locked)?.target
+        if (locked != null && locked.isHit(tap)) context.copyToClipboard(locked.code.value)
+        viewModel.tap(tap)
     }
 }
 
