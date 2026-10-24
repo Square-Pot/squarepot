@@ -29,9 +29,10 @@ from squarepot_server.api.models import (
     TagLookup,
 )
 from squarepot_server.db import CollectionRow, PlantRow, current_seq, get_meta
-from squarepot_server.labels.caption import burial_text, caption
+from squarepot_server.labels.caption import NAME, caption, entries, extra_text
 from squarepot_server.labels.layout import TEMPLATES, Item, LayoutError, Page, layout_pages
 from squarepot_server.labels.render import to_pdf, to_svg
+from squarepot_server.labels.text import Run
 from squarepot_server.runtime import Runtime
 
 bearer = HTTPBearer(
@@ -298,6 +299,24 @@ def create_labels(body: LabelRequest, session: SessionDep, runtime: RuntimeDep) 
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, f"No preset {body.burial_preset!r}."
             )
+    keys = {definition.key for definition in runtime.schema.fields}
+    for name, chosen, allowed in [
+        ("caption_fields", body.caption_fields, keys | {NAME}),
+        ("extra_fields", body.extra_fields, keys),
+    ]:
+        named = [entry.field for entry in chosen or [] if entry.field]
+        if unknown := [key for key in named if key not in allowed]:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                f"{name} names fields that cannot be printed there: {listed(unknown)}.",
+            )
+    in_caption = body.caption_fields if body.caption_fields is not None else entries(preset)
+    # Extras go into a burial zone that has room for text, and after the caption on other
+    # templates when the request chose them.
+    in_burial = body.extra_fields
+    if in_burial is None:
+        in_burial = entries(burial_preset) if burial_preset else []
+    after_caption = body.extra_fields or []
     rows = {
         row.id: row
         for row in session.scalars(
@@ -311,19 +330,18 @@ def create_labels(body: LabelRequest, session: SessionDep, runtime: RuntimeDep) 
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             f"These plants have no number to print: {listed(untagged)}.",
         )
+    overrides = body.layout.model_dump(exclude_none=True)
     batches: dict[str, list[Item]] = {}
     for plant_id in body.plants:
-        fields = rows[plant_id].fields
-        batches.setdefault(chosen_template(body.template, fields), []).append(
-            Item(
-                cast(str, rows[plant_id].tag),
-                caption(runtime.schema, preset, fields),
-                burial_text(runtime.schema, burial_preset, fields, body.language)
-                if burial_preset
-                else [],
-            )
-        )
-    overrides = body.layout.model_dump(exclude_none=True)
+        fields, custom = rows[plant_id].fields, rows[plant_id].custom
+        key = chosen_template(body.template, fields)
+        lines = caption(runtime.schema, in_caption, fields, custom)
+        burial: list[list[Run]] = []
+        if TEMPLATES[key].layout.model_copy(update=overrides).burial_text:
+            burial = extra_text(runtime.schema, in_burial, fields, body.language, custom)
+        else:
+            lines += extra_text(runtime.schema, after_caption, fields, body.language, custom)
+        batches.setdefault(key, []).append(Item(cast(str, rows[plant_id].tag), lines, burial))
     pages: list[Page] = []
     try:
         # A partly used sheet is the first one fed in.

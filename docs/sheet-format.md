@@ -54,10 +54,10 @@ An example with a few columns:
 A custom column holds whatever the owner wants to keep next to a plant that
 the schema has no field for, such as a mark for a marathon. Square-Pot imports
 it without knowing what it means, and serves it with the plant's other
-values. The owner chooses where custom columns show. Two places are planned
-and not built yet: the phone's settings, choosing which ones the phone shows,
-and label preparation, choosing which ones a printed label shows. Until then,
-they are only in the API and the phone's copy.
+values. The owner chooses where custom columns show. When preparing labels,
+each print request picks which ones a printed label shows, as `Name: value`.
+Choosing which ones the phone shows, in its settings, is planned and not built
+yet; until then, they are in the API and the phone's copy.
 
 - **Name.** The header, with spaces trimmed and runs of spaces made single;
   its case is kept for display: `Marathon`. Two custom columns whose names are

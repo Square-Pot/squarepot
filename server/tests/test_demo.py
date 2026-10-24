@@ -14,7 +14,7 @@ from pydantic import SecretStr, ValidationError
 from squarepot_server.app import create_app
 from squarepot_server.config import CollectionConfig, Settings, StoreKind
 from squarepot_server.fields import load_schema, parse_tab
-from squarepot_server.labels.caption import caption
+from squarepot_server.labels.caption import caption, entries
 from squarepot_server.store import CsvFileStore, StoreError
 from tests.conftest import TOKEN, runtime
 from tests.test_sync import ids, sync
@@ -89,7 +89,7 @@ def test_the_demo_collection_is_valid_and_matches_the_sample_sheet() -> None:
 def test_demo_names_follow_the_display_rules() -> None:
     # The schema adds "aff." to an affinity itself, so the sheet holds only the epithet.
     schema = load_schema(SCHEMA_FILE)
-    label = next(preset for preset in schema.presets if preset.key == "label")
+    label = entries(next(preset for preset in schema.presets if preset.key == "label"))
     parsed = parse_tab(schema, CsvFileStore().read(file_collection(DEMO)))
     texts = [
         " ".join("".join(run.text for run in item) for item in caption(schema, label, row.fields))

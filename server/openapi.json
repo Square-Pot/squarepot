@@ -750,6 +750,44 @@
         "title": "Label",
         "description": "A name in each UI language."
       },
+      "LabelEntry": {
+        "properties": {
+          "field": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "examples": [
+                  "genus"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field",
+            "description": "Key of a field from `/schema`, or the computed `name` in a caption."
+          },
+          "custom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom",
+            "description": "Name of a custom column from `Collection.custom_columns`, printed as `Name: value`. A plant without a value for it prints nothing for it."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "LabelEntry",
+        "description": "One thing to print on a label: a schema field, or a custom column."
+      },
       "LabelFormat": {
         "type": "string",
         "enum": [
@@ -1127,9 +1165,41 @@
             "description": "Key of the preset printed in the burial zone of a template with `burial_text`; `null` leaves the zone blank.",
             "default": "burial"
           },
+          "caption_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LabelEntry"
+                },
+                "type": "array",
+                "maxItems": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption Fields",
+            "description": "What the caption shows, in order, instead of `preset`'s fields. The plant's `name` is always included: first, when the list leaves it out."
+          },
+          "extra_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LabelEntry"
+                },
+                "type": "array",
+                "maxItems": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra Fields",
+            "description": "More about the plant, in order, each as `Label: value`: in the burial zone of a template with `burial_text`, instead of `burial_preset`'s fields, and after the caption on other templates, where it is cut first when space runs out. Omitted: `burial_preset` in the burial zone, and nothing after a caption."
+          },
           "language": {
             "$ref": "#/components/schemas/LabelLanguage",
-            "description": "Language of the field labels in the burial zone.",
+            "description": "Language of the field labels in the burial zone and in `extra_fields`.",
             "default": "en"
           },
           "layout": {

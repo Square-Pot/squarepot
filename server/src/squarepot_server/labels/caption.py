@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from squarepot_server.api.models import Display, FieldSchema, LabelLanguage, Preset
+from squarepot_server.api.models import Display, FieldSchema, LabelEntry, LabelLanguage, Preset
 from squarepot_server.labels.text import Run, Style
 
 NAME = "name"
@@ -31,10 +31,25 @@ def styled(value: str, display: Display) -> list[Run]:
     return runs
 
 
-def caption(schema: FieldSchema, preset: Preset, fields: dict[str, str]) -> list[list[Run]]:
-    """One item per non-empty preset entry, in preset order.
+def entries(preset: Preset) -> list[LabelEntry]:
+    return [LabelEntry(field=key) for key in preset.fields]
 
-    The first item is set in bold unless it has italics, as a name does: on
+
+def custom_item(name: str, custom: dict[str, str]) -> list[Run]:
+    """A custom column as `Name: value`, or nothing when the plant has no value for it."""
+    value = custom.get(name, "").strip()
+    return [Run(f"{name}: ", Style.BOLD), Run(value)] if value else []
+
+
+def caption(
+    schema: FieldSchema,
+    chosen: list[LabelEntry],
+    fields: dict[str, str],
+    custom: dict[str, str] | None = None,
+) -> list[list[Run]]:
+    """One item per non-empty entry, in order; the name always, first when not chosen.
+
+    The first item is set in bold unless it has italics or bold, as a name does: on
     the default preset, that is the field number.
 
     Computed fields other than the name (such as age) change over time and are
@@ -42,10 +57,15 @@ def caption(schema: FieldSchema, preset: Preset, fields: dict[str, str]) -> list
     """
     displays = {definition.key: definition.display for definition in schema.fields}
     computed = {field.key: field.from_ for field in schema.computed}
+    if all(entry.field != NAME for entry in chosen):
+        chosen = [LabelEntry(field=NAME), *chosen]
     items: list[list[Run]] = []
-    for key in preset.fields:
-        if key == NAME:
-            runs: list[Run] = []
+    for entry in chosen:
+        key = entry.field or ""
+        runs: list[Run] = []
+        if entry.custom is not None:
+            runs = custom_item(entry.custom, custom or {})
+        elif key == NAME:
             for part in computed.get(NAME, []):
                 if fields.get(part, "").strip():
                     runs.extend([Run(" ")] if runs else [])
@@ -63,19 +83,29 @@ def caption(schema: FieldSchema, preset: Preset, fields: dict[str, str]) -> list
     return items
 
 
-def burial_text(
-    schema: FieldSchema, preset: Preset, fields: dict[str, str], language: LabelLanguage
+def extra_text(
+    schema: FieldSchema,
+    chosen: list[LabelEntry],
+    fields: dict[str, str],
+    language: LabelLanguage,
+    custom: dict[str, str] | None = None,
 ) -> list[list[Run]]:
-    """One item per non-empty preset field: its label in bold, then its value.
+    """One item per non-empty entry: its label in bold, then its value.
 
     Computed fields are left out: the name is on the visible part, and age changes over time.
     """
     definitions = {definition.key: definition for definition in schema.fields}
     items: list[list[Run]] = []
-    for key in preset.fields:
-        definition = definitions.get(key)
-        if definition is None or not fields.get(key, "").strip():
+    for entry in chosen:
+        if entry.custom is not None:
+            if runs := custom_item(entry.custom, custom or {}):
+                items.append(runs)
+            continue
+        definition = definitions.get(entry.field or "")
+        if definition is None or not fields.get(definition.key, "").strip():
             continue
         label = getattr(definition.label, language.value)
-        items.append([Run(f"{label}: ", Style.BOLD), *styled(fields[key], definition.display)])
+        items.append(
+            [Run(f"{label}: ", Style.BOLD), *styled(fields[definition.key], definition.display)]
+        )
     return items

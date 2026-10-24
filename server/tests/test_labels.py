@@ -15,11 +15,18 @@ import zxingcpp
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from squarepot_server.api.models import LabelLanguage, LabelLayout, LabelOrientation, PageSize
+from squarepot_server.api import routes
+from squarepot_server.api.models import (
+    LabelEntry,
+    LabelLanguage,
+    LabelLayout,
+    LabelOrientation,
+    PageSize,
+)
 from squarepot_server.config import DEFAULT_SCHEMA_FILE
 from squarepot_server.fields import load_schema
 from squarepot_server.labels import datamatrix
-from squarepot_server.labels.caption import burial_text, caption
+from squarepot_server.labels.caption import caption, entries, extra_text
 from squarepot_server.labels.layout import (
     BURIAL_MAX_FONT,
     COMFORT,
@@ -42,8 +49,8 @@ from squarepot_server.labels.text import ELLIPSIS, Command, Run, Style
 from tests.conftest import FakeStore, runtime
 
 SCHEMA = load_schema(DEFAULT_SCHEMA_FILE)
-LABEL = next(preset for preset in SCHEMA.presets if preset.key == "label")
-BURIAL = next(preset for preset in SCHEMA.presets if preset.key == "burial")
+LABEL = entries(next(preset for preset in SCHEMA.presets if preset.key == "label"))
+BURIAL = entries(next(preset for preset in SCHEMA.presets if preset.key == "burial"))
 DPI = 300
 DATA_MATRIX = zxingcpp.BarcodeFormats(zxingcpp.BarcodeFormat.DataMatrix)
 PX_PER_MM = DPI / 25.4
@@ -77,7 +84,7 @@ def items(count: int) -> list[Item]:
         Item(
             TAGS[index % len(TAGS)],
             caption(SCHEMA, LABEL, PLANTS[index % len(PLANTS)]),
-            burial_text(SCHEMA, BURIAL, PLANTS[index % len(PLANTS)], LabelLanguage.EN),
+            extra_text(SCHEMA, BURIAL, PLANTS[index % len(PLANTS)], LabelLanguage.EN),
         )
         for index in range(count)
     ]
@@ -568,15 +575,15 @@ def test_a_long_caption_shrinks_then_is_cut_short() -> None:
 
 
 def test_burial_text_names_each_field_in_bold_in_the_chosen_language() -> None:
-    english = burial_text(SCHEMA, BURIAL, PLANTS[0], LabelLanguage.EN)
+    english = extra_text(SCHEMA, BURIAL, PLANTS[0], LabelLanguage.EN)
     assert [text(item) for item in english] == [
         "Source: Mesa Garden",
         "Seeding date: 2024-03-15",
     ]
     assert [run.style for run in english[0]] == [Style.BOLD, Style.REGULAR]
-    russian = burial_text(SCHEMA, BURIAL, PLANTS[0], LabelLanguage.RU)
+    russian = extra_text(SCHEMA, BURIAL, PLANTS[0], LabelLanguage.RU)
     assert [text(item) for item in russian] == ["Источник: Mesa Garden", "Дата посева: 2024-03-15"]
-    synonym = burial_text(SCHEMA, BURIAL, PLANTS[2], LabelLanguage.EN)[0]
+    synonym = extra_text(SCHEMA, BURIAL, PLANTS[2], LabelLanguage.EN)[0]
     assert synonym[1] == Run("Gymnocalycium cardenasianum", Style.ITALIC)
 
 
@@ -584,11 +591,11 @@ def test_burial_text_is_set_large_when_short_and_cut_short_when_long() -> None:
     box = geometry(layout("horizontal")).burial
     assert box is not None
     size, lines = fit(
-        burial_text(SCHEMA, BURIAL, PLANTS[0], LabelLanguage.EN), box, 6, BURIAL_MAX_FONT
+        extra_text(SCHEMA, BURIAL, PLANTS[0], LabelLanguage.EN), box, 6, BURIAL_MAX_FONT
     )
     assert size == BURIAL_MAX_FONT
     assert len(lines) == 2
-    long = burial_text(SCHEMA, BURIAL, PLANTS[2], LabelLanguage.EN) * 3
+    long = extra_text(SCHEMA, BURIAL, PLANTS[2], LabelLanguage.EN) * 3
     size, lines = fit(long, box, 6, BURIAL_MAX_FONT)
     assert size == MIN_FONT
     assert len(lines) == 6
@@ -722,6 +729,99 @@ def test_the_burial_preset_and_language_are_chosen_per_request(
     assert paths() == 4
     assert paths(burial_preset=None) == 3
     assert paths(language="ru") == 4
+
+
+def texts(items: list[list[Run]]) -> list[str]:
+    return [text(item) for item in items]
+
+
+def test_a_chosen_caption_keeps_the_name_and_shows_custom_columns() -> None:
+    fields = {"genus": "Lithops", "species": "lesliei", "field_number": "SB 1", "ex": "Mesa"}
+    custom = {"Marathon": "yes"}
+    chosen = [LabelEntry(field="field_number"), LabelEntry(custom="Marathon")]
+    items = caption(SCHEMA, chosen, fields, custom)
+    # The name comes first when the choice leaves it out; ex is switched off.
+    assert texts(items) == ["Lithops lesliei", "SB 1", "Marathon: yes"]
+    assert items[2][0] == Run("Marathon: ", Style.BOLD)
+    assert texts(caption(SCHEMA, [LabelEntry(custom="Marathon")], fields, {})) == [
+        "Lithops lesliei"
+    ]
+
+
+def test_extra_text_shows_fields_and_custom_columns_in_the_chosen_order() -> None:
+    fields = {"genus": "Lithops", "source": "Mesa Garden", "notes": " "}
+    chosen = [
+        LabelEntry(custom="Marathon"),
+        LabelEntry(field="source"),
+        LabelEntry(field="notes"),
+        LabelEntry(custom="Pot"),
+    ]
+    items = extra_text(SCHEMA, chosen, fields, LabelLanguage.RU, {"Marathon": "2026"})
+    assert texts(items) == ["Marathon: 2026", "Источник: Mesa Garden"]
+
+
+@pytest.mark.parametrize("entry", [{}, {"field": "genus", "custom": "Marathon"}])
+def test_an_entry_is_a_field_or_a_custom_column(entry: dict[str, str]) -> None:
+    with pytest.raises(ValueError, match="either `field` or `custom`"):
+        LabelEntry.model_validate(entry)
+
+
+def test_the_extra_fields_go_where_each_template_has_room(
+    client: TestClient, store: FakeStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store.put(
+        "main",
+        [
+            ["tag", "genus", "species", "ex", "source", "label_type", "Marathon"],
+            [1, "Lithops", "lesliei", "Mesa", "Nursery", "h", "yes"],
+            [2, "Conophytum", "bilobum", "Mesa", "Nursery", "v", ""],
+        ],
+    )
+    runtime(client).syncer.run_once()
+    laid_out: dict[str, list[Item]] = {}
+    real = layout_pages
+
+    def capture(layout: LabelLayout, items: list[Item], skip: int = 0) -> list[Page]:
+        laid_out["horizontal" if layout.burial_text else "vertical"] = items
+        return real(layout, items, skip)
+
+    monkeypatch.setattr(routes, "layout_pages", capture)
+
+    def post(**options: object) -> dict[str, tuple[list[str], list[str]]]:
+        request = {"plants": ["main:000001", "main:000002"]} | options
+        response = client.post("/api/v1/labels", json=request)
+        assert response.status_code == 200, response.text
+        return {key: (texts(item.caption), texts(item.burial)) for key, [item] in laid_out.items()}
+
+    # By default: the presets, and no extras after a vertical caption.
+    assert post() == {
+        "horizontal": (["Lithops lesliei", "ex Mesa"], ["Source: Nursery"]),
+        "vertical": (["Conophytum bilobum", "ex Mesa"], []),
+    }
+    chosen = post(
+        caption_fields=[{"field": "name"}],
+        extra_fields=[{"custom": "Marathon"}, {"field": "source"}],
+    )
+    assert chosen == {
+        "horizontal": (["Lithops lesliei"], ["Marathon: yes", "Source: Nursery"]),
+        "vertical": (["Conophytum bilobum", "Source: Nursery"], []),
+    }
+
+
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        ({"caption_fields": [{"field": "nope"}]}, "caption_fields names fields that cannot"),
+        ({"extra_fields": [{"field": "name"}]}, "extra_fields names fields that cannot"),
+        ({"extra_fields": [{"field": "age"}]}, "printed there: age."),
+    ],
+)
+def test_unknown_or_misplaced_fields_are_refused(
+    client: TestClient, options: dict[str, object], message: str
+) -> None:
+    response = client.post("/api/v1/labels", json={"plants": ["main:004217"]} | options)
+    assert response.status_code == 422
+    assert message in response.json()["message"]
 
 
 def test_plants_without_a_number_cannot_be_labelled(client: TestClient) -> None:

@@ -10,7 +10,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 Tag = Annotated[
     str,
@@ -364,6 +364,30 @@ class LabelTemplate(ApiModel):
     layout: LabelLayout
 
 
+class LabelEntry(ApiModel):
+    """One thing to print on a label: a schema field, or a custom column."""
+
+    field: Key | None = Field(
+        default=None,
+        description="Key of a field from `/schema`, or the computed `name` in a caption.",
+    )
+    custom: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        description=(
+            "Name of a custom column from `Collection.custom_columns`, printed as "
+            "`Name: value`. A plant without a value for it prints nothing for it."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def one_of(self) -> LabelEntry:
+        if (self.field is None) == (self.custom is None):
+            raise ValueError("give either `field` or `custom`")
+        return self
+
+
 class LabelRequest(ApiModel):
     plants: list[str] = Field(
         min_length=1,
@@ -387,8 +411,27 @@ class LabelRequest(ApiModel):
             "`null` leaves the zone blank."
         ),
     )
+    caption_fields: list[LabelEntry] | None = Field(
+        default=None,
+        max_length=30,
+        description=(
+            "What the caption shows, in order, instead of `preset`'s fields. The plant's "
+            "`name` is always included: first, when the list leaves it out."
+        ),
+    )
+    extra_fields: list[LabelEntry] | None = Field(
+        default=None,
+        max_length=30,
+        description=(
+            "More about the plant, in order, each as `Label: value`: in the burial zone of a "
+            "template with `burial_text`, instead of `burial_preset`'s fields, and after the "
+            "caption on other templates, where it is cut first when space runs out. Omitted: "
+            "`burial_preset` in the burial zone, and nothing after a caption."
+        ),
+    )
     language: LabelLanguage = Field(
-        default=LabelLanguage.EN, description="Language of the field labels in the burial zone."
+        default=LabelLanguage.EN,
+        description="Language of the field labels in the burial zone and in `extra_fields`.",
     )
     layout: LabelLayoutOverrides = Field(default_factory=LabelLayoutOverrides)
     format: LabelFormat = LabelFormat.PDF

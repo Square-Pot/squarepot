@@ -158,6 +158,11 @@ reads as one column and is reported as missing its `genus` column.
   The horizontal one prints the `burial` preset there, each field with its
   label in bold (`language`: English by default, or Russian); the vertical
   one leaves it blank.
+  A print request may choose instead what a label shows, in order:
+  `caption_fields` for the caption, and `extra_fields` for more about the
+  plant, printed in the burial zone of the horizontal label and after the
+  caption of the vertical one. Both take schema fields and custom columns
+  (`Name: value`). The plant's name is always included.
   By default (`auto`), each plant gets the template its `label_type` names,
   and each template's labels start on a page of their own.
   The code is always printed whole, with a white quiet zone of at least one
