@@ -40,11 +40,13 @@ fun TagOverlay(state: CameraUiState, modifier: Modifier = Modifier) {
         val map = FrameToView(frame, size.width, size.height)
         drawAimMark(map(SingleTargetSelector.aimPoint(frame)))
 
-        val (target, color) = when (val s = state.selection) {
+        val (selected, color) = when (val s = state.selection) {
             is State.Locked -> s.target to if (s.target.code == state.pinned) PINNED else LOCKED
             is State.Tracking -> s.target to TRACKING
             State.Searching -> null to OTHER
         }
+        // Draw the target with its smoothed corners when it is on screen, like every other label.
+        val target = selected?.let { sel -> state.detections.firstOrNull { it.code == sel.code } ?: sel }
 
         state.detections.forEach {
             drawQuad(it, map, OTHER, 1.dp.toPx())

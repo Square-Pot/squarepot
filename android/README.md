@@ -64,7 +64,9 @@ camera.
 
   It locks the label after a few stable frames (with a haptic tick). A label
   the decoder misses for a frame or two stays on screen for 0.3 s, so frames
-  and numbers do not blink. The bottom panel shows the selected label's plant
+  and numbers do not blink, and each label's corners go through a 1€ filter
+  (smoothed hard while the phone is still, followed closely while it moves),
+  so they do not tremble. The bottom panel shows the selected label's plant
   from the local copy (its botanical name, or that the copy has no plant or
   several plants with that number), the decode rate and latency over the last
   120 frames. Lookups read only the local copy, never the network.

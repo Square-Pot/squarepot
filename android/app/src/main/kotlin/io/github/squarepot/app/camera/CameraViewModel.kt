@@ -9,6 +9,7 @@ import io.github.squarepot.app.SquarepotApplication
 import io.github.squarepot.app.data.PlantView
 import io.github.squarepot.app.decoder.TagDecoder
 import io.github.squarepot.app.decoder.ZxingCppTagDecoder
+import io.github.squarepot.app.recognition.CornerSmoother
 import io.github.squarepot.app.recognition.Detection
 import io.github.squarepot.app.recognition.DetectionHold
 import io.github.squarepot.app.recognition.FrameSize
@@ -27,7 +28,10 @@ import java.util.Locale
 data class CameraUiState(
     val resolution: AnalysisResolution = AnalysisResolution.P720,
     val frame: FrameSize? = null,
-    /** The labels to draw: this frame's and those missed for no longer than the hold time. */
+    /**
+     * The labels to draw: this frame's and those missed for no longer than the hold time, with
+     * smoothed corners.
+     */
     val detections: List<Detection> = emptyList(),
     val selection: SingleTargetSelector.State = SingleTargetSelector.State.Searching,
     /** The label pinned by a tap, if any; the overlay draws it in its own colour. */
@@ -46,6 +50,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     val decoder: TagDecoder = ZxingCppTagDecoder()
     private val selector = SingleTargetSelector()
     private val hold = DetectionHold()
+    private val smoother = CornerSmoother()
     private val stats = RollingStats()
 
     private val _state = MutableStateFlow(CameraUiState())
@@ -92,6 +97,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
             resetRequested = false
             selector.reset()
             hold.clear()
+            smoother.clear()
             stats.clear()
         }
         stats.add(result.decodeMillis, hit = result.detections.isNotEmpty())
@@ -100,10 +106,11 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         val selection = selector.update(result.detections, result.frame, result.timestampMillis, tap)
         val shown = hold.update(result.detections, result.timestampMillis)
         lookup.request(shown.map { it.code.value })
+        val drawn = smoother.update(shown, result.detections, result.timestampMillis)
         _state.update {
             it.copy(
                 frame = result.frame,
-                detections = shown,
+                detections = drawn,
                 selection = selection,
                 pinned = selector.pinned,
                 stats = mapOf(result.decoderId to stats.snapshot()),
