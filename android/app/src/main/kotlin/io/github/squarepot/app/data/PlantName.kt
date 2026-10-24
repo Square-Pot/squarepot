@@ -20,7 +20,7 @@ fun botanicalName(schema: FieldSchemaDto?, fields: Map<String, String>): List<Te
         val value = fields[key]?.trim().orEmpty()
         if (value.isEmpty()) return@forEach
         if (runs.isNotEmpty()) runs += TextRun(" ")
-        runs += styled(value, displays[key] ?: DisplayDto())
+        runs += styled(value, displays[key])
     }
     return runs
 }
@@ -28,11 +28,13 @@ fun botanicalName(schema: FieldSchemaDto?, fields: Map<String, String>): List<Te
 /** The name as plain text, without italics. */
 fun List<TextRun>.plain(): String = joinToString("") { it.text }
 
-private fun styled(value: String, display: DisplayDto): List<TextRun> {
-    var text = applyCase(value, display.case)
-    if (display.quote) text = "‘$text’"
-    val prefix = display.prefix?.let { listOf(TextRun("$it ")) }.orEmpty()
-    return prefix + TextRun(text, display.italic)
+/** [value] with a field's display rules: case, quotes, then the prefix in roman type. */
+internal fun styled(value: String, display: DisplayDto?): List<TextRun> {
+    val rules = display ?: DisplayDto()
+    var text = applyCase(value, rules.case)
+    if (rules.quote) text = "‘$text’"
+    val prefix = rules.prefix?.let { listOf(TextRun("$it ")) }.orEmpty()
+    return prefix + TextRun(text, rules.italic)
 }
 
 private fun applyCase(value: String, case: String): String = when (case) {
