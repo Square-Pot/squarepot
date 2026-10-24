@@ -118,7 +118,8 @@ class SingleTargetSelector(private val config: Config = Config()) {
 
             currentNow !in candidates -> startTracking(best, now)
 
-            best != null && best.code != current.code &&
+            best != null &&
+                best.code != current.code &&
                 aimDistance(best, frame) * config.switchMargin < aimDistance(currentNow, frame) ->
                 startTracking(best, now)
 
