@@ -16,6 +16,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.squarepot.app.bench.BenchScreen
 import io.github.squarepot.app.camera.CameraScreen
+import io.github.squarepot.app.copy.CopyScreen
+
+private enum class Screen { CAMERA, BENCH, COPY }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -24,12 +27,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface {
-                    var showBench by rememberSaveable { mutableStateOf(false) }
-                    if (showBench) {
-                        BackHandler { showBench = false }
-                        BenchScreen(viewModel(), onBack = { showBench = false })
-                    } else {
-                        CameraScreen(viewModel(), onOpenBench = { showBench = true })
+                    var screen by rememberSaveable { mutableStateOf(Screen.CAMERA) }
+                    BackHandler(enabled = screen != Screen.CAMERA) { screen = Screen.CAMERA }
+                    when (screen) {
+                        Screen.CAMERA -> CameraScreen(
+                            viewModel(),
+                            onOpenBench = { screen = Screen.BENCH },
+                            onOpenCopy = { screen = Screen.COPY },
+                        )
+                        Screen.BENCH -> BenchScreen(viewModel(), onBack = { screen = Screen.CAMERA })
+                        Screen.COPY -> CopyScreen()
                     }
                 }
             }

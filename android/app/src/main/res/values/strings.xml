@@ -55,6 +55,7 @@
     <string name="resolution_1080" translatable="false">1080p</string>
     <string name="resolution_max">Max</string>
     <string name="open_bench">Bench</string>
+    <string name="open_copy">Local copy</string>
     <string name="back">Back</string>
 
     <string name="bench_title">Recognition bench</string>

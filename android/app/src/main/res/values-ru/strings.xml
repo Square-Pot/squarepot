@@ -56,6 +56,7 @@
     <string name="mode_alternate">Оба</string>
     <string name="resolution_max">Макс</string>
     <string name="open_bench">Замер</string>
+    <string name="open_copy">Локальная копия</string>
     <string name="back">Назад</string>
 
     <string name="bench_title">Замер распознавания</string>

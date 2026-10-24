@@ -56,7 +56,7 @@ import java.util.Locale
 import java.util.concurrent.Executors
 
 @Composable
-fun CameraScreen(viewModel: CameraViewModel, onOpenBench: () -> Unit) {
+fun CameraScreen(viewModel: CameraViewModel, onOpenBench: () -> Unit, onOpenCopy: () -> Unit) {
     val context = LocalContext.current
     var granted by remember { mutableStateOf(context.hasCameraPermission()) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
@@ -74,7 +74,7 @@ fun CameraScreen(viewModel: CameraViewModel, onOpenBench: () -> Unit) {
                 modifier = Modifier.align(Alignment.Center).padding(24.dp),
             )
         }
-        Controls(viewModel, onOpenBench, Modifier.align(Alignment.BottomCenter))
+        Controls(viewModel, onOpenBench, onOpenCopy, Modifier.align(Alignment.BottomCenter))
     }
 }
 
@@ -143,7 +143,12 @@ private fun LiveCamera(viewModel: CameraViewModel) {
 }
 
 @Composable
-private fun Controls(viewModel: CameraViewModel, onOpenBench: () -> Unit, modifier: Modifier = Modifier) {
+private fun Controls(
+    viewModel: CameraViewModel,
+    onOpenBench: () -> Unit,
+    onOpenCopy: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     Column(
         modifier
@@ -173,7 +178,10 @@ private fun Controls(viewModel: CameraViewModel, onOpenBench: () -> Unit, modifi
                 )
             }
         }
-        Button(onClick = onOpenBench) { Text(stringResource(R.string.open_bench)) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onOpenBench) { Text(stringResource(R.string.open_bench)) }
+            Button(onClick = onOpenCopy) { Text(stringResource(R.string.open_copy)) }
+        }
     }
 }
 

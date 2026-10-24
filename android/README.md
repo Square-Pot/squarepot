@@ -43,9 +43,10 @@ old cursors and failures.
 
 ## Status: recognition spike
 
-The app currently holds only the recognition spike, which measures how
-reliably labels are read in real conditions before the rest of the app is
-built:
+The app opens on the recognition spike, which measures how reliably labels
+are read in real conditions. **Bench** and **Local copy** on the camera screen
+open the photo bench and the local copy described above; Back returns to the
+camera.
 
 - **Live camera.** Analysis frames (720p by default; 1080p or the largest
   16:9 size can be picked) are decoded by ML Kit, zxing-cpp, or both on
