@@ -9,6 +9,7 @@ import io.github.squarepot.app.recognition.Detection
 import io.github.squarepot.app.recognition.FrameSize
 import io.github.squarepot.app.recognition.RollingStats
 import io.github.squarepot.app.recognition.SingleTargetSelector
+import io.github.squarepot.app.recognition.TagCode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +20,8 @@ data class CameraUiState(
     val frame: FrameSize? = null,
     val detections: List<Detection> = emptyList(),
     val selection: SingleTargetSelector.State = SingleTargetSelector.State.Searching,
+    /** The label pinned by a tap, if any; the overlay draws it in its own colour. */
+    val pinned: TagCode? = null,
     val stats: Map<String, RollingStats.Snapshot> = emptyMap(),
 )
 
@@ -66,6 +69,7 @@ class CameraViewModel : ViewModel() {
                 frame = result.frame,
                 detections = result.detections,
                 selection = selection,
+                pinned = selector.pinned,
                 stats = mapOf(result.decoderId to stats.snapshot()),
             )
         }

@@ -17,7 +17,9 @@ import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -144,11 +147,20 @@ private fun LiveCamera(viewModel: CameraViewModel) {
  * where there is no label goes back to choosing automatically.
  */
 private fun Modifier.pickOnTap(viewModel: CameraViewModel, context: Context) = pointerInput(viewModel) {
-    detectTapGestures { offset ->
+    // PreviewView consumes every touch (tap to focus, pinch to zoom), so a tap detector in the
+    // usual pass never fires. Watch taps in the Initial pass, before the preview, and leave them
+    // unconsumed so the preview still focuses where the label was tapped.
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        val up = waitForUpOrCancellation(PointerEventPass.Initial) ?: return@awaitEachGesture
+        val quick = up.uptimeMillis - down.uptimeMillis < viewConfiguration.longPressTimeoutMillis
+        val still = (up.position - down.position).getDistance() < viewConfiguration.touchSlop
+        if (!quick || !still) return@awaitEachGesture
+
         val current = viewModel.state.value
-        val frame = current.frame ?: return@detectTapGestures
+        val frame = current.frame ?: return@awaitEachGesture
         val map = FrameToView(frame, size.width.toFloat(), size.height.toFloat())
-        val tap = SingleTargetSelector.Tap(map.toFrame(offset), TAP_REACH.toPx() / map.scale)
+        val tap = SingleTargetSelector.Tap(map.toFrame(up.position), TAP_REACH.toPx() / map.scale)
         val locked = (current.selection as? SingleTargetSelector.State.Locked)?.target
         if (locked != null && locked.isHit(tap)) context.copyToClipboard(locked.code.value)
         viewModel.tap(tap)

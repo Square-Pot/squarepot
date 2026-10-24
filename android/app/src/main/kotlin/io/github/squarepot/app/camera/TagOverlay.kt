@@ -26,7 +26,8 @@ import kotlin.math.max
 
 /**
  * Draws the aim mark, every decoded label (thin, with its number in small type) and the selected
- * one (yellow while tracking, green when locked, with its number in large type).
+ * one (yellow while tracking, green when locked, blue when pinned by a tap, with its number in
+ * large type).
  *
  * Assumes the preview fills the view with centre crop (PreviewView FILL_CENTER) and shows the
  * same field of view as the analysis frame: both use a 16:9 resolution.
@@ -40,7 +41,7 @@ fun TagOverlay(state: CameraUiState, modifier: Modifier = Modifier) {
         drawAimMark(map(SingleTargetSelector.aimPoint(frame)))
 
         val (target, color) = when (val s = state.selection) {
-            is State.Locked -> s.target to LOCKED
+            is State.Locked -> s.target to if (s.target.code == state.pinned) PINNED else LOCKED
             is State.Tracking -> s.target to TRACKING
             State.Searching -> null to OTHER
         }
@@ -106,4 +107,5 @@ private fun DrawScope.drawQuad(detection: Detection, map: FrameToView, color: Co
 
 private val OTHER = Color.White.copy(alpha = 0.6f)
 private val LOCKED = Color(0xFF4CAF50)
+private val PINNED = Color(0xFF29B6F6)
 private val TRACKING = Color(0xFFFFC107)

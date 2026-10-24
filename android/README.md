@@ -54,7 +54,8 @@ camera.
   app picks one label:
   1. **a tapped label**, whatever its size. It stays picked until you tap
      another label, tap where there is no label, or it is out of sight for
-     more than 0.3 s. Tapping the picked label copies its number;
+     more than 0.3 s. A tapped label is drawn in blue instead of green, and
+     tapping it again copies its number. The tap also focuses the camera there;
   2. otherwise **the clearly largest label** (the nearest pot's; labels more
      than 1.5 times smaller are background);
   3. among labels of about equal size, **the one nearest the aim mark**, a
