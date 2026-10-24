@@ -62,13 +62,15 @@ camera.
      small cross centred a bit above the middle of the frame. Vertical distance
      counts half, since the label usually sits on the far rim, above the plant.
 
-  It locks the label after a few stable frames (with a haptic tick). The
-  bottom panel shows the decode rate and latency over the last 120 frames.
+  It locks the label after a few stable frames (with a haptic tick). A label
+  the decoder misses for a frame or two stays on screen for 0.3 s, so frames
+  and numbers do not blink. The bottom panel shows the decode rate and latency
+  over the last 120 frames.
 - **Bench.** Pick a folder of label photos. Each photo is made upright (EXIF
   orientation), scaled to a long side of 1280, 1920 and 2560 px in turn (the
   720p, 1080p and a larger analysis frame, for the live mode), then taken at
-  full resolution (for the photo mode), and decoded at each size. The results are written as `squarepot-bench-<time>.json` in the
-  same folder.
+  full resolution (for the photo mode), and decoded at each size. The results
+  are written as `squarepot-bench-<time>.json` in the same folder.
 
 ### Bench ground truth
 

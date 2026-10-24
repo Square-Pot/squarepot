@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import io.github.squarepot.app.decoder.TagDecoder
 import io.github.squarepot.app.decoder.ZxingCppTagDecoder
 import io.github.squarepot.app.recognition.Detection
+import io.github.squarepot.app.recognition.DetectionHold
 import io.github.squarepot.app.recognition.FrameSize
 import io.github.squarepot.app.recognition.RollingStats
 import io.github.squarepot.app.recognition.SingleTargetSelector
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.update
 data class CameraUiState(
     val resolution: AnalysisResolution = AnalysisResolution.P720,
     val frame: FrameSize? = null,
+    /** The labels to draw: this frame's and those missed for no longer than the hold time. */
     val detections: List<Detection> = emptyList(),
     val selection: SingleTargetSelector.State = SingleTargetSelector.State.Searching,
     /** The label pinned by a tap, if any; the overlay draws it in its own colour. */
@@ -32,6 +34,7 @@ data class CameraUiState(
 class CameraViewModel : ViewModel() {
     val decoder: TagDecoder = ZxingCppTagDecoder()
     private val selector = SingleTargetSelector()
+    private val hold = DetectionHold()
     private val stats = RollingStats()
 
     private val _state = MutableStateFlow(CameraUiState())
@@ -58,6 +61,7 @@ class CameraViewModel : ViewModel() {
         if (resetRequested) {
             resetRequested = false
             selector.reset()
+            hold.clear()
             stats.clear()
         }
         stats.add(result.decodeMillis, hit = result.detections.isNotEmpty())
@@ -67,7 +71,7 @@ class CameraViewModel : ViewModel() {
         _state.update {
             it.copy(
                 frame = result.frame,
-                detections = result.detections,
+                detections = hold.update(result.detections, result.timestampMillis),
                 selection = selection,
                 pinned = selector.pinned,
                 stats = mapOf(result.decoderId to stats.snapshot()),
