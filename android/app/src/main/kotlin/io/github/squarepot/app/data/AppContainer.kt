@@ -16,6 +16,7 @@ private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 class AppContainer(context: Context) {
     val database = CopyDatabase.open(context)
     val settings = SettingsStore(context.settingsDataStore)
+    val captions = CaptionSettingsStore(context.settingsDataStore)
     val localCopy = LocalCopy(database.copy())
 
     private val engine = SyncEngine(database)
