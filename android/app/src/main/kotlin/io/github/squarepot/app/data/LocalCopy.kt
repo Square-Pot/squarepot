@@ -10,7 +10,17 @@ import io.github.squarepot.app.data.local.PlantEntity
 /** One field of a plant, ready to show: the schema's label in the UI language and the value. */
 data class FieldValue(val key: String, val label: String, val value: String)
 
-data class PlantView(val id: String, val tag: String?, val collectionName: String, val fields: List<FieldValue>)
+/** A piece of text, set in italics or not. */
+data class TextRun(val text: String, val italic: Boolean = false)
+
+data class PlantView(
+    val id: String,
+    val tag: String?,
+    val collectionName: String,
+    val fields: List<FieldValue>,
+    /** The botanical name (see [botanicalName]); empty when the copy has no schema yet. */
+    val name: List<TextRun> = emptyList(),
+)
 
 /** Reads the local copy. Never touches the network: this is what the camera path uses. */
 class LocalCopy(private val dao: CopyDao) {
@@ -42,7 +52,7 @@ fun PlantEntity.toView(collectionName: String, schema: FieldSchemaDto?, language
         .map { FieldValue(it.key, it.label.forLanguage(language), fields.getValue(it.key)) }
     val knownKeys = known.mapTo(HashSet()) { it.key }
     val unknown = fields.filterKeys { it !in knownKeys }.map { (key, value) -> FieldValue(key, key, value) }
-    return PlantView(id, tag, collectionName, known + unknown)
+    return PlantView(id, tag, collectionName, known + unknown, botanicalName(schema, fields))
 }
 
 private const val TAG_LENGTH = 6
