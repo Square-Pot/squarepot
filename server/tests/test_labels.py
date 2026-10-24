@@ -114,20 +114,28 @@ SIDE_BY_SIDE: dict[str, dict[str, Any]] = {
         "width_mm": 30,
         "height_mm": 12,
         "burial_mm": 6,
+        "band_mm": 0,
         "chamfer_mm": 2,
     },
-    "tightest-height": {"height_mm": 29.4},
-    "large-module": {"module_mm": 2.0, "width_mm": 120, "height_mm": 40},
+    "tightest-height": {"height_mm": 32.4},
+    "no-band": {"height_mm": 29.4, "band_mm": 0},
+    "large-module": {"module_mm": 2.0, "width_mm": 120, "height_mm": 43},
     "code-only": {
         "max_lines": 0,
         "show_number": False,
         "width_mm": 14.4,
-        "height_mm": 24.4,
+        "height_mm": 27.4,
         "burial_mm": 10,
         "chamfer_mm": 7.2,
         "burial_text": False,
     },
-    "no-burial": {"height_mm": 15, "burial_mm": 0, "chamfer_mm": 0, "burial_text": False},
+    "no-burial": {
+        "height_mm": 15,
+        "burial_mm": 0,
+        "band_mm": 0,
+        "chamfer_mm": 0,
+        "burial_text": False,
+    },
     "blank-burial": {"burial_text": False},
     "no-frame-with-number": {"caption_box": False, "show_number": True},
     "no-number": {"show_number": False},
@@ -256,6 +264,7 @@ def overlaps(a: Rect, b: Rect) -> bool:
         ({"height_mm": 41}, "no room for a caption under the code: make it taller"),
         ({"burial_mm": 60}, "has no visible part above its 60 mm burial"),
         ({"burial_mm": 0, "chamfer_mm": 2}, "Only a burial zone has corners to cut"),
+        ({"burial_mm": 0, "band_mm": 2}, "Only a burial zone has a band above it"),
         ({"chamfer_mm": 7.6}, "wider than the 15 mm label"),
         ({"width_mm": 200, "height_mm": 280}, "does not fit on a a4 page"),
         ({"width_mm": 14.4, "gap_mm": 0}, "Cut lines need a gap of at least 0.1 mm"),
@@ -276,7 +285,8 @@ def test_a_layout_too_small_is_an_error_not_a_crop(
 @pytest.mark.parametrize(
     ("changes", "message"),
     [
-        ({"height_mm": 29.3}, "cannot hold a 12 mm code with its quiet zone above a 15 mm"),
+        ({"height_mm": 32.3}, "cannot hold a 12 mm code with its quiet zone above a 15 mm"),
+        ({"burial_mm": 30}, "no visible part above its 30 mm burial and 3 mm band"),
         ({"width_mm": 14.4}, "no room for a caption beside the code: make it wider"),
         ({"width_mm": 16, "max_lines": 0}, "no room for the number beside the code"),
     ],
@@ -304,7 +314,7 @@ def test_pages_hold_full_rows_and_columns() -> None:
     # A4 minus 10 mm margins: 11 columns of 15 + 2 mm, 4 rows of 60 + 2 mm.
     assert [len(page.symbols) for page in pages] == [44, 6]
     assert pages[1].symbols[0].label == Rect(10, 10, 15, 60)
-    # 2 columns of 76 + 2 mm, 8 rows of 30 + 2 mm.
+    # A4 minus 9 mm margins: 2 columns of 76 + 2 mm, 8 rows of 33 + 2 mm.
     assert [len(page.symbols) for page in layout_pages(layout("horizontal"), items(17))] == [16, 1]
 
 
@@ -433,10 +443,28 @@ def test_the_burial_zone_holds_its_text_the_soil_line_and_the_cut_corners(key: s
 def test_the_burial_text_box_keeps_clear_of_the_cut_corners() -> None:
     template = layout("horizontal")
     box = geometry(template).burial
-    assert box == Rect(6, 15.5, 64, 14)
+    assert box == Rect(6, 18.5, 64, 14)
     with pytest.raises(LayoutError, match="no room for text in its burial zone"):
-        geometry(layout("horizontal", burial_mm=2, height_mm=17))
-    assert geometry(layout("horizontal", burial_mm=2, height_mm=17, burial_text=False))
+        geometry(layout("horizontal", burial_mm=2, height_mm=20))
+    assert geometry(layout("horizontal", burial_mm=2, height_mm=20, burial_text=False))
+
+
+def test_the_band_lifts_the_code_and_stays_blank() -> None:
+    template = layout("horizontal")
+    shape = geometry(template)
+    # The code and caption are where they were on a 30 mm label without a band.
+    without = geometry(layout("horizontal", height_mm=30, band_mm=0))
+    assert (shape.symbol, shape.frame) == (without.symbol, without.frame)
+    assert (shape.visible, shape.soil) == (15, 18)
+    [page] = layout_pages(template, items(1))
+    [symbol] = page.symbols
+    band = Rect(
+        symbol.label.x, symbol.label.y + shape.visible, symbol.label.width, template.band_mm
+    )
+    for path in page.paths:
+        for contour in contours(path):
+            assert not overlaps(bounds(contour), band)
+    assert not [line for line in page.lines if band.contains(Rect(line.x1, line.y1, 0, 0))]
 
 
 def test_dashed_lines_are_dashed_in_svg_and_pdf() -> None:

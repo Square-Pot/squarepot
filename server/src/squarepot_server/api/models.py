@@ -263,7 +263,16 @@ class LabelLayout(ApiModel):
         le=300,
         description=(
             "Height of the white zone at the bottom of the label that goes into the substrate. "
-            "Nothing is printed in it, and a dashed grey line marks the soil level."
+            "A dashed grey line marks the soil level."
+        ),
+    )
+    band_mm: float = Field(
+        ge=0,
+        le=50,
+        description=(
+            "Height of a blank band between the code and the burial zone. It lifts the code "
+            "clear of the soil and stones, and may itself go into the substrate. Needs "
+            "`burial_mm`."
         ),
     )
     chamfer_mm: float = Field(
@@ -321,6 +330,7 @@ class LabelLayoutOverrides(ApiModel):
     width_mm: float | None = Field(default=None, gt=0, le=300)
     height_mm: float | None = Field(default=None, gt=0, le=300)
     burial_mm: float | None = Field(default=None, ge=0, le=300)
+    band_mm: float | None = Field(default=None, ge=0, le=50)
     chamfer_mm: float | None = Field(default=None, ge=0, le=50)
     burial_text: bool | None = None
     module_mm: float | None = Field(default=None, ge=0.5, le=5)

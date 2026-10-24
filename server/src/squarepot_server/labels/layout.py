@@ -8,7 +8,8 @@ and then being cut short.
 
 A label has a visible part, which holds the code and the caption, and may
 have a white burial zone under it that goes into the substrate, blank or
-with more about the plant.
+with more about the plant. A blank band between the two can lift the code
+clear of the soil.
 """
 
 from __future__ import annotations
@@ -73,6 +74,7 @@ TEMPLATES = {
                 width_mm=15,
                 height_mm=60,
                 burial_mm=25,
+                band_mm=0,
                 chamfer_mm=0,
                 burial_text=False,
                 module_mm=1.2,
@@ -89,14 +91,16 @@ TEMPLATES = {
             key="horizontal",
             label=Label(en="Horizontal", ru="Горизонтальная"),
             description=(
-                "A wide, low label for low plants: the caption and the code side by side above "
-                "the soil, and a white zone with cut corners that goes into the substrate."
+                "A wide, low label for low plants: the caption and the code side by side, a "
+                "blank band under them that lifts them clear of the soil, and a white zone with "
+                "cut corners that goes into the substrate."
             ),
             layout=LabelLayout(
                 orientation=LabelOrientation.HORIZONTAL,
                 width_mm=76,
-                height_mm=30,
+                height_mm=33,
                 burial_mm=15,
+                band_mm=3,
                 chamfer_mm=5,
                 burial_text=True,
                 module_mm=1.2,
@@ -104,7 +108,8 @@ TEMPLATES = {
                 caption_box=True,
                 show_number=True,
                 page=PageSize.A4,
-                margin_mm=10,
+                # 9 mm, not 10, keeps eight rows of 33 mm on an A4 page.
+                margin_mm=9,
                 gap_mm=2,
                 cut_lines=True,
             ),
@@ -182,8 +187,10 @@ class Geometry:
     # Outer edge of the caption's frame; the text sits inside it.
     frame: Rect
     text: Rect
-    # Height of the visible part, above the burial zone.
+    # Height of the visible part, which holds the code and the caption.
     visible: float
+    # Where the burial zone starts: the visible part and the band above it.
+    soil: float
     # The strip next to the code that holds the number, when it is shown.
     number: Rect | None = None
     # The box in the burial zone for its text, when it has one.
@@ -196,12 +203,18 @@ def geometry(layout: LabelLayout) -> Geometry:
     size = datamatrix.SIZE * module
     quiet = QUIET_MODULES * module
     needed = size + 2 * quiet
-    visible = layout.height_mm - layout.burial_mm
+    soil = layout.height_mm - layout.burial_mm
+    visible = soil - layout.band_mm
     horizontal = layout.orientation == LabelOrientation.HORIZONTAL
     name = f"A {layout.width_mm:g}x{layout.height_mm:g} mm label"
     number = None
+    if layout.band_mm and not layout.burial_mm:
+        raise LayoutError("Only a burial zone has a band above it: set burial_mm, or band_mm to 0.")
     if layout.burial_mm and visible <= EPSILON:
-        raise LayoutError(f"{name} has no visible part above its {layout.burial_mm:g} mm burial.")
+        band = f" and {layout.band_mm:g} mm band" if layout.band_mm else ""
+        raise LayoutError(
+            f"{name} has no visible part above its {layout.burial_mm:g} mm burial{band}."
+        )
     if horizontal:
         top = (visible - size) / 2
         side = min(top, 2 * quiet)
@@ -270,7 +283,7 @@ def geometry(layout: LabelLayout) -> Geometry:
         inset = layout.chamfer_mm + BURIAL_SIDE
         box = Rect(
             inset,
-            visible + BURIAL_TOP,
+            soil + BURIAL_TOP,
             layout.width_mm - 2 * inset,
             layout.burial_mm - 2 * BURIAL_TOP,
         )
@@ -279,7 +292,7 @@ def geometry(layout: LabelLayout) -> Geometry:
                 f"{name} has no room for text in its burial zone: make burial_mm larger or "
                 f"chamfer_mm smaller, or set burial_text to false."
             )
-    return Geometry(symbol, frame, text, visible, number, box)
+    return Geometry(symbol, frame, text, visible, soil, number, box)
 
 
 def fit(
@@ -380,7 +393,7 @@ def draw_label(page: Page, x: float, y: float, layout: LabelLayout, item: Item) 
     )
     page.paths.append(symbol_path(item.tag, symbol.x, symbol.y, module))
     if layout.burial_mm:
-        draw_burial(page, x, y, layout, shape.visible)
+        draw_burial(page, x, y, layout, shape.soil)
     if shape.number is not None:
         draw_number(page, x + shape.number.x, y + shape.number.y, shape.number, item.tag)
     if layout.max_lines and item.caption:
@@ -463,13 +476,13 @@ def draw_number(page: Page, x: float, y: float, strip: Rect, tag: str) -> None:
     page.paths.append(commands)
 
 
-def draw_burial(page: Page, x: float, y: float, layout: LabelLayout, visible: float) -> None:
+def draw_burial(page: Page, x: float, y: float, layout: LabelLayout, soil: float) -> None:
     """The soil line, just inside the burial zone, and the cut corners under it."""
-    soil = y + visible + CUT_LINE / 2
-    page.lines.append(Line(x, soil, x + layout.width_mm, soil, CUT_LINE, CUT_GREY, dash=SOIL_DASH))
+    line = y + soil + CUT_LINE / 2
+    page.lines.append(Line(x, line, x + layout.width_mm, line, CUT_LINE, CUT_GREY, dash=SOIL_DASH))
     if layout.chamfer_mm:
         # Started a line's width down, so that the stroke stays out of the quiet zone.
-        top, bottom = y + visible + CUT_LINE, y + layout.height_mm
+        top, bottom = y + soil + CUT_LINE, y + layout.height_mm
         right = x + layout.width_mm
         page.lines.append(Line(x, top, x + layout.chamfer_mm, bottom, CUT_LINE, CUT_GREY))
         page.lines.append(Line(right, top, right - layout.chamfer_mm, bottom, CUT_LINE, CUT_GREY))

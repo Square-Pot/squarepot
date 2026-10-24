@@ -776,7 +776,14 @@
             "maximum": 300.0,
             "minimum": 0.0,
             "title": "Burial Mm",
-            "description": "Height of the white zone at the bottom of the label that goes into the substrate. Nothing is printed in it, and a dashed grey line marks the soil level."
+            "description": "Height of the white zone at the bottom of the label that goes into the substrate. A dashed grey line marks the soil level."
+          },
+          "band_mm": {
+            "type": "number",
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Band Mm",
+            "description": "Height of a blank band between the code and the burial zone. It lifts the code clear of the soil and stones, and may itself go into the substrate. Needs `burial_mm`."
           },
           "chamfer_mm": {
             "type": "number",
@@ -844,6 +851,7 @@
           "width_mm",
           "height_mm",
           "burial_mm",
+          "band_mm",
           "chamfer_mm",
           "burial_text",
           "module_mm",
@@ -908,6 +916,19 @@
               }
             ],
             "title": "Burial Mm"
+          },
+          "band_mm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band Mm"
           },
           "chamfer_mm": {
             "anyOf": [
