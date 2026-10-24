@@ -57,13 +57,13 @@ repos:
         files: ^schema/.*\.schema\.json$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.8
+    rev: v0.17.1
     hooks:
       - id: ruff-check
       - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.3.1
+    rev: v2.4.0
     hooks:
       - id: mypy
         # Components with dependencies are type-checked in their own CI job.
