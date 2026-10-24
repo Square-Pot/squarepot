@@ -16,6 +16,10 @@ services:
       dockerfile: server/Dockerfile
     mem_limit: ${SQUAREPOT_MEMORY_LIMIT:-1g}
     env_file: .env
+    environment:
+      # Proxies whose X-Forwarded-For uvicorn believes, so that the server sees each
+      # client's own address behind a reverse proxy on the host.
+      FORWARDED_ALLOW_IPS: ${SQUAREPOT_TRUSTED_PROXIES:-172.16.0.0/12}
     volumes:
       - data:/data
     ports:

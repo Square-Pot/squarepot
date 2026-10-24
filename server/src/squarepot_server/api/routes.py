@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import secrets
 from collections.abc import Iterator
@@ -35,6 +36,7 @@ from squarepot_server.labels.render import to_pdf, to_svg
 from squarepot_server.labels.text import Run
 from squarepot_server.runtime import Runtime
 
+log = logging.getLogger(__name__)
 bearer = HTTPBearer(
     auto_error=False,
     description="The API token set by the operator at installation.",
@@ -54,9 +56,20 @@ def require_token(
     request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
 ) -> None:
-    expected = get_runtime(request).settings.api_token.get_secret_value().encode()
+    runtime = get_runtime(request)
+    # The client's own address: behind a trusted proxy, the one it forwarded.
+    client = request.client.host if request.client else ""
+    if (wait := runtime.backoff.retry_after(client)) is not None:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Too many requests with a wrong API token; try again later.",
+            headers={"Retry-After": str(wait)},
+        )
+    expected = runtime.settings.api_token.get_secret_value().encode()
     given = credentials.credentials.encode() if credentials else b""
     if not secrets.compare_digest(given, expected):
+        if runtime.backoff.fail(client):
+            log.warning("client %s: too many wrong API tokens, backing off", client)
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
             "A valid API token is required.",
@@ -123,7 +136,7 @@ public = APIRouter(prefix="/api/v1")
 router = APIRouter(
     prefix="/api/v1",
     dependencies=[Depends(require_token)],
-    responses=errors(status.HTTP_401_UNAUTHORIZED),
+    responses=errors(status.HTTP_401_UNAUTHORIZED, status.HTTP_429_TOO_MANY_REQUESTS),
 )
 
 

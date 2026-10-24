@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import requests
@@ -12,6 +12,7 @@ from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from squarepot_server.api.models import FieldSchema
+from squarepot_server.backoff import Backoff
 from squarepot_server.config import CollectionConfig, Settings, StoreKind
 from squarepot_server.db import make_engine
 from squarepot_server.fields import Cell, load_schema
@@ -62,6 +63,7 @@ class Runtime:
     sessions: sessionmaker[Session]
     syncer: Syncer
     worker: SyncWorker | None
+    backoff: Backoff = field(default_factory=Backoff)
 
     @classmethod
     def start(cls, settings: Settings, store: CollectionStore | None = None) -> Runtime:

@@ -33,7 +33,11 @@ fails when the committed file is out of date.
 | `POST /api/v1/labels` | Prints labels for plants, as a PDF or one SVG page. |
 
 Every route except `health` needs the operator's API token as
-`Authorization: Bearer <token>`. Every error has the same body:
+`Authorization: Bearer <token>`. A client address that sends 10 wrong or
+missing tokens must then wait: it gets one more try a minute, and `429` with
+`Retry-After` until then, even with the right token. Behind a reverse proxy,
+the address is the one the proxy forwards (`SQUAREPOT_TRUSTED_PROXIES` in
+[deploy](../deploy/.env.example)). Every error has the same body:
 `{"code": "not_found", "message": "…"}`. Large responses are gzip-compressed
 when the client accepts it.
 
