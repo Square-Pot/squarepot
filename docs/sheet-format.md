@@ -39,13 +39,44 @@ An example with a few columns:
   `aliases`. Aliases exist so that sheets made before this format still work:
   `uid` is read as `tag`, `cultivated_variety` as `cultivar`, `information`
   as `notes`. Square-Pot never renames the owner's headers.
-- **Unknown columns** are kept as they are. They are not imported, shown or
-  written, and they never cause an error.
+- **Custom columns** are all the others: a column whose header is not a field
+  `key` or alias is read as it is, under its header's name (see
+  [Custom columns](#custom-columns)). A column with an empty header is ignored.
 - **Missing columns** are treated as empty fields, except for required fields
   (`required: true` in the schema; today only `genus`). Without a `genus`
   column the tab is rejected with an explanation.
 - **Duplicate headers** (two columns mapping to the same field) make the tab
-  invalid until the owner removes one.
+  invalid until the owner removes one. Two custom columns with the same name
+  only leave those two columns out.
+
+## Custom columns
+
+A custom column holds whatever the owner wants to keep next to a plant that
+the schema has no field for, such as a mark for a marathon. Square-Pot imports
+it without knowing what it means, and serves it with the plant's other
+values. The owner chooses where custom columns show. Two places are planned
+and not built yet: the phone's settings, choosing which ones the phone shows,
+and label preparation, choosing which ones a printed label shows. Until then,
+they are only in the API and the phone's copy.
+
+- **Name.** The header, with spaces trimmed and runs of spaces made single;
+  its case is kept for display: `Marathon`. Two custom columns whose names are
+  equal ignoring case are both left out, and reported.
+- **Value.** Text, as the sheet shows it, trimmed: a number cell reads as
+  `12.5`, a checkbox as `TRUE` or `FALSE`. An empty cell means no value. With
+  a service account, values are read unformatted, so a date in a custom
+  column arrives as the sheet's day number; read by link, it arrives as the
+  sheet shows it.
+- **Limits.** At most 50 custom columns per tab, names of at most 64
+  characters, and values of at most 1000 characters. Columns beyond the first
+  50, and columns with longer names, are left out; a longer value is cut short
+  with `…`. Each case is reported.
+- **Never written.** Like every other column, Square-Pot only reads custom
+  columns.
+- **Never interpreted.** A custom column is opaque passthrough text: neither
+  typed nor validated, and shown on labels and on the phone only where the
+  owner picks it. Anything that needs meaning becomes a field in the
+  [schema](../schema/fields.yaml).
 
 ## Values
 
@@ -133,12 +164,13 @@ Invalid cells are shown to the owner with their row and column:
   skipped, because Square-Pot cannot name the plant. If the row has a number,
   the number stays registered, so it is not issued to another plant.
 
-Only tab-level problems (no `genus` column, duplicate headers) stop the
-import.
+Only tab-level problems (no `genus` column, two columns for the same field)
+stop the import.
 
 ## Versioning
 
 The schema has a `version`. Adding an optional field is not breaking: old
-sheets simply lack the column. Renaming or removing a field, or changing its
-type, is breaking; it raises `version` and keeps the old header as an
-alias for at least one release.
+sheets simply lack the column. A sheet that already has a custom column of
+that name then reads it as the new field. Renaming or removing a field, or
+changing its type, is breaking; it raises `version` and keeps the old header
+as an alias for at least one release.

@@ -422,6 +422,20 @@
             ],
             "title": "Error",
             "description": "Why the last sync attempt failed, such as an unreachable sheet or a missing `genus` column. `null` when it succeeded. The server keeps serving its last copy."
+          },
+          "custom_columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Custom Columns",
+            "description": "Names of the tab's custom columns, in column order: the columns whose header is not a field key or alias. A client may let the owner choose which to show.",
+            "examples": [
+              [
+                "Marathon",
+                "soil"
+              ]
+            ]
           }
         },
         "additionalProperties": false,
@@ -431,7 +445,8 @@
           "name",
           "plant_count",
           "synced_at",
-          "error"
+          "error",
+          "custom_columns"
         ],
         "title": "Collection",
         "description": "One collection: one tab of a Google Sheet."
@@ -1235,6 +1250,20 @@
                 "species": "lesliei"
               }
             ]
+          },
+          "custom": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Custom",
+            "description": "Values of the collection's `custom_columns` by name, as text, as the sheet shows them. Empty cells are omitted.",
+            "examples": [
+              {
+                "Marathon": "yes",
+                "soil": "pumice 70%"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -1244,7 +1273,8 @@
           "collection_id",
           "tag",
           "row",
-          "fields"
+          "fields",
+          "custom"
         ],
         "title": "Plant",
         "description": "One plant: one row of a collection's tab."

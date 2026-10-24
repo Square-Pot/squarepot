@@ -76,6 +76,8 @@ class CollectionRow(Base):
     plant_count: Mapped[int] = mapped_column(default=0)
     # Per-cell problems of the last read, as {"row", "column", "message"} objects.
     issues: Mapped[list[Any]] = mapped_column(default=list)
+    # Names of the tab's custom columns, in column order.
+    custom_columns: Mapped[list[Any]] = mapped_column(default=list)
 
 
 class PlantRow(Base):
@@ -88,6 +90,8 @@ class PlantRow(Base):
     tag: Mapped[str | None] = mapped_column(String(6), index=True)
     row: Mapped[int]
     fields: Mapped[dict[str, Any]]
+    # Values of custom columns by name.
+    custom: Mapped[dict[str, Any]] = mapped_column(default=dict)
 
 
 class RegisteredTag(Base):

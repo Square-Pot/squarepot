@@ -76,6 +76,22 @@ def test_edits_additions_and_removals_reach_the_delta(client: TestClient, store:
     assert len(sync(client)["plants"]) == 2
 
 
+def test_custom_columns_reach_the_phone_and_their_edits_the_delta(
+    client: TestClient, store: FakeStore
+) -> None:
+    assert sync(client)["collections"][0]["custom_columns"] == []
+    store.put("main", [[*HEADER, "Marathon"], [4217, "Lithops", "lesliei", "SB 1234", "yes"]])
+    runtime(client).syncer.run_once()
+    body = sync(client)
+    assert body["collections"][0]["custom_columns"] == ["Marathon"]
+    [plant] = body["plants"]
+    assert plant["custom"] == {"Marathon": "yes"}
+    store.put("main", [[*HEADER, "Marathon"], [4217, "Lithops", "lesliei", "SB 1234", "no"]])
+    runtime(client).syncer.run_once()
+    delta = sync(client, body["cursor"])
+    assert [plant["custom"] for plant in delta["plants"]] == [{"Marathon": "no"}]
+
+
 def test_a_removed_row_that_comes_back_is_sent_again(client: TestClient, store: FakeStore) -> None:
     original = store.tabs["main"]
     store.put("main", original[:1] + original[2:])

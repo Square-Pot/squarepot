@@ -147,6 +147,7 @@ class Syncer:
                     row.store_version = version
                     row.plant_count = len(parsed.rows)
                     row.issues = [issue_json(issue) for issue in parsed.issues]
+                    row.custom_columns = parsed.custom_columns
                 row.error = None
                 row.synced_at = self.clock()
             except (StoreError, TabError) as error:
@@ -175,16 +176,23 @@ class Syncer:
                         tag=row.tag,
                         row=row.row,
                         fields=row.fields,
+                        custom=row.custom,
                     )
                 )
                 continue
-            if not plant.removed and (plant.tag, plant.row, plant.fields) == (
+            if not plant.removed and (plant.tag, plant.row, plant.fields, plant.custom) == (
                 row.tag,
                 row.row,
                 row.fields,
+                row.custom,
             ):
                 continue
-            plant.tag, plant.row, plant.fields = row.tag, row.row, row.fields
+            plant.tag, plant.row, plant.fields, plant.custom = (
+                row.tag,
+                row.row,
+                row.fields,
+                row.custom,
+            )
             plant.removed = False
             plant.seq = next_seq(session)
         for plant_id, plant in existing.items():

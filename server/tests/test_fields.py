@@ -8,6 +8,9 @@ import pytest
 from squarepot_server.api.models import FieldSchema
 from squarepot_server.config import DEFAULT_SCHEMA_FILE
 from squarepot_server.fields import (
+    MAX_CUSTOM_COLUMNS,
+    MAX_CUSTOM_NAME,
+    MAX_CUSTOM_VALUE,
     Cell,
     Issue,
     TabError,
@@ -40,6 +43,56 @@ def test_headers_match_keys_and_aliases_ignoring_case(schema: FieldSchema) -> No
     [row] = parsed.rows
     assert row.tag == "004217"
     assert row.fields == {"genus": "Echeveria", "cultivar": "Perle von Nürnberg", "notes": "gift"}
+    assert row.custom == {"My own column": "ignored"}
+
+
+def test_unknown_columns_are_custom_columns_read_as_text(schema: FieldSchema) -> None:
+    parsed = parse_tab(
+        schema,
+        [
+            ["genus", "  Marathon ", "", "pot  width", "soil", 2024, "Bought"],
+            ["Lithops", " yes ", "lost", 7.0, "", 12.5, True],
+            ["Conophytum"],
+        ],
+    )
+    assert parsed.issues == []
+    assert parsed.custom_columns == ["Marathon", "pot width", "soil", "2024", "Bought"]
+    first, second = parsed.rows
+    assert first.fields == {"genus": "Lithops"}
+    assert first.custom == {"Marathon": "yes", "pot width": "7", "2024": "12.5", "Bought": "TRUE"}
+    assert second.custom == {}
+
+
+def test_custom_columns_with_the_same_name_are_left_out(schema: FieldSchema) -> None:
+    parsed = parse_tab(
+        schema, [["genus", "Soil", "mark", "soil "], ["Lithops", "pumice", "x", "grit"]]
+    )
+    assert parsed.custom_columns == ["mark"]
+    assert parsed.rows[0].custom == {"mark": "x"}
+    assert parsed.issues == [
+        Issue(1, "B", "columns B and D have the same name 'Soil': they are left out")
+    ]
+
+
+def test_custom_columns_over_the_limits_are_left_out(schema: FieldSchema) -> None:
+    long_name = "n" * (MAX_CUSTOM_NAME + 1)
+    header: list[Cell] = ["genus", long_name, *(f"c{i}" for i in range(MAX_CUSTOM_COLUMNS + 1))]
+    parsed = parse_tab(schema, [header, ["Lithops"]])
+    assert parsed.custom_columns == [f"c{i}" for i in range(MAX_CUSTOM_COLUMNS)]
+    assert [(issue.row, issue.column) for issue in parsed.issues] == [
+        (1, "B"),
+        (1, column_name(len(header) - 1)),
+    ]
+    assert "longer than 64 characters" in parsed.issues[0].message
+    assert "more than 50 custom columns" in parsed.issues[1].message
+
+
+def test_a_long_custom_value_is_cut_short(schema: FieldSchema) -> None:
+    parsed = parse_tab(schema, [["genus", "story"], ["Lithops", "x" * 5000]])
+    value = parsed.rows[0].custom["story"]
+    assert len(value) == MAX_CUSTOM_VALUE
+    assert value.endswith("…")
+    assert parsed.issues == [Issue(2, "B", "longer than 1000 characters: cut short")]
 
 
 def test_description_is_a_field_of_its_own_beside_notes(schema: FieldSchema) -> None:

@@ -17,7 +17,11 @@ By taking part you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
   be declined: they make labels bigger.
 - **The schema is the contract.** Fields are defined once in `schema/`. The
   API, labels, captions, the app and the web follow it; they never define
-  fields of their own.
+  fields of their own. A sheet's custom columns
+  ([sheet format](docs/sheet-format.md#custom-columns)) are opaque passthrough
+  text: neither typed nor validated, and shown on labels and on the phone only
+  where the owner picks them. Anything that needs meaning becomes a schema
+  field.
 - **English everywhere** in code, comments, documentation, commits and pull
   requests. The user interface ships in English and Russian.
 

@@ -140,6 +140,13 @@ class Collection(ApiModel):
             "`genus` column. `null` when it succeeded. The server keeps serving its last copy."
         ),
     )
+    custom_columns: list[str] = Field(
+        description=(
+            "Names of the tab's custom columns, in column order: the columns whose header is "
+            "not a field key or alias. A client may let the owner choose which to show."
+        ),
+        examples=[["Marathon", "soil"]],
+    )
 
 
 class Plant(ApiModel):
@@ -163,6 +170,13 @@ class Plant(ApiModel):
             "by the schema's rules."
         ),
         examples=[{"genus": "Lithops", "species": "lesliei", "seeding_date": "2024-03-15"}],
+    )
+    custom: dict[str, str] = Field(
+        description=(
+            "Values of the collection's `custom_columns` by name, as text, as the sheet shows "
+            "them. Empty cells are omitted."
+        ),
+        examples=[{"Marathon": "yes", "soil": "pumice 70%"}],
     )
 
 

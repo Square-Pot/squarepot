@@ -83,12 +83,18 @@ def to_collection(row: CollectionRow) -> Collection:
         plant_count=row.plant_count,
         synced_at=row.synced_at,
         error=row.error,
+        custom_columns=row.custom_columns,
     )
 
 
 def to_plant(row: PlantRow) -> Plant:
     return Plant(
-        id=row.id, collection_id=row.collection_id, tag=row.tag, row=row.row, fields=row.fields
+        id=row.id,
+        collection_id=row.collection_id,
+        tag=row.tag,
+        row=row.row,
+        fields=row.fields,
+        custom=row.custom,
     )
 
 

@@ -62,6 +62,7 @@ def test_lookup_by_tag(client: TestClient) -> None:
         "tag": "004217",
         "row": 2,
         "fields": {"genus": "Lithops", "species": "lesliei", "field_number": "SB 1234"},
+        "custom": {},
     }
 
 

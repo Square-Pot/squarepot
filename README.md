@@ -32,7 +32,10 @@ complete and readable in the spreadsheet, with no software needed.
 - **The spreadsheet is the source of truth.** The server is a cache and a sync
   engine. On conflict, the spreadsheet wins.
 - **One field schema.** Fields are defined once in [`schema/`](schema/). The API,
-  labels, captions, the app and the web all follow it.
+  labels, captions, the app and the web all follow it. A sheet's other columns
+  come through as custom columns: opaque text, neither typed nor validated,
+  shown on labels and on the phone only where the owner picks them. Anything
+  that needs meaning becomes a schema field.
 - **A fixed label format.** A label encodes only a six-digit number in a 10×10
   Data Matrix, the smallest square symbol that holds six digits. This keeps
   labels as small as possible.
