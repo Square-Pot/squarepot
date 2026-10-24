@@ -39,6 +39,11 @@ updates:
     groups:
       images:
         patterns: ["*"]
+    # A new Python minor moves the image and CI's Python together, in a PR of
+    # its own; only patch releases come from here.
+    ignore:
+      - dependency-name: python
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
 
   - package-ecosystem: gradle
     directory: /android
