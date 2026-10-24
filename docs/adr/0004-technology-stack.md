@@ -18,7 +18,7 @@ direct control of the camera pipeline and an efficient barcode decoder.
 
 | Part | Stack |
 | --- | --- |
-| Android app | Kotlin, Jetpack Compose, CameraX, ML Kit Barcode Scanning (zxing-cpp as a fallback decoder), Room for the local copy |
+| Android app | Kotlin, Jetpack Compose, CameraX, zxing-cpp as the barcode decoder, Room for the local copy |
 | Server | Python, FastAPI, Pydantic, SQLAlchemy with Alembic migrations; PostgreSQL by default, SQLite for a minimal install |
 | Labels and photo captions | zxing-cpp to find codes in photos, Pillow, SVG generation converted to PDF |
 | Web app | TypeScript in strict mode, React, Vite |
@@ -36,9 +36,17 @@ The parts share a contract, not code:
 
 ## Consequences
 
-- Native Android gives full control of CameraX and ML Kit, which the live
+- Native Android gives full control of CameraX and the decoder, which the live
   mode needs. The product owner has decided on Android only for now; an
   iOS app would be a separate project.
+- The app decodes with zxing-cpp alone. The first draft of this decision had
+  ML Kit Barcode Scanning as the decoder and zxing-cpp as a fallback; the
+  recognition spike (#58, PR #4) measured both on a real phone (Samsung
+  SM-S918B) with the owner's photos of real labels. zxing-cpp read 24 of 32
+  labels at the live analysis size (25 at full resolution) with no misreads,
+  in 8 ms median per frame; ML Kit read none of the 32 and was slow or silent
+  live. zxing-cpp also needs no Google Play services, so the app can be
+  published on F-Droid.
 - Python has the widest pool of contributors for the server and bot, and mature
   libraries for Google APIs, images and PDFs.
 - The domain model exists in more than one language (Python, Kotlin,
