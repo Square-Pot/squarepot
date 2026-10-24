@@ -42,6 +42,7 @@ class LocalCopyTest {
         tag = "004217",
         sheetRow = 2,
         fields = mapOf("species" to "lesliei", "added_later" to "x", "genus" to "Lithops"),
+        custom = mapOf("Marathon" to "yes"),
     )
 
     @Test
@@ -55,6 +56,11 @@ class LocalCopyTest {
             ),
             view.fields,
         )
+    }
+
+    @Test
+    fun `custom column values are carried as they are`() {
+        assertEquals(mapOf("Marathon" to "yes"), plant.toView("Main", schema, "en").custom)
     }
 
     @Test

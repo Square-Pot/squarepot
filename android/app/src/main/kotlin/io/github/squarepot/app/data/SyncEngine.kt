@@ -140,6 +140,7 @@ private fun CollectionDto.toEntity() = CollectionEntity(
     plantCount = plantCount,
     serverSyncedAt = syncedAt?.let(::epochMillis),
     serverError = error,
+    customColumns = customColumns,
 )
 
 private fun PlantDto.toEntity() = PlantEntity(
@@ -148,6 +149,7 @@ private fun PlantDto.toEntity() = PlantEntity(
     tag = tag,
     sheetRow = row,
     fields = fields,
+    custom = custom,
 )
 
 private fun epochMillis(timestamp: String): Long? = try {

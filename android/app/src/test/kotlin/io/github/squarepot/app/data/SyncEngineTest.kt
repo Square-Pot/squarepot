@@ -159,6 +159,34 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `custom columns and their values reach the copy`() = runTest {
+        respond(
+            full(
+                cursor = "c1",
+                plants = listOf(plant("p1", "000001", custom = """{"Marathon": "yes"}""")),
+                collections = listOf(collection("main", customColumns = """["Marathon", "soil"]""")),
+            ),
+        )
+        respond(SCHEMA_V1)
+        engine.sync(api)
+
+        assertEquals(mapOf("Marathon" to "yes"), copy.plantsByTag("000001", "en").single().custom)
+        val columns = copy.customColumns().first().single()
+        assertEquals("Main", columns.name)
+        assertEquals(listOf("Marathon", "soil"), columns.customColumns)
+    }
+
+    @Test
+    fun `a server without custom columns leaves them empty`() = runTest {
+        respond(full(cursor = "c1", plants = listOf(plant("p1", "000001"))))
+        respond(SCHEMA_V1)
+        engine.sync(api)
+
+        assertTrue(copy.plantsByTag("000001", "en").single().custom.isEmpty())
+        assertTrue(copy.customColumns().first().single().customColumns.isEmpty())
+    }
+
+    @Test
     fun `a new schema version is fetched and the full copy replaces the old one`() = runTest {
         respond(full(cursor = "c1", plants = listOf(plant("p1", "000001"))))
         respond(SCHEMA_V1)
@@ -273,14 +301,23 @@ class SyncEngineTest {
     }
 }
 
-private fun collection(id: String, syncedAt: String? = null, error: String? = null) = """
+/** A collection; [customColumns] is a JSON array, or null to leave the key out as an older server does. */
+private fun collection(id: String, syncedAt: String? = null, error: String? = null, customColumns: String? = null) = """
     {"id": "$id", "name": "${id.replaceFirstChar(Char::uppercase)}", "plant_count": 1,
-        "synced_at": ${syncedAt?.let { "\"$it\"" } ?: "null"}, "error": ${error?.let { "\"$it\"" } ?: "null"}}
+        "synced_at": ${syncedAt?.let { "\"$it\"" } ?: "null"}, "error": ${error?.let { "\"$it\"" } ?: "null"}
+        ${customColumns?.let { ", \"custom_columns\": $it" }.orEmpty()}}
 """.trimIndent()
 
-private fun plant(id: String, tag: String?, genus: String = "Lithops", collection: String = "main") = """
+/** A plant; [custom] is a JSON object, or null to leave the key out as an older server does. */
+private fun plant(
+    id: String,
+    tag: String?,
+    genus: String = "Lithops",
+    collection: String = "main",
+    custom: String? = null,
+) = """
     {"id": "$id", "collection_id": "$collection", "tag": ${tag?.let { "\"$it\"" } ?: "null"}, "row": 2,
-        "fields": {"genus": "$genus"}, "future_key": "ignored"}
+        "fields": {"genus": "$genus"}${custom?.let { ", \"custom\": $it" }.orEmpty()}, "future_key": "ignored"}
 """.trimIndent()
 
 private fun full(

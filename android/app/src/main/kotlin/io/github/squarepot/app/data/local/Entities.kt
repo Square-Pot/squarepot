@@ -15,9 +15,13 @@ data class CollectionEntity(
     val serverSyncedAt: Long?,
     /** Why the server's last read of the sheet failed, as the server words it. */
     val serverError: String?,
+    /** The sheet's custom columns, in column order. */
+    val customColumns: List<String>,
 )
 
 data class CollectionName(val id: String, val name: String)
+
+data class CollectionColumns(val name: String, val customColumns: List<String>)
 
 /** One plant. The tag index is not unique: two plants share a number while a collision is unresolved. */
 @Entity(
@@ -30,6 +34,8 @@ data class PlantEntity(
     val tag: String?,
     val sheetRow: Int,
     val fields: Map<String, String>,
+    /** Values of the collection's custom columns by name. */
+    val custom: Map<String, String>,
 )
 
 /** The single row describing the copy as a whole. */

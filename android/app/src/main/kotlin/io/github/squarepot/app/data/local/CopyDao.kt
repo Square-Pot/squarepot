@@ -26,6 +26,9 @@ interface CopyDao {
     @Query("SELECT id, name FROM collections")
     suspend fun collectionNames(): List<CollectionName>
 
+    @Query("SELECT name, customColumns FROM collections ORDER BY name COLLATE NOCASE")
+    fun observeCustomColumns(): Flow<List<CollectionColumns>>
+
     @Query("SELECT COUNT(*) FROM plants")
     fun observePlantCount(): Flow<Int>
 

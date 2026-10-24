@@ -33,6 +33,12 @@ in that copy, never over the network.
   server last read each sheet, with the sheet's error if its last read failed.
 - **Changing server.** A new server address drops the cursor, so the next sync
   replaces the whole copy.
+- **Custom columns.** The copy also keeps each collection's own sheet columns
+  (`custom_columns`) and every plant's values for them, so captions can show
+  them offline.
+- **App updates.** When an update changes the copy's tables, the copy and its
+  cursor are dropped, and the next sync downloads a full copy. There are no
+  migrations to maintain: the server holds the data.
 
 Release builds talk to the server over HTTPS only. Debug builds also allow
 plain HTTP, for a demo server on the local network or on the emulator's host

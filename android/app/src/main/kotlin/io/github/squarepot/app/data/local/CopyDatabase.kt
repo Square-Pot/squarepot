@@ -9,6 +9,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import io.github.squarepot.app.data.api.ApiJson
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 
@@ -20,7 +21,7 @@ import kotlinx.serialization.builtins.serializer
  */
 @Database(
     entities = [CollectionEntity::class, PlantEntity::class, SyncStateEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(FieldsConverter::class)
@@ -35,13 +36,20 @@ abstract class CopyDatabase : RoomDatabase() {
     }
 }
 
-/** Stores a plant's fields as one JSON object. */
+/** Stores a plant's fields as one JSON object, and a collection's column names as one JSON array. */
 class FieldsConverter {
     private val serializer = MapSerializer(String.serializer(), String.serializer())
+    private val listSerializer = ListSerializer(String.serializer())
 
     @TypeConverter
     fun toJson(fields: Map<String, String>): String = ApiJson.encodeToString(serializer, fields)
 
     @TypeConverter
     fun fromJson(json: String): Map<String, String> = ApiJson.decodeFromString(serializer, json)
+
+    @TypeConverter
+    fun listToJson(names: List<String>): String = ApiJson.encodeToString(listSerializer, names)
+
+    @TypeConverter
+    fun listFromJson(json: String): List<String> = ApiJson.decodeFromString(listSerializer, json)
 }

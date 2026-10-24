@@ -4,8 +4,10 @@ package io.github.squarepot.app.data
 
 import io.github.squarepot.app.data.api.ApiJson
 import io.github.squarepot.app.data.api.FieldSchemaDto
+import io.github.squarepot.app.data.local.CollectionColumns
 import io.github.squarepot.app.data.local.CopyDao
 import io.github.squarepot.app.data.local.PlantEntity
+import kotlinx.coroutines.flow.Flow
 
 /** One field of a plant, ready to show: the schema's label in the UI language and the value. */
 data class FieldValue(val key: String, val label: String, val value: String)
@@ -20,6 +22,8 @@ data class PlantView(
     val fields: List<FieldValue>,
     /** The botanical name (see [botanicalName]); empty when the copy has no schema yet. */
     val name: List<TextRun> = emptyList(),
+    /** Values of the collection's custom columns by name. */
+    val custom: Map<String, String> = emptyMap(),
 )
 
 /** Reads the local copy. Never touches the network: this is what the camera path uses. */
@@ -32,6 +36,9 @@ class LocalCopy(private val dao: CopyDao) {
         val collections = dao.collectionNames().associate { it.id to it.name }
         return plants.map { it.toView(collections[it.collectionId] ?: it.collectionId, schema, language) }
     }
+
+    /** Each collection's custom columns, for choosing which of them a caption shows. */
+    fun customColumns(): Flow<List<CollectionColumns>> = dao.observeCustomColumns()
 
     private suspend fun schema(): FieldSchemaDto? = dao.state()?.schemaJson?.let {
         ApiJson.decodeFromString(FieldSchemaDto.serializer(), it)
@@ -52,7 +59,7 @@ fun PlantEntity.toView(collectionName: String, schema: FieldSchemaDto?, language
         .map { FieldValue(it.key, it.label.forLanguage(language), fields.getValue(it.key)) }
     val knownKeys = known.mapTo(HashSet()) { it.key }
     val unknown = fields.filterKeys { it !in knownKeys }.map { (key, value) -> FieldValue(key, key, value) }
-    return PlantView(id, tag, collectionName, known + unknown, botanicalName(schema, fields))
+    return PlantView(id, tag, collectionName, known + unknown, botanicalName(schema, fields), custom)
 }
 
 private const val TAG_LENGTH = 6

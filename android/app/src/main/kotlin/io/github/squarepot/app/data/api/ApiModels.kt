@@ -46,6 +46,8 @@ data class CollectionDto(
     @SerialName("synced_at") val syncedAt: String? = null,
     /** Why the server's last read of the sheet failed, in English; null when it succeeded. */
     val error: String? = null,
+    /** The sheet's own columns, which are not schema fields, in column order. */
+    @SerialName("custom_columns") val customColumns: List<String> = emptyList(),
 )
 
 @Serializable
@@ -57,6 +59,8 @@ data class PlantDto(
     val row: Int,
     /** Canonical field values by schema key; empty cells are absent. */
     val fields: Map<String, String> = emptyMap(),
+    /** Values of the collection's custom columns by name, as the sheet shows them; empty cells are absent. */
+    val custom: Map<String, String> = emptyMap(),
 )
 
 /** `GET /api/v1/schema`: schema/fields.yaml as JSON. */
