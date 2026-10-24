@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Backing off clients that keep sending a wrong API token.
 
-Each client, by IP address, has a bucket of failed attempts that refills
+Each client, by IP address (an IPv6 one by its /64 network, which one
+holder can fill with addresses), has a bucket of failed attempts that refills
 with time. A wrong or missing token takes one; while the bucket is empty, the
 client's requests are refused without the token being checked, so guessing
 stops. A correct token takes nothing. The state is in memory, bounded, and
@@ -10,6 +11,7 @@ lost on restart.
 
 from __future__ import annotations
 
+import ipaddress
 import math
 import threading
 import time
@@ -20,6 +22,19 @@ from dataclasses import dataclass, field
 FAILURES = 10
 REFILL_SECONDS = 60.0
 MAX_CLIENTS = 10_000
+
+
+def client_key(host: str) -> str:
+    """The address to count failures by: an IPv6 address stands for its /64."""
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return host
+    if isinstance(address, ipaddress.IPv4Address):
+        return host
+    if address.ipv4_mapped is not None:
+        return str(address.ipv4_mapped)
+    return str(ipaddress.ip_network(f"{address}/64", strict=False))
 
 
 @dataclass

@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from squarepot_server.backoff import Backoff
+from squarepot_server.backoff import Backoff, client_key
 from tests.conftest import TOKEN, runtime
 
 
@@ -88,3 +88,26 @@ def test_the_oldest_clients_are_forgotten_first() -> None:
     assert backoff.fail("b")
     assert backoff.retry_after("b") == 60
     assert backoff.retry_after("a") is None
+
+
+@pytest.mark.parametrize(
+    ("host", "key"),
+    [
+        ("203.0.113.7", "203.0.113.7"),
+        ("2001:db8:1:2:3:4:5:6", "2001:db8:1:2::/64"),
+        ("2001:db8:1:2::ffff", "2001:db8:1:2::/64"),
+        ("::ffff:203.0.113.7", "203.0.113.7"),
+        ("testclient", "testclient"),
+    ],
+)
+def test_an_ipv6_client_is_counted_by_its_64(host: str, key: str) -> None:
+    assert client_key(host) == key
+
+
+def test_addresses_in_one_ipv6_64_share_their_attempts(client: TestClient, clock: Clock) -> None:
+    app = ProxyHeadersMiddleware(cast(Any, client.app), trusted_hosts="testclient")
+    proxied = TestClient(cast(Any, app))
+    for host in range(10):
+        assert get(proxied, "wrong", **{"X-Forwarded-For": f"2001:db8::{host}"}) == 401
+    assert get(proxied, TOKEN, **{"X-Forwarded-For": "2001:db8::ffff"}) == 429
+    assert get(proxied, TOKEN, **{"X-Forwarded-For": "2001:db8:0:1::1"}) == 200

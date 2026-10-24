@@ -29,6 +29,7 @@ from squarepot_server.api.models import (
     SyncKind,
     TagLookup,
 )
+from squarepot_server.backoff import client_key
 from squarepot_server.db import CollectionRow, PlantRow, current_seq, get_meta
 from squarepot_server.labels.caption import NAME, caption, entries, extra_text
 from squarepot_server.labels.layout import TEMPLATES, Item, LayoutError, Page, layout_pages
@@ -59,7 +60,7 @@ def require_token(
 ) -> None:
     runtime = get_runtime(request)
     # The client's own address: behind a trusted proxy, the one it forwarded.
-    client = request.client.host if request.client else ""
+    client = client_key(request.client.host) if request.client else ""
     if (wait := runtime.backoff.retry_after(client)) is not None:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
