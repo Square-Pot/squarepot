@@ -46,6 +46,22 @@ complete and readable in the spreadsheet, with no software needed.
 Design documents are in [`docs/`](docs/). They come before the code: requirements,
 the spreadsheet format and decision records will land there first.
 
+## Origins
+
+Square-Pot grew out of four earlier projects of the Square-Pot organisation,
+which are no longer developed. This project brings the best of them together;
+their ideas carried over, their code did not.
+
+- [Plants-Data-Organizer](https://github.com/Square-Pot/Plants-Data-Organizer):
+  sorting plant photos by detecting and decoding the Data Matrix code in them.
+- [Plant-Passport](https://github.com/Square-Pot/Plant-Passport): a Django
+  service for plant records, PDF sheets of Data Matrix labels, and recognising
+  a plant by the code in a photo.
+- [plant-lib](https://github.com/Square-Pot/plant-lib): a web app for plant
+  taxonomy and related data, labels and identification.
+- [colab-tools](https://github.com/Square-Pot/colab-tools): notebooks for
+  editing the plant database and making labels.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, commit
