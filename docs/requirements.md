@@ -77,8 +77,15 @@ labels is not fixed yet; the recognition spike measures it.
   above the plant (far rim) or below it (near rim), while the middle of the
   frame usually shows the plant itself. There is no crosshair in the centre of
   the view.
-- It shows that plant's caption (the `overlay` preset) next to the label. Other
-  labels in the frame get no caption.
+- It shows that plant's caption next to the label: to the right of it, or
+  above it when there is no room on the right, never below, where the plant
+  usually is. In the settings, the caption can go in a panel at the bottom of
+  the screen instead.
+- The caption's fields are chosen in the app's settings and kept on the phone.
+  Until the collector chooses, they are the field number, the name, ex and
+  the first of the sheet's own columns.
+- Other labels in the frame show only their number, or, if the collector
+  turns it on, their number and a short name such as "M. theresae".
 - The selection does not jump back and forth between labels of almost the same
   size.
 - One tap copies the plant's details to the clipboard, or opens the full card.
