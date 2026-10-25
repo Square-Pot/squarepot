@@ -1,0 +1,38 @@
+name: Web lockfile
+
+# Resolves web/package.json into package-lock.json on a runner, for a change of
+# dependencies made without npm at hand. Download the artifact and commit it.
+# A run starts on any branch push that changes web/package.json, or by hand.
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+    paths: [web/package.json]
+
+permissions:
+  contents: read
+
+jobs:
+  lockfile:
+    name: Resolve package-lock.json
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Resolve
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-package-lock
+          path: web/package-lock.json
+          retention-days: 7

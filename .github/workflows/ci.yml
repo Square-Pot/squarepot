@@ -146,6 +146,41 @@ jobs:
       - name: Test
         run: uv run pytest
 
+  web:
+    name: Web
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Generate the API client
+        run: npm run gen
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npx vite build
+
   server-image:
     name: Server image
     runs-on: ubuntu-24.04
@@ -166,11 +201,19 @@ jobs:
           docker run --detach --name server --publish 127.0.0.1:8000:8000 \
             --env SQUAREPOT_API_TOKEN=ci-token-0123456789 squarepot-server:ci
           for _ in $(seq 30); do
-            curl --fail --silent http://127.0.0.1:8000/api/v1/health && exit 0
+            curl --fail --silent http://127.0.0.1:8000/api/v1/health && break
             sleep 1
           done
-          docker logs server
-          exit 1
+          curl --fail --silent http://127.0.0.1:8000/api/v1/health || { docker logs server; exit 1; }
+
+      - name: Check that the web app is served
+        run: |
+          # The app's own addresses get its page; its scripts come from assets/.
+          curl --fail --silent --show-error "http://127.0.0.1:8000/c/main?genus=Lithops" | tee index.html
+          grep --quiet '<div id="root"></div>' index.html
+          script="$(grep --only-matching '/assets/[^"]*\.js' index.html | head -n 1)"
+          test -n "${script}"
+          curl --fail --silent --show-error --output /dev/null "http://127.0.0.1:8000${script}"
 
       # How much memory the server needs, to size the cap on a small host: idle
       # with the demo plants, then at its peak after the largest label request.

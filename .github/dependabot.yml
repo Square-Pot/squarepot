@@ -44,6 +44,19 @@ updates:
     ignore:
       - dependency-name: python
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # The web build stage stays on an LTS line; a new one comes in a PR of its own.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+    groups:
+      web:
+        patterns: ["*"]
 
   - package-ecosystem: gradle
     directory: /android
