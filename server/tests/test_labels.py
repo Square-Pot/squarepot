@@ -363,12 +363,12 @@ def test_a_short_caption_gets_room_and_a_long_one_takes_it_back(key: str) -> Non
     left, right = COMFORT[template.orientation]
     text = geometry(template).text
     short = [[Run("SB 12", Style.BOLD)], [Run("Lithops", Style.ITALIC)]]
-    area, size, _ = comfortable_fit(short, text, template.max_lines, template.orientation)
+    area, size, _, _ = comfortable_fit(short, text, template.max_lines, template.orientation)
     assert size == MAX_FONT
     assert area.x == pytest.approx(text.x + left)
     assert area.x + area.width == pytest.approx(text.x + text.width - right)
     long = [[Run("Conophytum " * 4, Style.ITALIC)]] * 3
-    area, size, _ = comfortable_fit(long, text, template.max_lines, template.orientation)
+    area, size, _, _ = comfortable_fit(long, text, template.max_lines, template.orientation)
     assert area.x < text.x + left
     # It loses no font size to the extra room.
     assert size == fit(long, text, template.max_lines)[0]
@@ -568,10 +568,11 @@ def test_a_name_first_is_not_set_in_bold() -> None:
 
 def test_a_long_caption_shrinks_then_is_cut_short() -> None:
     area = Rect(0, 0, 13, 7)
-    size, lines = fit(caption(SCHEMA, LABEL, PLANTS[2]), area, max_lines=3)
+    size, lines, cut = fit(caption(SCHEMA, LABEL, PLANTS[2]), area, max_lines=3)
     assert size == MIN_FONT
     assert len(lines) == 3
     assert text(lines[-1]).endswith(ELLIPSIS)
+    assert cut
 
 
 def test_burial_text_names_each_field_in_bold_in_the_chosen_language() -> None:
@@ -590,21 +591,23 @@ def test_burial_text_names_each_field_in_bold_in_the_chosen_language() -> None:
 def test_burial_text_is_set_large_when_short_and_cut_short_when_long() -> None:
     box = geometry(layout("horizontal")).burial
     assert box is not None
-    size, lines = fit(
+    size, lines, cut = fit(
         extra_text(SCHEMA, BURIAL, PLANTS[0], LabelLanguage.EN), box, 6, BURIAL_MAX_FONT
     )
     assert size == BURIAL_MAX_FONT
     assert len(lines) == 2
+    assert not cut
     long = extra_text(SCHEMA, BURIAL, PLANTS[2], LabelLanguage.EN) * 3
-    size, lines = fit(long, box, 6, BURIAL_MAX_FONT)
+    size, lines, cut = fit(long, box, 6, BURIAL_MAX_FONT)
     assert size == MIN_FONT
     assert len(lines) == 6
     assert text(lines[-1]).endswith(ELLIPSIS)
+    assert cut
 
 
 def test_words_are_kept_whole_when_a_smaller_size_allows() -> None:
     area = Rect(0, 0, 14, 20)
-    _, lines = fit(caption(SCHEMA, LABEL, PLANTS[2]), area, max_lines=6)
+    _, lines, _ = fit(caption(SCHEMA, LABEL, PLANTS[2]), area, max_lines=6)
     assert "Gymnocalycium" in [text(line).split(" ")[0] for line in lines]
 
 
@@ -711,6 +714,29 @@ def test_auto_prints_each_plant_with_its_label_type(client: TestClient, store: F
     ]
     forced = client.post("/api/v1/labels", json={"plants": plants, "template": "vertical"})
     assert forced.headers["x-page-count"] == "1"
+
+
+def test_cut_captions_are_named_for_every_page(client: TestClient, store: FakeStore) -> None:
+    long = "a very long note that cannot fit on a small label " * 4
+    store.put(
+        "main",
+        [["tag", "genus", "notes"], [1, "Lithops", ""], [2, "Lithops", long], [3, "Lithops", ""]],
+    )
+    runtime(client).syncer.run_once()
+    plants = ["main:000002", "main:000001", "main:000003", "main:000002"]
+    request = {
+        "plants": plants,
+        "template": "vertical",
+        "extra_fields": [{"field": "notes"}],
+        "skip": 43,
+        "format": "svg",
+    }
+    # Page 1 holds no cut caption; the header still names the one on page 2.
+    response = client.post("/api/v1/labels", json={**request, "page": 1})
+    assert response.headers["x-page-count"] == "2"
+    assert response.headers["x-cut-captions"] == "main:000002"
+    request["extra_fields"] = []
+    assert client.post("/api/v1/labels", json=request).headers["x-cut-captions"] == ""
 
 
 def test_the_burial_preset_and_language_are_chosen_per_request(

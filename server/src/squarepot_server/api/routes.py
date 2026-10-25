@@ -275,6 +275,12 @@ def chosen_template(template: str, fields: dict[str, str]) -> str:
     return "horizontal" if fields.get("label_type") == "h" else "vertical"
 
 
+def cut_captions(plants: list[str], pages: list[Page]) -> list[str]:
+    """The requested plants whose text was cut short, each once, in request order."""
+    cut = {plant_id for page in pages for plant_id in page.cut}
+    return [plant_id for plant_id in dict.fromkeys(plants) if plant_id in cut]
+
+
 def listed(values: list[str]) -> str:
     shown = ", ".join(values[:10])
     return shown + (f" and {len(values) - 10} more" if len(values) > 10 else "")
@@ -288,7 +294,8 @@ def listed(values: list[str]) -> str:
         "Lays out a label for each plant on pages, as PDF (every page) or SVG (one page). "
         "Each label holds the plant's code, whole and with its quiet zone, and a caption from "
         "the preset. A layout too small for the code is refused with `422`, never cropped; "
-        "a caption too long for the label is shrunk, then cut short with an ellipsis."
+        "a caption too long for the label is shrunk, then cut short with an ellipsis, and "
+        "the plant is named in `X-Cut-Captions`."
     ),
     response_class=Response,
     responses={
@@ -302,7 +309,15 @@ def listed(values: list[str]) -> str:
                 "X-Page-Count": {
                     "description": "Number of pages in the layout.",
                     "schema": {"type": "integer"},
-                }
+                },
+                "X-Cut-Captions": {
+                    "description": (
+                        "Ids of the plants whose caption or burial text was cut short, "
+                        "comma-separated, in request order, on every page of the layout "
+                        "(also when the response is one SVG page). Empty when nothing was cut."
+                    ),
+                    "schema": {"type": "string"},
+                },
             },
         },
         **errors(status.HTTP_404_NOT_FOUND, status.HTTP_422_UNPROCESSABLE_CONTENT),
@@ -367,7 +382,9 @@ def create_labels(body: LabelRequest, session: SessionDep, runtime: RuntimeDep) 
             burial = extra_text(runtime.schema, in_burial, fields, body.language, custom)
         else:
             lines += extra_text(runtime.schema, after_caption, fields, body.language, custom)
-        batches.setdefault(key, []).append(Item(cast(str, rows[plant_id].tag), lines, burial))
+        batches.setdefault(key, []).append(
+            Item(cast(str, rows[plant_id].tag), lines, burial, plant_id)
+        )
     pages: list[Page] = []
     try:
         # A partly used sheet is the first one fed in.
@@ -391,6 +408,7 @@ def create_labels(body: LabelRequest, session: SessionDep, runtime: RuntimeDep) 
         media_type=LABEL_TYPES[body.format],
         headers={
             "X-Page-Count": str(len(pages)),
+            "X-Cut-Captions": ",".join(cut_captions(body.plants, pages)),
             "Content-Disposition": f'inline; filename="labels.{body.format.value}"',
         },
     )

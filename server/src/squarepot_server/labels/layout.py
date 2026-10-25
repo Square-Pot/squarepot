@@ -168,6 +168,8 @@ class Page:
     paths: list[list[Command]] = field(default_factory=list)
     lines: list[Line] = field(default_factory=list)
     symbols: list[Symbol] = field(default_factory=list)
+    # Plants whose caption or burial text was cut short, by `Item.plant_id`.
+    cut: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -177,6 +179,8 @@ class Item:
     tag: str
     caption: list[list[Run]]
     burial: list[list[Run]] = field(default_factory=list)
+    # The plant's id, to report a cut caption by; the tag when empty.
+    plant_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -297,8 +301,11 @@ def geometry(layout: LabelLayout) -> Geometry:
 
 def fit(
     items: list[list[Run]], area: Rect, max_lines: int, largest: float = MAX_FONT
-) -> tuple[float, list[list[Run]]]:
-    """The largest font size at which the caption fits, and its lines; cut short if none does."""
+) -> tuple[float, list[list[Run]], bool]:
+    """The largest font size at which the caption fits, and its lines; cut short if none does.
+
+    The last value says whether the lines were cut short.
+    """
 
     def lines_at(size: float) -> list[list[Run]]:
         # One line more than allowed is enough to know that the caption does not fit.
@@ -321,19 +328,19 @@ def fit(
                 not whole_words
                 or all(width(word, size) <= area.width for item in items for word in words(item))
             ):
-                return size, lines
+                return size, lines, False
             size = round(size - FONT_STEP, 6)
     size = MIN_FONT
     lines = lines_at(size)
     room = min(max_lines, math.floor(area.height / (size * LINE_HEIGHT) + EPSILON))
-    if len(lines) > room:
-        lines = [*lines[: room - 1], truncate(lines[room - 1], size, area.width)]
-    return size, lines
+    if len(lines) <= room:
+        return size, lines, False
+    return size, [*lines[: room - 1], truncate(lines[room - 1], size, area.width)], True
 
 
 def comfortable_fit(
     items: list[list[Run]], text: Rect, max_lines: int, orientation: LabelOrientation
-) -> tuple[Rect, float, list[list[Run]]]:
+) -> tuple[Rect, float, list[list[Run]], bool]:
     """The caption's area, font size and lines, with the most extra room that costs no size.
 
     When even the smallest size does not fit, the caption gets all of the room, so that as
@@ -342,14 +349,14 @@ def comfortable_fit(
     left, right = COMFORT[orientation]
     # Never so much that not even one character fits.
     scale = min(1.0, max(text.width - MIN_FONT, 0) / (left + right))
-    best: tuple[Rect, float, list[list[Run]]] | None = None
+    best: tuple[Rect, float, list[list[Run]], bool] | None = None
     for step in range(COMFORT_STEPS, -1, -1):
         share = scale * step / COMFORT_STEPS
         area = Rect(text.x + left * share, text.y, text.width - (left + right) * share, text.height)
-        size, lines = fit(items, area, max_lines)
+        size, lines, cut = fit(items, area, max_lines)
         # Ties keep the larger inset, met first, except at the smallest size.
         if best is None or size > best[1] + EPSILON or (size <= MIN_FONT + EPSILON and step == 0):
-            best = (area, size, lines)
+            best = (area, size, lines, cut)
     assert best is not None
     return best
 
@@ -396,16 +403,22 @@ def draw_label(page: Page, x: float, y: float, layout: LabelLayout, item: Item) 
         draw_burial(page, x, y, layout, shape.soil)
     if shape.number is not None:
         draw_number(page, x + shape.number.x, y + shape.number.y, shape.number, item.tag)
+    cut = False
     if layout.max_lines and item.caption:
-        draw_caption(page, x, y, layout, shape, item.caption)
+        cut |= draw_caption(page, x, y, layout, shape, item.caption)
     if shape.burial is not None and item.burial:
-        draw_burial_text(page, x, y, shape.burial, item.burial)
+        cut |= draw_burial_text(page, x, y, shape.burial, item.burial)
+    if cut:
+        page.cut.append(item.plant_id or item.tag)
 
 
 def draw_caption(
     page: Page, x: float, y: float, layout: LabelLayout, shape: Geometry, items: list[list[Run]]
-) -> None:
-    area, size, lines = comfortable_fit(items, shape.text, layout.max_lines, layout.orientation)
+) -> bool:
+    """Draw the caption; whether it was cut short."""
+    area, size, lines, cut = comfortable_fit(
+        items, shape.text, layout.max_lines, layout.orientation
+    )
     horizontal = layout.orientation == LabelOrientation.HORIZONTAL
     if layout.caption_box:
         frame = shape.frame
@@ -421,6 +434,7 @@ def draw_caption(
     draw_lines(
         page, x + area.x, y + area.y + first, area.width, size, lines, centred=not horizontal
     )
+    return cut
 
 
 def draw_lines(
@@ -444,11 +458,15 @@ def draw_lines(
         page.paths.append(commands)
 
 
-def draw_burial_text(page: Page, x: float, y: float, box: Rect, items: list[list[Run]]) -> None:
-    """The burial text at the top left of its box, as large as fits, then cut short."""
+def draw_burial_text(page: Page, x: float, y: float, box: Rect, items: list[list[Run]]) -> bool:
+    """The burial text at the top left of its box, as large as fits, then cut short.
+
+    Returns whether it was cut short.
+    """
     room = math.floor(box.height / (MIN_FONT * LINE_HEIGHT) + EPSILON)
-    size, lines = fit(items, box, room, BURIAL_MAX_FONT)
+    size, lines, cut = fit(items, box, room, BURIAL_MAX_FONT)
     draw_lines(page, x + box.x, y + box.y, box.width, size, lines, centred=False)
+    return cut
 
 
 def draw_number(page: Page, x: float, y: float, strip: Rect, tag: str) -> None:

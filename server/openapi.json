@@ -345,7 +345,7 @@
           "labels"
         ],
         "summary": "Print labels for plants",
-        "description": "Lays out a label for each plant on pages, as PDF (every page) or SVG (one page). Each label holds the plant's code, whole and with its quiet zone, and a caption from the preset. A layout too small for the code is refused with `422`, never cropped; a caption too long for the label is shrunk, then cut short with an ellipsis.",
+        "description": "Lays out a label for each plant on pages, as PDF (every page) or SVG (one page). Each label holds the plant's code, whole and with its quiet zone, and a caption from the preset. A layout too small for the code is refused with `422`, never cropped; a caption too long for the label is shrunk, then cut short with an ellipsis, and the plant is named in `X-Cut-Captions`.",
         "operationId": "create_labels",
         "requestBody": {
           "content": {
@@ -365,6 +365,12 @@
                 "description": "Number of pages in the layout.",
                 "schema": {
                   "type": "integer"
+                }
+              },
+              "X-Cut-Captions": {
+                "description": "Ids of the plants whose caption or burial text was cut short, comma-separated, in request order, on every page of the layout (also when the response is one SVG page). Empty when nothing was cut.",
+                "schema": {
+                  "type": "string"
                 }
               }
             },
