@@ -1,8 +1,9 @@
 # Web app
 
 The browser client. It shows the collections read-only: the list with search,
-sorting and filters (custom sheet columns too), and a plant card with its label
-preview. Plant data is edited in the spreadsheet, not here. Later: the label
+sorting and filters (custom sheet columns too), a plant card with its label
+preview, and the print editor (`/c/<collection>/print`): pick plants, one label
+type a sheet, what the labels show, the server's own A4 preview, and the PDF. Plant data is edited in the spreadsheet, not here. Later: the label
 designer, onboarding and the spreadsheet connection.
 
 Stack: TypeScript (strict), React, Vite. The API client is generated from

@@ -8,6 +8,7 @@ describe("routes", () => {
     ["/c/main", { page: "list", collection: "main" }],
     ["/c/main/", { page: "list", collection: "main" }],
     ["/c/main/p/main%3A004217", { page: "plant", collection: "main", plant: "main:004217" }],
+    ["/c/main/print", { page: "print", collection: "main" }],
     ["/c/main/x/1", { page: "home" }],
     ["/elsewhere", { page: "home" }],
   ])("%s", (path, route) => {

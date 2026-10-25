@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Two kinds of page, so no router library: `/c/<collection>` and `/c/<collection>/p/<plant>`.
+// A few pages, so no router library: `/c/<collection>`, `/c/<collection>/p/<plant>` and
+// `/c/<collection>/print`.
 // The query string carries the list's search, filters and sort on both.
 import { useSyncExternalStore, type MouseEvent } from "react";
 
 export type Route =
   | { page: "home" }
   | { page: "list"; collection: string }
-  | { page: "plant"; collection: string; plant: string };
+  | { page: "plant"; collection: string; plant: string }
+  | { page: "print"; collection: string };
 
 function decode(part: string): string {
   try {
@@ -20,6 +22,7 @@ export function parseRoute(pathname: string): Route {
   const parts = pathname.split("/").filter(Boolean).map(decode);
   if (parts[0] === "c" && parts[1] !== undefined) {
     if (parts.length === 2) return { page: "list", collection: parts[1] };
+    if (parts.length === 3 && parts[2] === "print") return { page: "print", collection: parts[1] };
     if (parts[2] === "p" && parts[3] !== undefined && parts.length === 4) {
       return { page: "plant", collection: parts[1], plant: parts[3] };
     }
@@ -35,6 +38,8 @@ export function routePath(route: Route): string {
       return `/c/${encodeURIComponent(route.collection)}`;
     case "plant":
       return `/c/${encodeURIComponent(route.collection)}/p/${encodeURIComponent(route.plant)}`;
+    case "print":
+      return `/c/${encodeURIComponent(route.collection)}/print`;
   }
 }
 

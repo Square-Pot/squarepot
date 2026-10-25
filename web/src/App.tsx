@@ -9,6 +9,7 @@ import { navigate, routePath, useLocation } from "./router";
 import { Header } from "./views/Header";
 import { ListView } from "./views/List";
 import { PlantCard } from "./views/PlantCard";
+import { PrintView } from "./views/Print";
 import { TokenScreen } from "./views/TokenScreen";
 
 export function App() {
@@ -102,7 +103,22 @@ function Browse() {
           {error}
         </p>
       )}
-      {route.page === "plant" ? (
+      {route.page === "print" ? (
+        <PrintView
+          key={collection.id}
+          schema={schema}
+          collection={collection}
+          templates={templates}
+          rows={rows}
+          found={result}
+          state={state}
+          onState={(next) => {
+            const search = serializeListState(next).toString();
+            navigate(routePath({ page: "print", collection: collection.id }) + (search ? `?${search}` : ""), { replace: true });
+          }}
+          listHref={listHref}
+        />
+      ) : route.page === "plant" ? (
         open ? (
           <PlantCard
             schema={schema}
@@ -133,6 +149,7 @@ function Browse() {
           state={state}
           onState={onState}
           plantHref={plantHref}
+          printHref={routePath({ page: "print", collection: collection.id }) + suffix}
         />
       )}
     </div>

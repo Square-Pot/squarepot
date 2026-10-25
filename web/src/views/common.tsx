@@ -40,6 +40,8 @@ const ICONS = {
   up: <path d="M12 19V5M6 11l6-6 6 6" />,
   down: <path d="M12 5v14M6 13l6 6 6-6" />,
   back: <path d="M15 5l-7 7 7 7" />,
+  download: <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
+  print: <><path d="M7 9V4h10v5" /><rect x="4" y="9" width="16" height="7" rx="1" /><path d="M7 14h10v6H7z" /></>,
   key: <><circle cx="8" cy="15" r="4" /><path d="M11 12l8-8M16 7l3 3" /></>,
 };
 
