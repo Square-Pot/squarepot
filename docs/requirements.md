@@ -71,12 +71,13 @@ labels is not fixed yet; the recognition spike measures it.
 
 - The app picks the **largest label in the frame**, which is the nearest one,
   and ignores all the others. Size is the main criterion.
-- Between labels of similar size, the one closer to the vertical middle band of
-  the frame wins: only the horizontal position counts. A label above or below
-  the middle is not penalised, because the label sits on the rim of the pot,
-  above the plant (far rim) or below it (near rim), while the middle of the
-  frame usually shows the plant itself. There is no crosshair in the centre of
-  the view.
+- Between labels of similar size (neither more than 1.5 times the area of the
+  other), the one nearest the aim mark wins. The aim mark is a small cross on
+  the view, centred across and a little above the middle, at 40% of the
+  height. Vertical distance counts half as much as horizontal distance,
+  because the label sits on the rim of the pot, above the plant (far rim) or
+  below it (near rim), while the middle of the frame usually shows the plant
+  itself.
 - It shows that plant's caption next to the label: to the right of it, or
   above it when there is no room on the right, never below, where the plant
   usually is. In the settings, the caption can go in a panel at the bottom of
@@ -88,7 +89,10 @@ labels is not fixed yet; the recognition spike measures it.
   turns it on, their number and a short name such as "M. theresae".
 - The selection does not jump back and forth between labels of almost the same
   size.
-- One tap copies the plant's details to the clipboard, or opens the full card.
+- A tap on a label picks that label instead. It stays picked until another
+  label or empty space is tapped, or until it has been out of sight for more
+  than 0.3 s. A second tap on the picked label copies its caption to the
+  clipboard. There is no full plant card yet.
 - Optional: a quick screenshot or a short video clip with the recognised
   plant's caption, ready to send to a friend.
 - The largest label must be read reliably in that scene, at the working
