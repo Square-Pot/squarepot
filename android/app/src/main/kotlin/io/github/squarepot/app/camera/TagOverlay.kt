@@ -64,15 +64,15 @@ fun TagOverlay(
         val frame = state.frame ?: return@Canvas
         val map = FrameToView(frame, size.width, size.height)
         drawAimMark(map(SingleTargetSelector.aimPoint(frame)))
-        val painter = OverlayPainter(this, measurer, map, texts)
+        val painter = OverlayPainter(this, measurer, texts)
         val color = if (state.selectedByTap) TAPPED else PICKED
         val neighbours = state.detections.filter { it.code != selected?.code }
-        neighbours.forEach { painter.frame(it, PALE, 1.dp) }
+        neighbours.forEach { painter.frame(it, map, PALE, 1.dp) }
 
         val taken = mutableListOf<ViewBox>()
         if (selected != null) {
-            painter.frame(selected, color, 2.5.dp)
-            val label = painter.bounds(selected)
+            painter.frame(selected, map, color, 2.5.dp)
+            val label = painter.bounds(selected, map)
             taken += if (atLabel && content != null) {
                 val area = ViewBox(0f, reservedTop.toPx(), size.width, size.height - reservedBottom.toPx())
                 val note = if (state.selectedByTap) texts.yourPick else null
@@ -86,9 +86,28 @@ fun TagOverlay(
         neighbours.sortedByDescending { it.area }.forEach { neighbour ->
             val plant = state.plants[neighbour.code.value]?.singleOrNull()
             val name = plant?.takeIf { withNames }?.let { shortName(it, state.schema) }.orEmpty()
-            painter.neighbour(neighbour.code.value, painter.bounds(neighbour), name.annotated(), taken)
+            painter.neighbour(neighbour.code.value, painter.bounds(neighbour, map), name.annotated(), taken)
                 ?.let { taken += it }
         }
+    }
+}
+
+/**
+ * A caption as the camera draws it at the label, on a dark ground with a stand-in label, for the
+ * settings screen to show what a choice looks like.
+ */
+@Composable
+fun CaptionSample(content: CaptionContent, look: CaptionLook, number: String, modifier: Modifier = Modifier) {
+    val measurer = rememberTextMeasurer()
+    val texts = rememberCaptionTexts()
+    Canvas(modifier) {
+        drawRect(SAMPLE_GROUND)
+        val side = SAMPLE_LABEL.toPx()
+        val label = ViewBox.of(SAMPLE_MARGIN.toPx(), size.height - side - SAMPLE_MARGIN.toPx(), side, side)
+        drawRect(PAPER, Offset(label.left, label.top), Size(side, side))
+        drawRect(PICKED, Offset(label.left, label.top), Size(side, side), style = Stroke(2.5.dp.toPx()))
+        val area = ViewBox(0f, 0f, size.width, size.height)
+        OverlayPainter(this, measurer, texts).caption(CaptionCard(content, look, PICKED, null), number, label, area)
     }
 }
 
@@ -104,12 +123,11 @@ private fun selectedTab(color: Color) =
 private class OverlayPainter(
     private val scope: DrawScope,
     private val measurer: TextMeasurer,
-    private val map: FrameToView,
     private val texts: CaptionTexts,
 ) {
     private val tabHeight = with(scope) { TAB_HEIGHT.toPx() }
 
-    fun frame(detection: Detection, color: Color, width: Dp) = with(scope) {
+    fun frame(detection: Detection, map: FrameToView, color: Color, width: Dp) = with(scope) {
         val path = Path()
         detection.corners.forEachIndexed { i, p ->
             val o = map(p)
@@ -120,7 +138,7 @@ private class OverlayPainter(
     }
 
     /** The label's frame as an axis-aligned box in view pixels. */
-    fun bounds(detection: Detection): ViewBox {
+    fun bounds(detection: Detection, map: FrameToView): ViewBox {
         val points = detection.corners.map { map(it) }
         return ViewBox(points.minOf { it.x }, points.minOf { it.y }, points.maxOf { it.x }, points.maxOf { it.y })
     }
@@ -301,7 +319,7 @@ private val NEIGHBOUR_NAME = TextStyle(
 )
 
 /** Text on a tab in [color]: dark blue on a tap's pick, dark green on the app's. */
-private fun onColor(color: Color) = if (color == TAPPED) Color(0xFF06121F) else Color(0xFF0B1A10)
+internal fun onColor(color: Color) = if (color == TAPPED) Color(0xFF06121F) else Color(0xFF0B1A10)
 
 private val TAB_HEIGHT = 19.dp
 private val TAB_PAD = 6.dp
@@ -319,6 +337,9 @@ private val LINE_GAP = 3.dp
 private val ACCENT = 3.dp
 
 private val PAPER = Color(0xFFF7F8F2)
+private val SAMPLE_GROUND = Color(0xFF45433D)
+private val SAMPLE_LABEL = 34.dp
+private val SAMPLE_MARGIN = 24.dp
 private val PAPER_EDGE = Color.Black.copy(alpha = 0.18f)
 
 /** A cross where the selector aims, so the collector knows what "nearest the centre" means. */

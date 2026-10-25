@@ -19,23 +19,10 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -43,7 +30,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,18 +50,21 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.squarepot.app.BuildConfig
 import io.github.squarepot.app.R
+import io.github.squarepot.app.data.CaptionPlace
 import io.github.squarepot.app.data.copyText
-import io.github.squarepot.app.recognition.CornerSmoother
-import io.github.squarepot.app.recognition.RollingStats
 import io.github.squarepot.app.recognition.SingleTargetSelector
 import io.github.squarepot.app.recognition.TagCode
 import io.github.squarepot.app.recognition.isHit
 import java.time.LocalDate
-import java.util.Locale
 import java.util.concurrent.Executors
 
+/**
+ * The live camera with the controls over it: the copy's status, ⚙ for the caption settings and
+ * the torch at the top; the label count, or panel B when captions go there, at the bottom; and
+ * the hidden 1€ panel when it is open.
+ */
 @Composable
-fun CameraScreen(viewModel: CameraViewModel, onOpenBench: () -> Unit, onOpenCopy: () -> Unit) {
+fun CameraScreen(viewModel: CameraViewModel, onOpenSettings: () -> Unit, onOpenCopy: () -> Unit) {
     val context = LocalContext.current
     var granted by remember { mutableStateOf(context.hasCameraPermission()) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
@@ -83,11 +72,13 @@ fun CameraScreen(viewModel: CameraViewModel, onOpenBench: () -> Unit, onOpenCopy
         if (!granted) launcher.launch(Manifest.permission.CAMERA)
     }
 
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val density = LocalDensity.current
-    var controlsHeight by remember { mutableStateOf(0.dp) }
+    var topHeight by remember { mutableStateOf(0.dp) }
+    var bottomHeight by remember { mutableStateOf(0.dp) }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (granted) {
-            LiveCamera(viewModel, reservedBottom = controlsHeight)
+            LiveCamera(viewModel, reservedTop = topHeight, reservedBottom = bottomHeight)
         } else {
             Text(
                 stringResource(R.string.camera_permission_needed),
@@ -95,19 +86,41 @@ fun CameraScreen(viewModel: CameraViewModel, onOpenBench: () -> Unit, onOpenCopy
                 modifier = Modifier.align(Alignment.Center).padding(24.dp),
             )
         }
-        Controls(
-            viewModel,
-            onOpenBench,
-            onOpenCopy,
-            Modifier
-                .align(Alignment.BottomCenter)
-                .onSizeChanged { controlsHeight = with(density) { it.height.toDp() } },
+        CameraTopBar(
+            state,
+            onOpenCopy = onOpenCopy,
+            onOpenSettings = onOpenSettings,
+            onTorch = { viewModel.setTorch(!state.torch) },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .onSizeChanged { topHeight = with(density) { it.height.toDp() } },
         )
+        val bottom = Modifier
+            .align(Alignment.BottomCenter)
+            .onSizeChanged { bottomHeight = with(density) { it.height.toDp() } }
+        if (state.captions.place == CaptionPlace.PANEL) {
+            CaptionPanel(
+                state,
+                onFold = { viewModel.setCaptions(state.captions.copy(panelFolded = !state.captions.panelFolded)) },
+                onToggleTuning = { viewModel.setTuning(!state.tuning) },
+                modifier = bottom,
+            )
+        } else {
+            LabelCount(state, bottom)
+        }
+        if (state.tuning) {
+            TuningPanel(
+                state,
+                onChange = viewModel::setSmoothing,
+                onClose = { viewModel.setTuning(false) },
+                modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = topHeight),
+            )
+        }
     }
 }
 
 @Composable
-private fun LiveCamera(viewModel: CameraViewModel, reservedBottom: Dp) {
+private fun LiveCamera(viewModel: CameraViewModel, reservedTop: Dp, reservedBottom: Dp) {
     val context = LocalContext.current
     val texts = rememberCaptionTexts()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -145,6 +158,8 @@ private fun LiveCamera(viewModel: CameraViewModel, reservedBottom: Dp) {
         }
     }
 
+    LaunchedEffect(controller, state.torch) { controller.enableTorch(state.torch) }
+
     // Haptic tick when a label locks.
     val lockedCode = (state.selection as? SingleTargetSelector.State.Locked)?.target?.code
     LaunchedEffect(lockedCode) {
@@ -164,7 +179,7 @@ private fun LiveCamera(viewModel: CameraViewModel, reservedBottom: Dp) {
         TagOverlay(
             state,
             Modifier.fillMaxSize(),
-            reservedTop = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding(),
+            reservedTop = reservedTop,
             reservedBottom = reservedBottom,
         )
     }
@@ -199,82 +214,6 @@ private fun Modifier.pickOnTap(viewModel: CameraViewModel, context: Context, tex
         }
     }
 
-/** Hidden sliders for the overlay's 1€ filter, so the best values can be found on the phone. */
-@Composable
-private fun SmoothingTuner(params: CornerSmoother.Params, onChange: (CornerSmoother.Params) -> Unit) {
-    val style = MaterialTheme.typography.bodySmall
-    Text(String.format(Locale.ROOT, "1€ min cutoff %.2f Hz", params.minCutoff), color = Color.White, style = style)
-    Slider(
-        value = params.minCutoff,
-        onValueChange = { onChange(params.copy(minCutoff = it)) },
-        valueRange = 0.05f..5f,
-    )
-    Text(String.format(Locale.ROOT, "1€ beta %.3f", params.beta), color = Color.White, style = style)
-    Slider(
-        value = params.beta,
-        onValueChange = { onChange(params.copy(beta = it)) },
-        valueRange = 0f..0.5f,
-    )
-}
-
-@Composable
-private fun Controls(
-    viewModel: CameraViewModel,
-    onOpenBench: () -> Unit,
-    onOpenCopy: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    Column(
-        modifier
-            .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.55f))
-            .safeDrawingPadding()
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        // Which build this is, so a phone run can be matched to its commit at a glance. A long
-        // press opens the hidden overlay tuning.
-        var tuning by rememberSaveable { mutableStateOf(false) }
-        Text(
-            BUILD,
-            color = Color.White,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.pointerInput(Unit) { detectTapGestures(onLongPress = { tuning = !tuning }) },
-        )
-        if (tuning) SmoothingTuner(state.smoothing, viewModel::setSmoothing)
-        state.frame?.let {
-            Text("${it.width}×${it.height}", color = Color.White, style = MaterialTheme.typography.bodySmall)
-        }
-        state.stats.toSortedMap().forEach { (id, s) ->
-            if (s.frames > 0) Text(formatStats(id, s), color = Color.White, style = MaterialTheme.typography.bodySmall)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            AnalysisResolution.entries.forEach { r ->
-                FilterChip(
-                    selected = state.resolution == r,
-                    onClick = { viewModel.setResolution(r) },
-                    label = { Text(stringResource(r.label), color = Color.White) },
-                )
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onOpenBench) { Text(stringResource(R.string.open_bench)) }
-            Button(onClick = onOpenCopy) { Text(stringResource(R.string.open_copy)) }
-        }
-    }
-}
-
-private fun formatStats(id: String, s: RollingStats.Snapshot): String = String.format(
-    Locale.ROOT,
-    "%s: %.0f%% frames, %.1f ms median, %.1f ms p95 (n=%d)",
-    id,
-    s.hitRate * PERCENT,
-    s.medianMillis,
-    s.p95Millis,
-    s.frames,
-)
-
 private fun Context.hasCameraPermission() =
     ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
 
@@ -290,17 +229,16 @@ private fun Context.copyCaption(content: CaptionContent, code: TagCode, texts: C
     Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 }
 
-private val AnalysisResolution.label: Int
+internal val AnalysisResolution.label: Int
     get() = when (this) {
         AnalysisResolution.P720 -> R.string.resolution_720
         AnalysisResolution.P1080 -> R.string.resolution_1080
         AnalysisResolution.MAX -> R.string.resolution_max
     }
 
-private const val PERCENT = 100f
-
 /** How far from a label a tap still picks it. */
 private val TAP_REACH = 32.dp
 
-private val BUILD = "${BuildConfig.VERSION_NAME} · ${BuildConfig.COMMIT.take(SHORT_COMMIT)}"
+/** Which build this is, so a phone run can be matched to its commit at a glance. */
+internal val BUILD = "${BuildConfig.VERSION_NAME} · ${BuildConfig.COMMIT.take(SHORT_COMMIT)}"
 private const val SHORT_COMMIT = 7

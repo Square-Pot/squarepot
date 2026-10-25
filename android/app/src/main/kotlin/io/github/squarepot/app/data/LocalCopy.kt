@@ -37,6 +37,14 @@ class LocalCopy(private val dao: CopyDao) {
         return plants.map { it.toView(collections[it.collectionId] ?: it.collectionId, schema, language) }
     }
 
+    /** The plant whose botanical name is longest, the hardest case for a caption; null when the copy is empty. */
+    suspend fun longestNamed(language: String): PlantView? {
+        val schema = schema()
+        val longest = dao.allPlants().maxByOrNull { botanicalName(schema, it.fields).plain().length } ?: return null
+        val collections = dao.collectionNames().associate { it.id to it.name }
+        return longest.toView(collections[longest.collectionId] ?: longest.collectionId, schema, language)
+    }
+
     /** Each collection's custom columns, for choosing which of them a caption shows. */
     fun customColumns(): Flow<List<CollectionColumns>> = dao.observeCustomColumns()
 

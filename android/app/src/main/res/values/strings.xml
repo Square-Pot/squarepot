@@ -52,8 +52,52 @@
     <string name="resolution_1080" translatable="false">1080p</string>
     <string name="resolution_max">Max</string>
     <string name="open_bench">Bench</string>
-    <string name="open_copy">Local copy</string>
     <string name="back">Back</string>
+
+    <string name="captions_title">Camera captions</string>
+    <string name="captions_open">Caption settings</string>
+    <string name="torch">Torch</string>
+    <string name="copy_chip">Copy %1$s</string>
+    <string name="copy_chip_none">No copy</string>
+    <string name="point_at_label">Point at a label</string>
+    <plurals name="labels_in_view">
+        <item quantity="one">%d label in view</item>
+        <item quantity="other">%d labels in view</item>
+    </plurals>
+    <string name="panel_fold">Fold or unfold the panel</string>
+    <string name="place_title">Where</string>
+    <string name="place_label">At the label</string>
+    <string name="place_label_hint">Next to the number. No bottom panel; the viewfinder stays free.</string>
+    <string name="place_panel">Bottom panel</string>
+    <string name="place_panel_hint">As before: numbers in the picture, the caption in a dark panel.</string>
+    <string name="look_title">Caption look</string>
+    <string name="look_card">Paper card</string>
+    <string name="look_bare">Bare text</string>
+    <string name="fields_title">What to show</string>
+    <string name="fields_note">Top to bottom, as in the caption. The sample is the plant with the longest name.</string>
+    <string name="fields_empty">Nothing chosen: labels keep only their numbers.</string>
+    <string name="fields_schema">Square-Pot fields</string>
+    <string name="fields_custom">Your columns · %1$s</string>
+    <string name="fields_column_badge">column</string>
+    <string name="fields_sample_empty">empty for this plant</string>
+    <string name="fields_reset">Reset fields to the default</string>
+    <string name="move_up">Move up</string>
+    <string name="remove">Remove</string>
+    <string name="names_title">Long names</string>
+    <string name="names_full">In full</string>
+    <string name="names_two_lines">Two lines</string>
+    <string name="names_short_genus">Short genus</string>
+    <string name="neighbours_title">Neighbouring labels</string>
+    <string name="neighbours_number">Number only</string>
+    <string name="neighbours_name">Number and short name</string>
+    <string name="sample_none">Download the local copy to see a sample caption.</string>
+    <string name="tools_title">Tools</string>
+    <string name="analysis_resolution">Analysis resolution</string>
+    <string name="tuning_title">Frame smoothing · 1€</string>
+    <string name="tuning_reset">Reset</string>
+    <string name="tuning_copy">Copy values</string>
+    <string name="tuning_hint">Hold the version line to open or close the smoothing panel.</string>
+    <string name="close">Close</string>
 
     <string name="caption_app_pick">picked by the app</string>
     <string name="caption_your_pick">your pick</string>

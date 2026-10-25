@@ -36,6 +36,9 @@ interface CopyDao {
     @Query("SELECT * FROM plants WHERE tag = :tag ORDER BY collectionId, sheetRow")
     suspend fun plantsByTag(tag: String): List<PlantEntity>
 
+    @Query("SELECT * FROM plants")
+    suspend fun allPlants(): List<PlantEntity>
+
     @Upsert
     suspend fun upsertCollections(collections: List<CollectionEntity>)
 

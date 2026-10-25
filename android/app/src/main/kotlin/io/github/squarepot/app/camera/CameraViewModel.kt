@@ -52,6 +52,9 @@ data class CameraUiState(
     val customColumns: List<CollectionColumns> = emptyList(),
     /** When the local copy was last refreshed, epoch millis; null before the first sync. */
     val refreshedAt: Long? = null,
+    val torch: Boolean = false,
+    /** The hidden 1€ tuning panel is open over the camera. */
+    val tuning: Boolean = false,
 ) {
     /**
      * The selected label, with its smoothed corners when it is on screen: locked by the selector
@@ -121,6 +124,17 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
     }
+
+    fun setTorch(on: Boolean) {
+        _state.update { it.copy(torch = on) }
+    }
+
+    fun setTuning(open: Boolean) {
+        _state.update { it.copy(tuning = open) }
+    }
+
+    /** The plant with the longest name in the copy, for the caption settings' sample; null without a copy. */
+    suspend fun longestNamed(): PlantView? = container.localCopy.longestNamed(Locale.getDefault().language)
 
     /** Saves new caption settings; the state follows once they are stored. */
     fun setCaptions(settings: CaptionSettings) {

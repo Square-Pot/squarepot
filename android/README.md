@@ -48,12 +48,12 @@ Sync is unit-tested against a fake server (OkHttp MockWebServer) with Room
 under Robolectric. The tests cover full and delta responses, schema changes,
 old cursors and failures.
 
-## Status: recognition spike
+## Camera
 
-The app opens on the recognition spike, which measures how reliably labels
-are read in real conditions. **Bench** and **Local copy** on the camera screen
-open the photo bench and the local copy described above; Back returns to the
-camera.
+The app opens on the live camera. The chip at the top left shows when the
+local copy was refreshed and opens it; ⚙ opens the caption settings, which
+also hold the tools (analysis resolution and the photo bench); Back returns
+to the camera.
 
 - **Live camera.** Analysis frames (720p by default; 1080p or the largest
   16:9 size can be picked) are decoded by zxing-cpp. In single-plant mode the
@@ -61,7 +61,7 @@ camera.
   1. **a tapped label**, whatever its size. It stays picked until you tap
      another label, tap where there is no label, or it is out of sight for
      more than 0.3 s. A tapped label is drawn in blue instead of green, and
-     tapping it again copies its number. The tap also focuses the camera there;
+     tapping it again copies its caption. The tap also focuses the camera there;
   2. otherwise **the clearly largest label** (the nearest pot's; labels more
      than 1.5 times smaller are background);
   3. among labels of about equal size, **the one nearest the aim mark**, a
@@ -72,10 +72,22 @@ camera.
   the decoder misses for a frame or two stays on screen for 0.3 s, so frames
   and numbers do not blink, and each label's corners go through a 1€ filter
   (smoothed hard while the phone is still, followed closely while it moves),
-  so they do not tremble. The bottom panel shows the selected label's plant
-  from the local copy (its botanical name, or that the copy has no plant or
-  several plants with that number), the decode rate and latency over the last
-  120 frames. Lookups read only the local copy, never the network.
+  so they do not tremble. Lookups read only the local copy, never the network.
+- **Captions.** Every decoded label has a frame and its number on a tab. The
+  selected label's caption shows the chosen fields from the local copy
+  (field number, name, ex and the first custom column until the owner picks
+  others), or that the copy has no plant or several plants with that number.
+  By default it hangs off the number tab: to the right of the label when it
+  fits, else above it, never below, since the plant is usually under its
+  label. It can be a paper card or bare text, or go in a dark panel at the
+  bottom instead, which folds to the name alone. Long names can be shown in
+  full, on two lines or with the genus as its initial; neighbouring labels
+  can show a short name. All of this is in the caption settings and kept on
+  the phone.
+- **Smoothing panel.** A long press on the version line (in the caption
+  settings, or in the bottom panel) opens a hidden panel over the camera with
+  the 1€ filter's two settings, the decode rate and latency over the last 120
+  frames, and a button that copies the values for a report.
 - **Bench.** Pick a folder of label photos. Each photo is made upright (EXIF
   orientation), scaled to a long side of 1280, 1920 and 2560 px in turn (the
   720p, 1080p and a larger analysis frame, for the live mode), then taken at

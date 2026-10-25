@@ -15,9 +15,13 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.withStyle
 import io.github.squarepot.app.R
+import io.github.squarepot.app.data.CaptionField
 import io.github.squarepot.app.data.CaptionLine
+import io.github.squarepot.app.data.PlantView
 import io.github.squarepot.app.data.TextRun
+import io.github.squarepot.app.data.api.FieldSchemaDto
 import io.github.squarepot.app.data.caption
+import io.github.squarepot.app.data.copyText
 import io.github.squarepot.app.recognition.TagCode
 import java.time.LocalDate
 
@@ -106,3 +110,29 @@ fun List<TextRun>.annotated(): AnnotatedString = buildAnnotatedString {
         if (run.italic) withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(run.text) } else append(run.text)
     }
 }
+
+/**
+ * The schema's fields a caption can show, with their names in [language]: the computed name
+ * first, then the fields in schema order, then the other computed fields (such as age).
+ */
+class FieldCatalogue(schema: FieldSchemaDto?, language: String) {
+    val schema: List<Pair<CaptionField, String>> = schema?.let { s ->
+        val computed = s.computed.map { CaptionField.Field(it.key) to it.label.forLanguage(language) }
+        val (name, others) = computed.partition { it.first.key == NAME_KEY }
+        name + s.fields.map { CaptionField.Field(it.key) to it.label.forLanguage(language) } + others
+    }.orEmpty()
+
+    /** What the settings call [field]: its schema name, or the column's own name. */
+    fun titleOf(field: CaptionField): String = when (field) {
+        is CaptionField.Custom -> field.column
+        is CaptionField.Field -> schema.firstOrNull { it.first == field }?.second ?: field.key
+    }
+
+    private companion object {
+        const val NAME_KEY = "name"
+    }
+}
+
+/** What [field] shows for [plant] with these settings, as plain text; empty when the plant has no value. */
+fun CameraUiState.sampleValue(plant: PlantView, field: CaptionField, texts: CaptionTexts, today: LocalDate): String =
+    caption(plant, schema, listOf(field), captions.nameMode, today).copyText(texts::age)
