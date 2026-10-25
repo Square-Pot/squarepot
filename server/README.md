@@ -154,6 +154,10 @@ reads as one column and is reported as missing its `genus` column.
   wherever it moves in the sheet. A plant without one is identified by its
   contents.
 - **Migrations.** The server applies its Alembic migrations at startup.
+- **Web app.** With `SQUAREPOT_WEB_DIR` set, as the image does, the server
+  also serves the [web app](../web/)'s build at `/`: any path no route
+  matches gets a file of the build, or `index.html` for the app's own
+  addresses. Unknown paths under `/api/` stay API errors.
 - **Labels.** Each label holds the plant's number in a 10×10 Data Matrix
   ([ADR 0001](../docs/adr/0001-label-code-format.md)) and a caption from the
   `label` preset. The `vertical` template has the code on top and the caption

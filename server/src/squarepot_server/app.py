@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException
 
-from squarepot_server import __version__
+from squarepot_server import __version__, web
 from squarepot_server.api import routes
 from squarepot_server.api.models import Error
 from squarepot_server.config import Settings, get_settings
@@ -87,4 +87,6 @@ def create_app(settings: Settings | None = None, store: CollectionStore | None =
     app.add_exception_handler(Exception, on_unexpected_error)
     app.include_router(routes.public)
     app.include_router(routes.router)
+    # The web app answers whatever no route matches, routes added later included.
+    app.router.default = web.serve
     return app

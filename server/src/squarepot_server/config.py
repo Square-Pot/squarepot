@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     collections: list[CollectionConfig] = []
     sync_interval_seconds: float = Field(default=60, ge=0)
     schema_file: Path = DEFAULT_SCHEMA_FILE
+    web_dir: Path | None = Field(
+        default=None, description="The built web app, served at /; none serves only the API."
+    )
 
     @model_validator(mode="after")
     def collections_match_the_store(self) -> Settings:
