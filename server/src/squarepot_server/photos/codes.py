@@ -53,7 +53,9 @@ def read_numbers(data: bytes) -> list[str]:
             if found or max(full) <= FIRST_PASS:
                 return found
         # Nothing read on the small copy: the whole image, decoded again at full size.
+        # A JPEG is decoded straight to grey: a third of the memory of RGB.
         with Image.open(io.BytesIO(data)) as opened:
+            opened.draft("L", full)
             return numbers_in(opened.convert("L"))
     except (UnidentifiedImageError, Image.DecompressionBombError, OSError) as error:
         raise UnsupportedImage("not a JPEG, PNG or WebP image") from error
