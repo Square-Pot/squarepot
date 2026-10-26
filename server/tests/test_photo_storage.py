@@ -118,9 +118,9 @@ def test_deleting_a_missing_file_is_no_error() -> None:
 
 LISTING = """<?xml version="1.0" encoding="UTF-8"?>
 <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-  <Contents><Key>{first}</Key></Contents>
-  <Contents><Key>photos/004217/../../secret</Key></Contents>
-  {more}
+<Contents><Key>{first}</Key></Contents>
+<Contents><Key>photos/004217/../../secret</Key></Contents>
+{more}
 </ListBucketResult>"""
 
 
