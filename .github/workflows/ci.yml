@@ -245,6 +245,47 @@ jobs:
             echo "| $((idle / 1048576)) MiB | $((peak / 1048576)) MiB | $(($(stat --format=%s labels.pdf) / 1048576)) MiB |"
           } | tee --append "${GITHUB_STEP_SUMMARY}"
 
+      # The most memory one photo upload takes (ADR 0007): the largest JPEG and the
+      # largest PNG a client may send, each to a fresh server keeping photos on disk.
+      - name: Measure photo memory
+        run: |
+          token=ci-token-0123456789
+          docker run --rm --user "$(id -u)" --volume "${PWD}:/out" --entrypoint python \
+            squarepot-server:ci -c '
+          from PIL import Image
+          gradient = Image.linear_gradient("L")
+          gradient.resize((8960, 6696)).convert("RGB").save("/out/largest.jpg", quality=90)
+          gradient.resize((5650, 4240)).convert("RGBA").save("/out/largest.png")
+          '
+          api() { curl --fail --silent --show-error --header "Authorization: Bearer ${token}" "$@"; }
+          {
+            echo "### Server memory, one photo upload"
+            echo "| photo | size | idle | peak |"
+            echo "| --- | --- | --- | --- |"
+          } >> "${GITHUB_STEP_SUMMARY}"
+          for file in largest.jpg largest.png; do
+            docker run --detach --name photos --publish 127.0.0.1:8002:8000 \
+              --env SQUAREPOT_API_TOKEN="${token}" --env SQUAREPOT_STORE=file \
+              --env SQUAREPOT_COLLECTIONS='[{"id": "demo", "name": "Demo plants", "file": "/demo/plants.csv"}]' \
+              --env SQUAREPOT_PHOTOS=disk \
+              --volume "${PWD}/server/demo:/demo:ro" squarepot-server:ci
+            for _ in $(seq 30); do
+              api --output /dev/null http://127.0.0.1:8002/api/v1/plants/by-tag/000001 2>/dev/null && break
+              sleep 1
+            done
+            idle="$(docker exec photos cat /sys/fs/cgroup/memory.current)"
+            api --request PUT --header "Content-Type: image/${file##*.}" --data-binary "@${file}" \
+              --output /dev/null \
+              "http://127.0.0.1:8002/api/v1/photos/6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b?tag=000001" \
+              || { docker logs photos; exit 1; }
+            peak="$(docker exec photos cat /sys/fs/cgroup/memory.peak)"
+            docker rm --force photos > /dev/null
+            echo "| ${file} | $(($(stat --format=%s "${file}") / 1048576)) MiB | $((idle / 1048576)) MiB | $((peak / 1048576)) MiB |" \
+              | tee --append "${GITHUB_STEP_SUMMARY}"
+            # The server shares a 1 GB limit with the API: an upload must stay well below it.
+            [ "$((peak / 1048576))" -lt 600 ] || { echo "${file}: peak above 600 MiB"; exit 1; }
+          done
+
       - name: Save the image for publishing
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: docker save squarepot-server:ci | gzip --fast > server-image.tar.gz
