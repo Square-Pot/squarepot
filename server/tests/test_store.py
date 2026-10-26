@@ -335,5 +335,5 @@ def test_the_version_check_learns_whether_the_sheet_can_be_edited(
 def test_write_failures_become_store_errors() -> None:
     answer = response(403, {"error": {"message": "The caller does not have permission"}})
     sheets, _ = writing_store(answer)
-    with pytest.raises(StoreRefused, match="^Google answered 403: The caller does not have"):
+    with pytest.raises(StoreRefused, match=r"^Google answered 403: The caller does not have"):
         sheets.write(CONFIG, 2, [CellWrite(1, "Lithops")])
