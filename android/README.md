@@ -127,6 +127,16 @@ to the camera.
   resets. The queue chip next to it shows what waits to be sent, and turns
   red when the server refused something; the queue screen says why and
   offers retry or discard.
+- **Status.** **Status…** on a card, and the walk's **Not seen** list (the
+  walk's plants nobody saw since it began, picked one by one or all at
+  once) set a status in the sheet: "lost" first, for a plant a walk did not
+  find, then "dead", "gifted", "sold"; a card can also clear one. The sheet
+  holds the English key, the app shows the schema's label. One request per
+  collection and per 500 plants, each plant with the status the copy has,
+  so a cell changed in the sheet meanwhile is kept and reported. Status
+  needs the server and a collection read with the service account
+  (ADR 0006): offline nothing is queued, and a collection read by link says
+  why it cannot be written. A status set from a card is also a sighting.
 - **Smoothing panel.** A long press on the version line (in the caption
   settings, or in the bottom panel) opens a hidden panel over the camera with
   the 1€ filter's two settings, the decode rate and latency over the last 120

@@ -36,6 +36,10 @@ data class InventoryUiState(
 ) {
     val waiting: Int get() = queue.size
     val problems: Int get() = queue.count { it.problem != null }
+
+    /** The plants of the walk nobody saw since it began, by number. */
+    val notSeen: List<PlantEntity>
+        get() = plants.filter { walk.covers(it) && it.tag !in seen }.sortedBy { it.tag }
 }
 
 /**

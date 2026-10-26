@@ -7,6 +7,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import io.github.squarepot.app.data.api.CollectionDto
 import io.github.squarepot.app.data.api.SquarepotApi
 import io.github.squarepot.app.data.local.CopyDatabase
+import io.github.squarepot.app.data.local.PlantEntity
 import io.github.squarepot.app.data.queue.Outbox
 import io.github.squarepot.app.data.queue.QueueDatabase
 import io.github.squarepot.app.data.queue.QueueOutcome
@@ -37,6 +38,7 @@ class AppContainer(context: Context) {
     )
 
     private val engine = SyncEngine(database)
+    private val statusEditor = StatusEditor()
     private val http = OkHttpClient.Builder()
         .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .callTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -47,6 +49,14 @@ class AppContainer(context: Context) {
 
     /** Syncs the local copy with the configured server. */
     suspend fun sync(): SyncOutcome = api(settings.current())?.let { engine.sync(it) } ?: SyncOutcome.NotConfigured
+
+    /** Sets [status] (empty clears it) for [plants] on the server, online only; a write syncs the copy. */
+    suspend fun setStatus(plants: List<PlantEntity>, status: String?): StatusOutcome {
+        val api = api(settings.current()) ?: return StatusOutcome.NotConfigured
+        return statusEditor.set(api, plants, status).also {
+            if (it.written > 0) SyncWorker.enqueue(app, restart = true)
+        }
+    }
 
     /** Sends the queued photos and sightings to the configured server. */
     suspend fun sendQueue(): QueueOutcome =
