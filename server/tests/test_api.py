@@ -39,6 +39,8 @@ def test_every_route_but_health_is_protected() -> None:
         ("DELETE", photo),
         ("GET", "/api/v1/collections"),
         ("GET", "/api/v1/labels/templates"),
+        ("GET", f"{photo}/image"),
+        ("GET", f"{photo}/thumbnail"),
         ("GET", "/api/v1/plants/by-tag/004217"),
         ("GET", "/api/v1/plants/by-tag/004217/photos"),
         ("GET", "/api/v1/schema"),
@@ -80,6 +82,9 @@ def test_lookup_by_tag(client: TestClient) -> None:
         "custom": {},
         "invalid": {},
         "status_since": None,
+        "photo_count": 0,
+        "last_photo": None,
+        "main_photo_id": None,
     }
 
 

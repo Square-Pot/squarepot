@@ -244,6 +244,22 @@ class Plant(ApiModel):
         ),
         examples=["2025-06-14"],
     )
+    photo_count: int = Field(
+        ge=0,
+        description=(
+            "How many photos the plant's number has, deleted ones left out (ADR 0007). A "
+            "plant without a number has none."
+        ),
+    )
+    last_photo: AwareDatetime | None = Field(
+        description="When the newest photo was taken; `null` without photos."
+    )
+    main_photo_id: UUID | None = Field(
+        description=(
+            "The photo to show for the plant: the one the owner chose, or else the newest. "
+            "`GET /api/v1/photos/{photo_id}/thumbnail` shows it. `null` without photos."
+        )
+    )
     invalid: dict[str, InvalidCell] = Field(
         description=(
             "Cells of this row the import rejected, by field key, such as a `seeding_date` "

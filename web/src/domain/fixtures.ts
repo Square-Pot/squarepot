@@ -94,5 +94,8 @@ export function plant(
     custom,
     invalid,
     status_since: null,
+    photo_count: 0,
+    last_photo: null,
+    main_photo_id: null,
   };
 }
