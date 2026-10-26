@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.view.CameraController
@@ -31,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +58,7 @@ import io.github.squarepot.app.data.copyText
 import io.github.squarepot.app.recognition.SingleTargetSelector
 import io.github.squarepot.app.recognition.TagCode
 import io.github.squarepot.app.recognition.isHit
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.util.concurrent.Executors
 
@@ -69,6 +72,7 @@ import java.util.concurrent.Executors
 fun CameraScreen(
     viewModel: CameraViewModel,
     inventory: InventoryViewModel,
+    photos: PhotoViewModel,
     onOpenSettings: () -> Unit,
     onOpenCopy: () -> Unit,
     onOpenWalk: () -> Unit,
@@ -77,6 +81,7 @@ fun CameraScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val inventoryState by inventory.state.collectAsStateWithLifecycle()
     val inventoryOn = inventoryState.walk.active
+    val shutter = remember { Shutter() }
     val density = LocalDensity.current
     var topHeight by remember { mutableStateOf(0.dp) }
     var bottomHeight by remember { mutableStateOf(0.dp) }
@@ -85,6 +90,7 @@ fun CameraScreen(
             LiveCamera(
                 viewModel,
                 cards = inventory.takeIf { inventoryOn },
+                shutter = shutter,
                 seen = if (inventoryOn) inventoryState.seen else emptySet(),
                 reservedTop = topHeight,
                 reservedBottom = bottomHeight,
@@ -118,10 +124,46 @@ fun CameraScreen(
                 modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = topHeight),
             )
         }
-        inventoryState.card?.takeIf { inventoryOn }?.let { tag ->
-            PlantCardSheet(tag, state, inventoryState, onSeen = inventory::markSeen, onDismiss = inventory::closeCard)
-        }
+        if (inventoryOn) InventorySheets(state, inventoryState, inventory, photos, shutter)
     }
+}
+
+/**
+ * Inventory mode's sheets: the card of a tapped label, whose "Take photo" takes one and closes
+ * it, and then the photo's review.
+ */
+@Composable
+private fun InventorySheets(
+    camera: CameraUiState,
+    inventory: InventoryUiState,
+    cards: InventoryViewModel,
+    photos: PhotoViewModel,
+    shutter: Shutter,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val review by photos.review.collectAsStateWithLifecycle()
+    inventory.card?.let { tag ->
+        PlantCardSheet(
+            tag,
+            camera,
+            inventory,
+            onSeen = cards::markSeen,
+            onTakePhoto = {
+                cards.closeCard()
+                scope.launch {
+                    try {
+                        shutter.take(context)?.let { photos.taken(tag.value, it) }
+                    } catch (e: ImageCaptureException) {
+                        val message = context.getString(R.string.capture_failed, e.message.orEmpty())
+                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
+            onDismiss = cards::closeCard,
+        )
+    }
+    review?.let { PhotoReviewSheet(it, camera, photos) }
 }
 
 /** Asks for the camera once; shows [camera] when it is granted, else why the app needs it. */
@@ -168,21 +210,66 @@ private fun CameraBottom(
     }
 }
 
-/** The preview and its overlay; [cards] opens a plant's card on a tap in inventory mode, else null. */
+/**
+ * The preview and its overlay. In inventory mode, [cards] opens a plant's card on a tap (else it
+ * is null), and the camera also takes photos through [shutter].
+ */
 @Composable
 private fun LiveCamera(
     viewModel: CameraViewModel,
     cards: InventoryViewModel?,
+    shutter: Shutter,
     seen: Set<String>,
     reservedTop: Dp,
     reservedBottom: Dp,
 ) {
     val context = LocalContext.current
     val texts = rememberCaptionTexts()
-    val lifecycleOwner = LocalLifecycleOwner.current
     val haptics = LocalHapticFeedback.current
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    val controller = rememberLiveController(viewModel, state, capture = cards != null, shutter)
+
+    // Haptic tick when a label locks.
+    val lockedCode = (state.selection as? SingleTargetSelector.State.Locked)?.target?.code
+    LaunchedEffect(lockedCode) {
+        if (lockedCode != null) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+
+    Box(Modifier.fillMaxSize().pickOnTap(viewModel, cards, context, texts)) {
+        AndroidView(
+            factory = { ctx ->
+                PreviewView(ctx).apply {
+                    scaleType = PreviewView.ScaleType.FILL_CENTER
+                    this.controller = controller
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+        TagOverlay(
+            state,
+            Modifier.fillMaxSize(),
+            reservedTop = reservedTop,
+            reservedBottom = reservedBottom,
+            seen = seen,
+        )
+    }
+}
+
+/**
+ * The camera controller of the live screen, bound to the lifecycle with the decoder on its
+ * analysis frames, following the chosen resolution and torch; with [capture], it also takes
+ * photos for [shutter].
+ */
+@Composable
+private fun rememberLiveController(
+    viewModel: CameraViewModel,
+    state: CameraUiState,
+    capture: Boolean,
+    shutter: Shutter,
+): LifecycleCameraController {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val controller = remember {
         LifecycleCameraController(context).apply {
             setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
@@ -216,30 +303,16 @@ private fun LiveCamera(
 
     LaunchedEffect(controller, state.torch) { controller.enableTorch(state.torch) }
 
-    // Haptic tick when a label locks.
-    val lockedCode = (state.selection as? SingleTargetSelector.State.Locked)?.target?.code
-    LaunchedEffect(lockedCode) {
-        if (lockedCode != null) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+    // Inventory mode adds photo capture: the camera rebinds, and analysis goes on as before.
+    LaunchedEffect(controller, capture) {
+        val photos = if (capture) CameraController.IMAGE_CAPTURE else 0
+        controller.setEnabledUseCases(CameraController.IMAGE_ANALYSIS or photos)
     }
-
-    Box(Modifier.fillMaxSize().pickOnTap(viewModel, cards, context, texts)) {
-        AndroidView(
-            factory = { ctx ->
-                PreviewView(ctx).apply {
-                    scaleType = PreviewView.ScaleType.FILL_CENTER
-                    this.controller = controller
-                }
-            },
-            modifier = Modifier.fillMaxSize(),
-        )
-        TagOverlay(
-            state,
-            Modifier.fillMaxSize(),
-            reservedTop = reservedTop,
-            reservedBottom = reservedBottom,
-            seen = seen,
-        )
+    DisposableEffect(controller) {
+        shutter.controller = controller
+        onDispose { shutter.controller = null }
     }
+    return controller
 }
 
 /**
