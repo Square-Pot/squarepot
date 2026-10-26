@@ -462,7 +462,13 @@
             "type": "integer",
             "minimum": 0.0,
             "title": "Plant Count",
-            "description": "Number of imported plants."
+            "description": "Number of plants in the collection: imported plants without a `status`."
+          },
+          "former_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Former Count",
+            "description": "Number of former plants: imported plants with a `status`, such as dead or sold. They are served like any other plant."
           },
           "synced_at": {
             "anyOf": [
@@ -525,6 +531,7 @@
           "id",
           "name",
           "plant_count",
+          "former_count",
           "synced_at",
           "error",
           "custom_columns",
@@ -710,6 +717,15 @@
             "title": "Pattern",
             "description": "Regular expression a value matches."
           },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/FieldValue"
+            },
+            "type": "array",
+            "title": "Values",
+            "description": "The allowed values, when the field takes a fixed set: a cell matching a value's `key` or one of its `aliases`, ignoring case, is stored as its `key`; any other is invalid. Empty for free values.",
+            "default": []
+          },
           "display": {
             "$ref": "#/components/schemas/Display"
           }
@@ -782,6 +798,39 @@
           "decimal"
         ],
         "title": "FieldType"
+      },
+      "FieldValue": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Key",
+            "description": "The value as stored and served in `Plant.fields`.",
+            "examples": [
+              "genus"
+            ]
+          },
+          "label": {
+            "$ref": "#/components/schemas/Label"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases",
+            "description": "Other words accepted on read, in lower case, such as Russian ones.",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "FieldValue",
+        "description": "One allowed value of a field that takes a fixed set of values."
       },
       "Health": {
         "properties": {
@@ -1454,6 +1503,22 @@
               }
             ]
           },
+          "status_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Since",
+            "description": "Since when the plant has its `status` (`fields.status`): the sheet's `status_date` when it has one, otherwise the day the server first saw this status in the sheet. `null` for a plant without a status.",
+            "examples": [
+              "2025-06-14"
+            ]
+          },
           "invalid": {
             "additionalProperties": {
               "$ref": "#/components/schemas/InvalidCell"
@@ -1481,6 +1546,7 @@
           "row",
           "fields",
           "custom",
+          "status_since",
           "invalid"
         ],
         "title": "Plant",

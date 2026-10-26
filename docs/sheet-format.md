@@ -126,6 +126,42 @@ one, the default. It is read case-insensitively, and any other value is
 reported as invalid, so the plant gets the default. Choosing a template when
 printing overrides it.
 
+## The status
+
+The optional `status` column marks a plant that is no longer in the
+collection. An empty cell means the plant is in it. The other values are:
+
+| Value | Shown as | Also read |
+| --- | --- | --- |
+| `dead` | Dead / Погиб | `погиб`, `умер` |
+| `gifted` | Gifted / Подарен | `подарен` |
+| `sold` | Sold / Продан | `продан` |
+| `lost` | Lost / Потерян | `потерян` |
+
+Values are read ignoring case, and the Russian words are read as their value;
+the sheet keeps what the owner typed. Any other value is reported as invalid,
+and the plant counts as being in the collection, so that nothing leaves the
+collection unnoticed.
+
+The date comes by itself: Square-Pot notes the day it first sees a status in
+the sheet, or sees it change to another one, and shows it with the status.
+Nothing is written to the sheet. To give the date yourself, use the optional
+`status_date` column: a date there always wins. For a plant without a
+number, Square-Pot recognises the row by its contents, so editing the row
+again gives the date of that edit; use `status_date` to keep the real one.
+
+A plant with a status is a former plant. It is left out of the collection's
+plant count and counted apart, and its number stays registered and is never
+issued to another plant. Every plant, former or not, is still served to the
+apps with its status and the date.
+
+Planned in the apps and not built yet:
+
+- lists and searches leave former plants out unless the owner asks to see
+  them, but looking up a number always finds its plant;
+- the camera still recognises a former plant's label, and shows its status;
+- printing does not select former plants unless the owner picks them.
+
 ## How Square-Pot writes
 
 Square-Pot writes to the sheet only when a user acts, never on its own.

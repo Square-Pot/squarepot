@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -162,6 +163,71 @@ def test_a_store_failure_keeps_the_copy_and_reports_it(
     store.failing.clear()
     runtime(client).syncer.run_once()
     assert sync(client, body["cursor"])["collections"][0]["error"] is None
+
+
+def test_former_plants_are_counted_apart_and_still_served(
+    client: TestClient, store: FakeStore
+) -> None:
+    store.put(
+        "main",
+        [
+            ["tag", "genus", "status", "status_date"],
+            [4217, "Lithops", "", ""],
+            [4218, "Conophytum", "dead", "2025-06-14"],
+            [4219, "Lithops", "sold", ""],
+        ],
+    )
+    runtime(client).syncer.run_once()
+    body = sync(client)
+    [main] = body["collections"]
+    assert (main["plant_count"], main["former_count"]) == (1, 2)
+    assert len(body["plants"]) == 3
+    plants = client.get("/api/v1/plants/by-tag/004218").json()["plants"]
+    assert plants[0]["fields"]["status"] == "dead"
+    assert plants[0]["status_since"] == "2025-06-14"
+
+
+def test_the_server_records_since_when_a_plant_has_its_status(
+    client: TestClient, store: FakeStore
+) -> None:
+    def since(tag: str) -> Any:
+        return client.get(f"/api/v1/plants/by-tag/{tag}").json()["plants"][0]["status_since"]
+
+    def put(status: str, notes: str = "", status_date: str = "") -> None:
+        store.put(
+            "main",
+            [
+                ["tag", "genus", "status", "notes", "status_date"],
+                [4217, "Lithops", status, notes, status_date],
+            ],
+        )
+
+    syncer = runtime(client).syncer
+    syncer.clock = lambda: datetime(2026, 10, 25, 12, tzinfo=UTC)
+    put("")
+    syncer.run_once()
+    assert since("004217") is None
+
+    put("dead")
+    syncer.run_once()
+    assert since("004217") == "2026-10-25"
+
+    # Another edit keeps the day; a different status starts a new one.
+    syncer.clock = lambda: datetime(2026, 11, 2, 12, tzinfo=UTC)
+    put("dead", notes="a pity")
+    syncer.run_once()
+    assert since("004217") == "2026-10-25"
+    put("gifted")
+    syncer.run_once()
+    assert since("004217") == "2026-11-02"
+
+    # A date in the sheet wins; without a status there is none.
+    put("gifted", status_date="2026-10-30")
+    syncer.run_once()
+    assert since("004217") == "2026-10-30"
+    put("")
+    syncer.run_once()
+    assert since("004217") is None
 
 
 def test_a_broken_tab_keeps_the_copy_and_reports_it(client: TestClient, store: FakeStore) -> None:

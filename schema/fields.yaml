@@ -22,6 +22,10 @@
 #     aliases     other headers accepted on read (legacy sheets); never written
 #     required    the column must exist, and a row whose cell is empty is
 #                 reported and skipped (see docs/sheet-format.md)
+#     values      the allowed values, when the field takes a fixed set: each
+#                 has a key (stored and served), a label per UI language and
+#                 aliases (other words accepted on read, such as Russian ones);
+#                 matching ignores case
 #     group       basic | extra; basic fields are the core description of a
 #                 plant, extra fields are additional detail. Presets decide what
 #                 is shown; the group only orders and groups fields in the UI.
@@ -174,6 +178,37 @@ fields:
       lower case. Choosing a template when printing overrides it.
     pattern: "^[hv]$"
 
+  - key: status
+    type: text
+    label: {en: Status, ru: Статус}
+    group: extra
+    description: >-
+      Why the plant is no longer in the collection. Empty means it is. A plant
+      with a status is left out of counts and of default lists and searches,
+      but is still served, found by its number and recognised by the camera.
+      Its number is never issued again.
+    values:
+      - key: dead
+        label: {en: Dead, ru: Погиб}
+        aliases: [погиб, умер]
+      - key: gifted
+        label: {en: Gifted, ru: Подарен}
+        aliases: [подарен]
+      - key: sold
+        label: {en: Sold, ru: Продан}
+        aliases: [продан]
+      - key: lost
+        label: {en: Lost, ru: Потерян}
+        aliases: [потерян]
+
+  - key: status_date
+    type: date
+    label: {en: Status date, ru: Дата выбытия}
+    group: extra
+    description: >-
+      When the plant died, or was given away, sold or lost. Optional: without
+      it, Square-Pot shows the day it first saw the status in the sheet.
+
 computed:
   - key: name
     label: {en: Name, ru: Название}
@@ -207,4 +242,4 @@ presets:
     fields: [tag, field_number, name, ex, locality, age]
   - key: full
     label: {en: Full, ru: Полная}
-    fields: [tag, field_number, name, synonym, ex, locality, source, seeding_date, purchase_date, price, currency, age, notes, description]
+    fields: [tag, field_number, name, synonym, ex, locality, source, seeding_date, purchase_date, price, currency, age, notes, description, status, status_date]

@@ -30,7 +30,7 @@ from squarepot_server.db import (
     next_seq,
     set_meta,
 )
-from squarepot_server.fields import Issue, ParsedTab, Row, TabError, parse_tab
+from squarepot_server.fields import STATUS, Issue, ParsedTab, Row, TabError, parse_tab
 from squarepot_server.store import CollectionStore, StoreError
 
 log = logging.getLogger(__name__)
@@ -145,7 +145,9 @@ class Syncer:
                     parsed = parse_tab(self.schema, self.store.read(collection))
                     self.apply(session, collection.id, parsed)
                     row.store_version = version
-                    row.plant_count = len(parsed.rows)
+                    former = sum(STATUS in plant.fields for plant in parsed.rows)
+                    row.plant_count = len(parsed.rows) - former
+                    row.former_count = former
                     row.issues = [issue_json(issue) for issue in parsed.issues]
                     row.custom_columns = parsed.custom_columns
                 row.error = None
@@ -163,10 +165,13 @@ class Syncer:
                 select(PlantRow).where(PlantRow.collection_id == collection_id)
             )
         }
+        # The day a status is first seen, for plants whose sheet gives no status_date.
+        today = self.clock().date()
         seen = set()
         for plant_id, row in zip(plant_ids(collection_id, parsed.rows), parsed.rows, strict=True):
             seen.add(plant_id)
             plant = existing.get(plant_id)
+            status = row.fields.get(STATUS)
             if plant is None:
                 session.add(
                     PlantRow(
@@ -178,10 +183,12 @@ class Syncer:
                         fields=row.fields,
                         custom=row.custom,
                         invalid=row.invalid,
+                        status_seen=status,
+                        status_since=today if status else None,
                     )
                 )
                 continue
-            new = (row.tag, row.row, row.fields, row.custom, row.invalid)
+            new = (row.tag, row.row, row.fields, row.custom, row.invalid, status)
             if (
                 not plant.removed
                 and (
@@ -190,11 +197,15 @@ class Syncer:
                     plant.fields,
                     plant.custom,
                     plant.invalid,
+                    plant.status_seen,
                 )
                 == new
             ):
                 continue
-            plant.tag, plant.row, plant.fields, plant.custom, plant.invalid = new
+            if status != plant.status_seen:
+                plant.status_seen = status
+                plant.status_since = today if status else None
+            plant.tag, plant.row, plant.fields, plant.custom, plant.invalid = new[:5]
             plant.removed = False
             plant.seq = next_seq(session)
         for plant_id, plant in existing.items():

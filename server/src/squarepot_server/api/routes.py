@@ -7,6 +7,7 @@ import logging
 import re
 import secrets
 from collections.abc import Iterator
+from datetime import date
 from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
@@ -31,6 +32,7 @@ from squarepot_server.api.models import (
 )
 from squarepot_server.backoff import client_key
 from squarepot_server.db import CollectionRow, PlantRow, current_seq, get_meta
+from squarepot_server.fields import STATUS, STATUS_DATE
 from squarepot_server.labels.caption import NAME, caption, entries, extra_text
 from squarepot_server.labels.layout import TEMPLATES, Item, LayoutError, Page, layout_pages
 from squarepot_server.labels.render import to_pdf, to_svg
@@ -106,6 +108,7 @@ def to_collection(row: CollectionRow, runtime: Runtime) -> Collection:
         id=row.id,
         name=row.name,
         plant_count=row.plant_count,
+        former_count=row.former_count,
         synced_at=row.synced_at,
         error=row.error,
         custom_columns=row.custom_columns,
@@ -122,7 +125,17 @@ def to_plant(row: PlantRow) -> Plant:
         fields=row.fields,
         custom=row.custom,
         invalid=row.invalid,
+        status_since=status_since(row),
     )
+
+
+def status_since(row: PlantRow) -> date | None:
+    """The sheet's status date wins over the day the server first saw the status."""
+    if STATUS not in row.fields:
+        return None
+    if STATUS_DATE in row.fields:
+        return date.fromisoformat(row.fields[STATUS_DATE])
+    return row.status_since
 
 
 def make_cursor(session: Session, seq: int) -> str:

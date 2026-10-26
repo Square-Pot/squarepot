@@ -7,6 +7,7 @@ the Android app, the bot and the web app are built against that file.
 
 from __future__ import annotations
 
+from datetime import date
 from enum import StrEnum
 from typing import Annotated, Literal
 
@@ -76,6 +77,17 @@ class Display(ApiModel):
     )
 
 
+class FieldValue(ApiModel):
+    """One allowed value of a field that takes a fixed set of values."""
+
+    key: Key = Field(description="The value as stored and served in `Plant.fields`.")
+    label: Label
+    aliases: list[str] = Field(
+        default=[],
+        description="Other words accepted on read, in lower case, such as Russian ones.",
+    )
+
+
 class FieldDefinition(ApiModel):
     key: Key = Field(description="Column header in the sheet and key in `Plant.fields`.")
     type: FieldType
@@ -85,6 +97,14 @@ class FieldDefinition(ApiModel):
     required: bool = False
     group: FieldGroup
     pattern: str | None = Field(default=None, description="Regular expression a value matches.")
+    values: list[FieldValue] = Field(
+        default=[],
+        description=(
+            "The allowed values, when the field takes a fixed set: a cell matching a value's "
+            "`key` or one of its `aliases`, ignoring case, is stored as its `key`; any other "
+            "is invalid. Empty for free values."
+        ),
+    )
     display: Display = Field(default_factory=Display)
 
 
@@ -138,7 +158,17 @@ class Collection(ApiModel):
 
     id: str = Field(description="Opaque, stable collection id.", examples=["main"])
     name: str = Field(description="Display name chosen by the owner.", examples=["Lithops"])
-    plant_count: int = Field(ge=0, description="Number of imported plants.")
+    plant_count: int = Field(
+        ge=0,
+        description="Number of plants in the collection: imported plants without a `status`.",
+    )
+    former_count: int = Field(
+        ge=0,
+        description=(
+            "Number of former plants: imported plants with a `status`, such as dead or sold. "
+            "They are served like any other plant."
+        ),
+    )
     synced_at: AwareDatetime | None = Field(
         description=(
             "When the server last confirmed that its copy matches the sheet: the last "
@@ -197,6 +227,14 @@ class Plant(ApiModel):
             "them. Empty cells are omitted."
         ),
         examples=[{"Marathon": "yes", "soil": "pumice 70%"}],
+    )
+    status_since: date | None = Field(
+        description=(
+            "Since when the plant has its `status` (`fields.status`): the sheet's "
+            "`status_date` when it has one, otherwise the day the server first saw this "
+            "status in the sheet. `null` for a plant without a status."
+        ),
+        examples=["2025-06-14"],
     )
     invalid: dict[str, InvalidCell] = Field(
         description=(

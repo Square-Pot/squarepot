@@ -13,7 +13,7 @@ database sequence instead.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any, ClassVar
 
 from sqlalchemy import (
@@ -73,7 +73,9 @@ class CollectionRow(Base):
     store_version: Mapped[str | None] = mapped_column(Text)
     synced_at: Mapped[datetime | None]
     error: Mapped[str | None] = mapped_column(Text)
+    # Plants without and with a status (docs/sheet-format.md, "The status").
     plant_count: Mapped[int] = mapped_column(default=0)
+    former_count: Mapped[int] = mapped_column(default=0)
     # Per-cell problems of the last read, as {"row", "column", "message"} objects.
     issues: Mapped[list[Any]] = mapped_column(default=list)
     # Names of the tab's custom columns, in column order.
@@ -94,6 +96,9 @@ class PlantRow(Base):
     custom: Mapped[dict[str, Any]] = mapped_column(default=dict)
     # Cells the import rejected, by field: {"cell", "value", "reason"}.
     invalid: Mapped[dict[str, Any]] = mapped_column(default=dict)
+    # The status as last seen, and the day it was first seen so; both null without one.
+    status_seen: Mapped[str | None] = mapped_column(Text)
+    status_since: Mapped[date | None]
 
 
 class RegisteredTag(Base):

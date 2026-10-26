@@ -46,6 +46,7 @@
         "required": {"type": "boolean"},
         "group": {"enum": ["basic", "extra"]},
         "pattern": {"type": "string", "format": "regex"},
+        "values": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/value"}},
         "display": {
           "type": "object",
           "additionalProperties": false,
@@ -55,6 +56,20 @@
             "quote": {"type": "boolean"},
             "case": {"enum": ["lower", "title", "upper", "as-is"]}
           }
+        }
+      }
+    },
+    "value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label"],
+      "properties": {
+        "key": {"$ref": "#/$defs/key"},
+        "label": {"$ref": "#/$defs/label"},
+        "aliases": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
         }
       }
     },

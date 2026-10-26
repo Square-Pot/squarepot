@@ -85,5 +85,14 @@ export function plant(
   custom: Record<string, string> = {},
   invalid: Plant["invalid"] = {},
 ): Plant {
-  return { id: `main:${String(row)}`, collection_id: "main", tag, row, fields, custom, invalid };
+  return {
+    id: `main:${String(row)}`,
+    collection_id: "main",
+    tag,
+    row,
+    fields,
+    custom,
+    invalid,
+    status_since: null,
+  };
 }

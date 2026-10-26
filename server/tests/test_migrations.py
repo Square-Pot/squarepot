@@ -50,3 +50,25 @@ def test_custom_columns_come_to_an_existing_database(tmp_path: Path) -> None:
     # The tab is read again on the next sync, which brings in its custom columns.
     assert tuple(collection) == (None, "[]")
     assert tuple(plant) == ('{"genus": "Lithops"}', "{}")
+
+
+def test_former_plants_come_to_an_existing_database(tmp_path: Path) -> None:
+    engine = make_engine(f"sqlite:///{tmp_path / 'db.sqlite'}")
+    config = Config()
+    config.set_main_option("script_location", str(MIGRATIONS))
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.upgrade(config, "0003")
+        connection.execute(
+            text(
+                "INSERT INTO collections (id, name, seq, removed, store_version, plant_count, "
+                "issues, custom_columns) VALUES ('main', 'Main', 1, 0, '7', 1, '[]', '[]')"
+            )
+        )
+    migrate(engine)
+    with engine.connect() as connection:
+        collection = connection.execute(
+            text("SELECT store_version, plant_count, former_count FROM collections")
+        ).one()
+    # The tab is read again on the next sync, which takes both counts.
+    assert tuple(collection) == (None, 1, 0)

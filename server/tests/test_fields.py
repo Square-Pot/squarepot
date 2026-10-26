@@ -105,11 +105,12 @@ def test_every_imported_key_comes_from_the_schema(schema: FieldSchema) -> None:
     keys = [field.key for field in schema.fields]
     values: list[Cell] = ["x"] * len(keys)
     values[keys.index("tag")] = 4217
-    for key in ("seeding_date", "purchase_date"):
+    for key in ("seeding_date", "purchase_date", "status_date"):
         values[keys.index(key)] = "2024-03-15"
     values[keys.index("price")] = 12.5
     values[keys.index("currency")] = "eur"
     values[keys.index("label_type")] = "h"
+    values[keys.index("status")] = "dead"
     parsed = parse_tab(schema, [list(keys), values])
     assert parsed.issues == []
     [row] = parsed.rows
@@ -233,6 +234,27 @@ def test_an_unknown_label_type_is_reported(schema: FieldSchema) -> None:
     parsed = parse_tab(schema, [["genus", "label_type"], ["Lithops", "horizontal"]])
     assert parsed.rows[0].fields == {"genus": "Lithops"}
     assert [issue.column for issue in parsed.issues] == ["B"]
+
+
+@pytest.mark.parametrize(
+    ("cell", "status"),
+    [
+        ("dead", "dead"),
+        (" Sold ", "sold"),
+        ("Погиб", "dead"),
+        ("умер", "dead"),
+        ("ПОДАРЕН", "gifted"),
+    ],
+)
+def test_a_status_is_stored_as_its_key(schema: FieldSchema, cell: str, status: str) -> None:
+    assert one(schema, ["genus", "status"], ["Lithops", cell])["status"] == status
+
+
+def test_an_unknown_status_is_reported_and_the_plant_stays(schema: FieldSchema) -> None:
+    parsed = parse_tab(schema, [["genus", "status"], ["Lithops", "болеет"]])
+    [row] = parsed.rows
+    assert row.fields == {"genus": "Lithops"}
+    assert row.invalid["status"]["reason"] == "not one of dead, gifted, sold, lost"
 
 
 def test_number_cells_in_text_fields_read_as_text(schema: FieldSchema) -> None:

@@ -23,6 +23,9 @@ SERIAL_EPOCH = date(1899, 12, 30)
 ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LEGACY_DATE = re.compile(r"^(\d{1,2})\.(\d{1,2})\.(\d{4})$")
 TAG = "tag"
+# A plant with any value in this field is no longer in the collection.
+STATUS = "status"
+STATUS_DATE = "status_date"
 ELLIPSIS = "…"
 # Custom columns: the most per tab, the longest name, and the longest value kept.
 MAX_CUSTOM_COLUMNS = 50
@@ -128,6 +131,12 @@ def read_text(definition: FieldDefinition, cell: Cell) -> str:
         text = text.upper()
     elif definition.key == "label_type":
         text = text.lower()
+    if definition.values:
+        folded = text.casefold()
+        for value in definition.values:
+            if folded == value.key or folded in (alias.casefold() for alias in value.aliases):
+                return value.key
+        raise InvalidValue(f"not one of {', '.join(value.key for value in definition.values)}")
     if definition.pattern and not re.fullmatch(definition.pattern, text):
         raise InvalidValue(f"does not match {definition.pattern}")
     return text

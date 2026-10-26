@@ -3,7 +3,8 @@
 
 JSON Schema validates the shape of the file; this script checks what JSON
 Schema cannot: that keys are unique, that aliases do not collide with keys,
-and that computed fields and presets refer only to keys that exist.
+that computed fields and presets refer only to keys that exist, and that a
+field's allowed values are distinct.
 
 Usage:
     python schema/check_fields.py [PATH]   check a schema file (default: schema/fields.yaml)
@@ -51,6 +52,16 @@ def check(schema: dict[str, Any]) -> list[str]:
             if ref not in field_keys:
                 errors.append(f"computed field '{item['key']}': unknown field '{ref}'")
 
+    for field in fields:
+        if "values" in field and field["type"] != "text":
+            errors.append(f"field '{field['key']}': values are only for text fields")
+        words: set[str] = set()
+        for value in field.get("values", []):
+            for word in [value["key"], *value.get("aliases", [])]:
+                if word.casefold() in words:
+                    errors.append(f"field '{field['key']}': value '{word}' is listed twice")
+                words.add(word.casefold())
+
     displayable = field_keys | {item["key"] for item in computed}
     preset_keys: set[str] = set()
     for preset in presets:
@@ -87,6 +98,10 @@ def self_test(schema: dict[str, Any]) -> list[str]:
     def set_duplicate_preset(s: dict[str, Any]) -> None:
         s["presets"].append(copy.deepcopy(s["presets"][0]))
 
+    def set_duplicate_value(s: dict[str, Any]) -> None:
+        field = next(f for f in s["fields"] if "values" in f)
+        field["values"][1].setdefault("aliases", []).append(field["values"][0]["key"].upper())
+
     breakages = [
         set_preset_ref,
         set_computed_ref,
@@ -94,6 +109,7 @@ def self_test(schema: dict[str, Any]) -> list[str]:
         set_alias_collision,
         set_computed_collision,
         set_duplicate_preset,
+        set_duplicate_value,
     ]
     missed: list[str] = []
     for breakage in breakages:

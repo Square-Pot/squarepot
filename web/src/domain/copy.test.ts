@@ -8,6 +8,7 @@ const MAIN: Collection = {
   id: "main",
   name: "Main",
   plant_count: 2,
+  former_count: 0,
   synced_at: null,
   error: null,
   custom_columns: [],
