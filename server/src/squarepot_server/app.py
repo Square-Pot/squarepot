@@ -15,7 +15,7 @@ from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException
 
 from squarepot_server import __version__, web
-from squarepot_server.api import photo_routes, routes
+from squarepot_server.api import inventory_routes, photo_routes, routes
 from squarepot_server.api.models import Error
 from squarepot_server.config import Settings, get_settings
 from squarepot_server.runtime import Runtime
@@ -103,6 +103,7 @@ def create_app(settings: Settings | None = None, store: CollectionStore | None =
     app.include_router(routes.router)
     app.include_router(photo_routes.public)
     app.include_router(photo_routes.router)
+    app.include_router(inventory_routes.router)
     # The web app answers whatever no route matches, routes added later included.
     app.router.default = web.serve
     return app

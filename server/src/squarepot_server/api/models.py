@@ -244,6 +244,12 @@ class Plant(ApiModel):
         ),
         examples=["2025-06-14"],
     )
+    last_seen: AwareDatetime | None = Field(
+        description=(
+            "When the plant was last seen: its newest sighting or the time its newest photo "
+            "was taken, whichever is later (ADR 0008). `null` when it was never seen."
+        )
+    )
     photo_count: int = Field(
         ge=0,
         description=(
@@ -440,6 +446,44 @@ class PhotoChange(ApiModel):
 class MainPhotoChoice(ApiModel):
     photo_id: UUID | None = Field(
         description="The photo to show for the plant; `null` shows the newest again."
+    )
+
+
+class SightingKind(StrEnum):
+    SEEN = "seen"
+    STATUS = "status"
+
+
+class Sighting(ApiModel):
+    """The owner saw the plant with this number (ADR 0008). A photo is a sighting by itself."""
+
+    id: UUID = Field(description="Chosen by the client: sending it again records nothing new.")
+    tag: Tag
+    seen_at: AwareDatetime = Field(
+        description="When the plant was seen; a time in the future counts as the time received."
+    )
+    kind: SightingKind = Field(
+        description="`seen`: marked as seen without a photo. `status`: its status was set."
+    )
+
+
+class SightingBatch(ApiModel):
+    sightings: list[Sighting] = Field(min_length=1, max_length=500)
+
+
+class SightingOutcome(StrEnum):
+    RECORDED = "recorded"
+    ALREADY_RECORDED = "already_recorded"
+    UNKNOWN_NUMBER = "unknown_number"
+
+
+class SightingResult(ApiModel):
+    id: UUID
+    result: SightingOutcome = Field(
+        description=(
+            "`unknown_number`: no plant has the number, so nothing was recorded; the client "
+            "can drop the sighting from its queue as for the others."
+        )
     )
 
 
