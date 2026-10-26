@@ -2,11 +2,15 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Collection, FieldSchema } from "../api/types";
 import { age } from "../domain/names";
+import { localDay } from "../domain/photos";
 import {
+  clearFilters,
   facets as countFacets,
   fieldNumberMatches,
   filterCount,
+  isFormer,
   own,
+  PHOTO_AGES,
   tagMatch,
   type Facets,
   type ListState,
@@ -46,9 +50,12 @@ export function ListView({ schema, collection, rows, now, result, state, onState
   const shown = paging.key === listKey ? paging.shown : PAGE;
   const query = state.q.trim();
   const filters = filterCount(state);
-  const facets = countFacets(rows, state, collection.custom_columns);
+  const facets = countFacets(rows, state, collection.custom_columns, now);
   const page = result.slice(0, shown);
-  const untagged = rows.filter((row) => !row.plant.tag).length;
+  // Former plants are left out of the counts, as of the default list.
+  const active = rows.filter((row) => !isFormer(row));
+  const untagged = active.filter((row) => !row.plant.tag).length;
+  const former = rows.length - active.length;
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -66,6 +73,8 @@ export function ListView({ schema, collection, rows, now, result, state, onState
 
   const columnLabel = (key: string): string => {
     if (key.startsWith("c:")) return key.slice(2);
+    if (key === "last_photo") return t("Последнее фото", "Last photo");
+    if (key === "last_seen") return t("Видели", "Seen");
     const field =
       schema.fields.find((definition) => definition.key === key) ??
       schema.computed.find((definition) => definition.key === key);
@@ -98,6 +107,25 @@ export function ListView({ schema, collection, rows, now, result, state, onState
           >
             <Name runs={row.name} query={query} />
           </a>
+        </td>
+      );
+    }
+    if (key === "last_photo") {
+      if (!plant.last_photo) return <td key={key} className="dt"><span className="none">{t("нет", "none")}</span></td>;
+      const old = new Date(now);
+      old.setMonth(old.getMonth() - state.photoAge);
+      return (
+        <td key={key} className="dt">
+          <span className={Date.parse(plant.last_photo) < old.getTime() ? "warn" : ""}>{format.day(plant.last_photo)}</span>
+        </td>
+      );
+    }
+    if (key === "last_seen") {
+      if (!plant.last_seen) return <td key={key} className="dt"><span className="warn">{t("никогда", "never")}</span></td>;
+      const before = state.seen === "since" && state.since && localDay(plant.last_seen) < state.since;
+      return (
+        <td key={key} className="dt">
+          <span className={before ? "warn" : ""}>{format.day(plant.last_seen)}</span>
         </td>
       );
     }
@@ -136,7 +164,7 @@ export function ListView({ schema, collection, rows, now, result, state, onState
   };
 
   const facetPanel = (where: string) => (
-    <FacetPanel facets={facets} state={state} onState={onState} where={where} />
+    <FacetPanel facets={facets} state={state} onState={onState} where={where} now={now} />
   );
 
   return (
@@ -221,12 +249,13 @@ export function ListView({ schema, collection, rows, now, result, state, onState
             <>
               {t("Найдено ", "")}
               <b>{result.length}</b>
-              {t(` из ${String(rows.length)}`, ` of ${String(rows.length)} match`)}
+              {t(` из ${String(active.length)}`, ` of ${String(active.length)} match`)}
             </>
           ) : (
             <>
-              <b>{rows.length}</b>
+              <b>{active.length}</b>
               {t(` растений · ${String(untagged)} без номера`, ` plants · ${String(untagged)} without a number`)}
+              {former > 0 && t(` · ${String(former)} выбывших скрыто`, ` · ${String(former)} former hidden`)}
             </>
           )}
         </div>
@@ -314,7 +343,7 @@ export function ListView({ schema, collection, rows, now, result, state, onState
                 </button>
               )}
               {filters > 0 && (
-                <button className="btn sec" type="button" onClick={() => { onState({ ...state, genus: [], tagged: "all", custom: {} }); }}>
+                <button className="btn sec" type="button" onClick={() => { onState(clearFilters(state)); }}>
                   {t("Сбросить фильтры", "Clear the filters")}
                 </button>
               )}
@@ -350,7 +379,19 @@ const withCustom = (custom: Record<string, string[]>, column: string, values: st
 const toggle = (values: string[], value: string): string[] =>
   values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
 
-function FacetPanel({ facets, state, onState, where }: { facets: Facets; state: ListState; onState: (next: ListState) => void; where: string }) {
+function FacetPanel({
+  facets,
+  state,
+  onState,
+  where,
+  now,
+}: {
+  facets: Facets;
+  state: ListState;
+  onState: (next: ListState) => void;
+  where: string;
+  now: Date;
+}) {
   const { t } = useI18n();
   const [allGenera, setAllGenera] = useState(false);
   const genera = allGenera ? facets.genus : facets.genus.slice(0, 8);
@@ -363,7 +404,7 @@ function FacetPanel({ facets, state, onState, where }: { facets: Facets; state: 
       <div className="fhead">
         <p className="fttl">{t("Фильтры", "Filters")}</p>
         {filterCount(state) > 0 && (
-          <button className="more" type="button" onClick={() => { onState({ ...state, genus: [], tagged: "all", custom: {} }); }}>
+          <button className="more" type="button" onClick={() => { onState(clearFilters(state)); }}>
             {t("Сбросить", "Clear")}
           </button>
         )}
@@ -399,6 +440,88 @@ function FacetPanel({ facets, state, onState, where }: { facets: Facets; state: 
           </label>
         ))}
       </div>
+      <div className="fgroup">
+        <p className="fttl small">{t("Фото", "Photo")}</p>
+        {(
+          [
+            ["any", t("Любое", "Any")],
+            ["none", t("Нет фото", "No photo")],
+            ["old", t("Последнее старше…", "Last one older than…")],
+          ] as const
+        ).map(([value, text]) => (
+          <label key={value} className="fopt">
+            <input type="radio" name={`photo-${where}`} checked={state.photo === value} onChange={() => { onState({ ...state, photo: value }); }} />
+            <span>{text}</span>
+            <span className="c">{facets.photo[value]}</span>
+          </label>
+        ))}
+        <select
+          className="finp"
+          aria-label={t("Старше", "Older than")}
+          value={state.photoAge}
+          onChange={(event) => { onState({ ...state, photo: "old", photoAge: Number(event.target.value) }); }}
+        >
+          {PHOTO_AGES.map((months) => (
+            <option key={months} value={months}>
+              {months === 6 ? t("полугода", "six months") : months === 12 ? t("года", "a year") : t("двух лет", "two years")}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="fgroup">
+        <p className="fttl small">{t("Визит", "Visit")}</p>
+        {(
+          [
+            ["any", t("Любой", "Any")],
+            ["since", t("Не видели с…", "Not seen since…")],
+            ["never", t("Ни разу", "Never")],
+          ] as const
+        ).map(([value, text]) => (
+          <label key={value} className="fopt">
+            <input
+              type="radio"
+              name={`seen-${where}`}
+              checked={state.seen === value}
+              onChange={() => {
+                // «Since» starts a month back until a day is picked.
+                const monthAgo = new Date(now);
+                monthAgo.setMonth(monthAgo.getMonth() - 1);
+                onState({ ...state, seen: value, since: value === "since" ? state.since || localDay(monthAgo.toISOString()) : "" });
+              }}
+            />
+            <span>{text}</span>
+            <span className="c">{value === "since" && !state.since ? "" : facets.seen[value]}</span>
+          </label>
+        ))}
+        <input
+          className="finp"
+          type="date"
+          aria-label={t("Не видели с", "Not seen since")}
+          value={state.since}
+          onChange={(event) => {
+            const since = event.target.value;
+            onState({ ...state, seen: since ? "since" : "any", since });
+          }}
+        />
+        <p className="sub2">{t("Считает и визиты без фото, и снимки.", "Counts visits without a photo and photos alike.")}</p>
+      </div>
+      <div className="fgroup">
+        <p className="fttl small">{t("Выбывшие", "Former plants")}</p>
+        <p className="sub2">{t("Со статусом: погиб, подарен, продан, потерян", "With a status: dead, gifted, sold, lost")}</p>
+        {(
+          [
+            ["hide", t("Скрыть", "Hide")],
+            ["show", t("Показать тоже", "Show too")],
+            ["only", t("Только выбывшие", "Only them")],
+          ] as const
+        ).map(([value, text]) => (
+          <label key={value} className="fopt">
+            <input type="radio" name={`former-${where}`} checked={state.former === value} onChange={() => { onState({ ...state, former: value }); }} />
+            <span>{text}</span>
+            <span className="c">{facets.former[value]}</span>
+          </label>
+        ))}
+      </div>
       {facets.custom.length > 0 && (
         <div className="fgroup">
           <p className="fttl small">{t("Свои колонки", "Your columns")}</p>
@@ -431,6 +554,7 @@ function FacetPanel({ facets, state, onState, where }: { facets: Facets; state: 
 
 function ActiveFilters({ state, onState }: { state: ListState; onState: (next: ListState) => void }) {
   const { t } = useI18n();
+  const format = useFormat();
   const chips: { key: string; text: ReactNode; remove: () => void }[] = [
     ...state.genus.map((genus) => ({
       key: `g:${genus}`,
@@ -453,6 +577,28 @@ function ActiveFilters({ state, onState }: { state: ListState; onState: (next: L
       key: "tagged",
       text: state.tagged === "yes" ? t("С номером", "With a number") : t("Без номера", "Without a number"),
       remove: () => { onState({ ...state, tagged: "all" }); },
+    });
+  }
+  if (state.photo !== "any") {
+    const older = state.photoAge === 6 ? t("полугода", "six months") : state.photoAge === 12 ? t("года", "a year") : t("двух лет", "two years");
+    chips.push({
+      key: "photo",
+      text: state.photo === "none" ? t("Нет фото", "No photo") : t(`Фото старше ${older}`, `Photo older than ${older}`),
+      remove: () => { onState({ ...state, photo: "any" }); },
+    });
+  }
+  if (state.seen !== "any") {
+    chips.push({
+      key: "seen",
+      text: state.seen === "never" ? t("Ни разу не видели", "Never seen") : t(`Не видели с ${format.date(state.since)}`, `Not seen since ${format.date(state.since)}`),
+      remove: () => { onState({ ...state, seen: "any", since: "" }); },
+    });
+  }
+  if (state.former !== "hide") {
+    chips.push({
+      key: "former",
+      text: state.former === "only" ? t("Только выбывшие", "Only former plants") : t("С выбывшими", "With former plants"),
+      remove: () => { onState({ ...state, former: "hide" }); },
     });
   }
   return (

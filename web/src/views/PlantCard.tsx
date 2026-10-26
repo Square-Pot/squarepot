@@ -9,6 +9,7 @@ import { useI18n } from "../i18n";
 import { navigate, onLinkClick } from "../router";
 import { Icon, Name } from "./common";
 import { LabelPreview } from "./LabelPreview";
+import { Photos } from "./Photos";
 
 interface Props {
   schema: FieldSchema;
@@ -121,6 +122,8 @@ export function PlantCard({ schema, collection, templates, row, now, list, listH
           </div>
         </div>
       )}
+
+      <Photos key={plant.tag ?? plant.id} schema={schema} plant={plant} />
 
       <div className="cgrid">
         <div className="side-main">

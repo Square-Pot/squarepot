@@ -12,3 +12,4 @@ export type LabelTemplate = Schemas["LabelTemplate"];
 export type Sync = Schemas["Sync"];
 export type LocalizedLabel = Schemas["Label"];
 export type InvalidCell = Schemas["InvalidCell"];
+export type Photo = Schemas["Photo"];
