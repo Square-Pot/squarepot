@@ -34,12 +34,37 @@ in that copy, never over the network.
   server last read each sheet, with the sheet's error if its last read failed.
 - **Changing server.** A new server address drops the cursor, so the next sync
   replaces the whole copy.
+- **Inventory.** Each plant also carries when it was last seen (its newest
+  sighting or photo), its photo count, its newest and main photo, and since
+  when it has its status; each collection, whether its plants can be edited.
 - **Custom columns.** The copy also keeps each collection's own sheet columns
   (`custom_columns`) and every plant's values for them, so captions can show
   them offline.
 - **App updates.** When an update changes the copy's tables, the copy and its
   cursor are dropped, and the next sync downloads a full copy. There are no
   migrations to maintain: the server holds the data.
+
+## Queue
+
+What the owner records on a plant's card in inventory mode (ADR 0007, 0008)
+waits on the phone until the server has it, so a walk through a greenhouse
+without signal loses nothing.
+
+- **What.** Sightings ("seen, no photo", or a status set) and photos, each with
+  an id the phone chooses, so sending one again after a lost answer is
+  harmless. A photo's comment follows the photo.
+- **When.** As soon as something is added, at app start and after the server
+  settings change. Sending runs in WorkManager and waits for a network.
+  Sightings go out in batches of up to 500, then photos one at a time; then
+  the copy is synced, so it shows the plants' new `last_seen` and photo count.
+- **Refusals.** A number no plant has, a photo that is too large or that the
+  server cannot read, and a photo whose file is gone stay in the queue for the
+  owner to retry or discard; the rest of the queue goes on. Network and server
+  errors, and a busy server, stop sending and are retried with backoff.
+- **Kept apart from the copy.** The queue is its own database. It holds data
+  that exists nowhere else yet, so an app update never drops it: every change
+  to its tables comes with a migration. Sent items are kept for 90 days, so a
+  long walk still counts them as seen.
 
 Release builds talk to the server over HTTPS only. Debug builds also allow
 plain HTTP, for a demo server on the local network or on the emulator's host

@@ -48,6 +48,8 @@ data class CollectionDto(
     val error: String? = null,
     /** The sheet's own columns, which are not schema fields, in column order. */
     @SerialName("custom_columns") val customColumns: List<String> = emptyList(),
+    /** Whether plants can be edited through the API: only collections read with the service account (ADR 0006). */
+    val editable: Boolean = false,
 )
 
 @Serializable
@@ -61,6 +63,15 @@ data class PlantDto(
     val fields: Map<String, String> = emptyMap(),
     /** Values of the collection's custom columns by name, as the sheet shows them; empty cells are absent. */
     val custom: Map<String, String> = emptyMap(),
+    /** Since when the plant has its status (YYYY-MM-DD); null without a status. */
+    @SerialName("status_since") val statusSince: String? = null,
+    /** When the plant was last seen (ISO 8601): its newest sighting or photo; null when never seen. */
+    @SerialName("last_seen") val lastSeen: String? = null,
+    @SerialName("photo_count") val photoCount: Int = 0,
+    /** When the newest photo was taken (ISO 8601); null without photos. */
+    @SerialName("last_photo") val lastPhoto: String? = null,
+    /** The photo to show for the plant: the owner's choice, else the newest. */
+    @SerialName("main_photo_id") val mainPhotoId: String? = null,
 )
 
 /** `GET /api/v1/schema`: schema/fields.yaml as JSON. */
@@ -110,6 +121,47 @@ data class LabelDto(val en: String, val ru: String) {
     /** The label in [language] (an ISO 639 code), English when there is none. */
     fun forLanguage(language: String): String = if (language == "ru") ru else en
 }
+
+/** How a plant was seen without a photo (ADR 0008); a photo is a sighting by itself. */
+@Serializable
+enum class SightingKind {
+    /** Marked as seen without a photo. */
+    @SerialName("seen")
+    SEEN,
+
+    /** Its status was set. */
+    @SerialName("status")
+    STATUS,
+}
+
+/** One sighting for `POST /api/v1/sightings`; [id] is the client's, so a resend records nothing twice. */
+@Serializable
+data class SightingDto(
+    val id: String,
+    val tag: String,
+    @SerialName("seen_at") val seenAt: String,
+    val kind: SightingKind,
+)
+
+@Serializable
+data class SightingBatchDto(val sightings: List<SightingDto>)
+
+/** What the server did with a sighting: recorded, already_recorded or unknown_number. */
+@Serializable
+data class SightingResultDto(val id: String, val result: String)
+
+/** A photo as the server keeps it; only what the phone needs. */
+@Serializable
+data class PhotoDto(
+    val id: String,
+    val tag: String,
+    @SerialName("taken_at") val takenAt: String,
+    val comment: String? = null,
+)
+
+/** `PATCH /api/v1/photos/{id}`: an empty [comment] removes it. */
+@Serializable
+data class PhotoChangeDto(val comment: String)
 
 /** The body of every error response. */
 @Serializable

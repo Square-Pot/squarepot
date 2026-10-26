@@ -7,8 +7,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import okhttp3.HttpUrl
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 import java.io.IOException
 
 /**
@@ -36,13 +40,42 @@ class SquarepotApi(server: HttpUrl, private val token: String, private val clien
         ListSerializer(CollectionDto.serializer()),
     )
 
-    private suspend fun <T> get(path: String, serializer: KSerializer<T>, query: HttpUrl.Builder.() -> Unit = {}): T {
-        val url = base.newBuilder().addPathSegment(path).apply(query).build()
-        val request = Request.Builder()
-            .url(url)
-            .header("Authorization", "Bearer $token")
-            .header("Accept", "application/json")
-            .build()
+    /** Records [sightings], at most [MAX_SIGHTINGS]; each comes back with what the server did with it. */
+    suspend fun recordSightings(sightings: List<SightingDto>): List<SightingResultDto> = send(
+        request(url("sightings")).post(json(SightingBatchDto.serializer(), SightingBatchDto(sightings))),
+        ListSerializer(SightingResultDto.serializer()),
+    )
+
+    /**
+     * Uploads the JPEG [photo] of plant [tag] as photo [id], taken at [takenAt] (ISO 8601) unless the
+     * camera recorded the time. Sending the same [id] again changes nothing and returns the photo.
+     */
+    suspend fun uploadPhoto(id: String, tag: String, takenAt: String, photo: File): PhotoDto {
+        val url = url("photos", id) {
+            addQueryParameter("tag", tag)
+            addQueryParameter("taken_at", takenAt)
+        }
+        return send(request(url).put(photo.asRequestBody(JPEG)), PhotoDto.serializer())
+    }
+
+    suspend fun changePhotoComment(id: String, comment: String): PhotoDto = send(
+        request(url("photos", id)).patch(json(PhotoChangeDto.serializer(), PhotoChangeDto(comment))),
+        PhotoDto.serializer(),
+    )
+
+    private suspend fun <T> get(path: String, serializer: KSerializer<T>, query: HttpUrl.Builder.() -> Unit = {}): T =
+        send(request(url(path, query = query)), serializer)
+
+    private fun url(vararg segments: String, query: HttpUrl.Builder.() -> Unit = {}): HttpUrl =
+        base.newBuilder().apply { segments.forEach { addPathSegment(it) } }.apply(query).build()
+
+    private fun request(url: HttpUrl) = Request.Builder()
+        .url(url)
+        .header("Authorization", "Bearer $token")
+        .header("Accept", "application/json")
+
+    private suspend fun <T> send(builder: Request.Builder, serializer: KSerializer<T>): T {
+        val request = builder.build()
         val body = withContext(Dispatchers.IO) {
             client.newCall(request).execute().use { response ->
                 val text = response.body.string()
@@ -54,15 +87,24 @@ class SquarepotApi(server: HttpUrl, private val token: String, private val clien
         return try {
             ApiJson.decodeFromString(serializer, body)
         } catch (e: IllegalArgumentException) {
-            throw ApiException(BAD_RESPONSE, null, "Unexpected response from $path", e)
+            throw ApiException(BAD_RESPONSE, null, "Unexpected response from ${request.url.encodedPath}", e)
         }
     }
 
     companion object {
         /** [ApiException.status] for a successful response the app could not read. */
         const val BAD_RESPONSE = 0
+
+        /** Most sightings one request takes. */
+        const val MAX_SIGHTINGS = 500
     }
 }
+
+private val JSON = "application/json".toMediaType()
+private val JPEG = "image/jpeg".toMediaType()
+
+private fun <T> json(serializer: KSerializer<T>, value: T) =
+    ApiJson.encodeToString(serializer, value).toRequestBody(JSON)
 
 /** An error response ([status] and the server's [code]), or an unreadable response (status 0). */
 class ApiException(val status: Int, val code: String?, message: String, cause: Throwable? = null) :

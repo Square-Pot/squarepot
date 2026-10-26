@@ -145,6 +145,7 @@ private fun CollectionDto.toEntity() = CollectionEntity(
     serverSyncedAt = syncedAt?.let(::epochMillis),
     serverError = error,
     customColumns = customColumns,
+    editable = editable,
 )
 
 private fun PlantDto.toEntity() = PlantEntity(
@@ -154,6 +155,11 @@ private fun PlantDto.toEntity() = PlantEntity(
     sheetRow = row,
     fields = fields,
     custom = custom,
+    statusSince = statusSince,
+    lastSeen = lastSeen?.let(::epochMillis),
+    photoCount = photoCount,
+    lastPhoto = lastPhoto?.let(::epochMillis),
+    mainPhotoId = mainPhotoId,
 )
 
 private fun epochMillis(timestamp: String): Long? = try {
