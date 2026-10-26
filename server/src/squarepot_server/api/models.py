@@ -383,6 +383,51 @@ class EditConflict(ApiModel):
     )
 
 
+class StatusSeen(ApiModel):
+    id: str = Field(description="The plant's `id`.", examples=["main:004217"])
+    seen: str | None = Field(
+        description=(
+            "The status the client last saw: the plant's `fields.status`, the rejected "
+            "`invalid` value if the import rejected the cell, or `null` for none. If the sheet "
+            "no longer holds it, that plant is not written."
+        )
+    )
+
+
+class BulkStatus(ApiModel):
+    """One status for many plants of a collection (ADR 0008)."""
+
+    status: str | None = Field(
+        description="A status key such as `lost`; `null` or empty clears the status.",
+        examples=["lost"],
+    )
+    status_date: date | None = Field(
+        default=None,
+        description=(
+            "Written into `status_date` with the status; without it that cell is emptied. "
+            "A tab without a `status_date` column is left so, unless a date is given."
+        ),
+    )
+    plants: list[StatusSeen] = Field(min_length=1, max_length=500)
+
+
+class StatusOutcome(StrEnum):
+    WRITTEN = "written"
+    CHANGED_IN_SHEET = "changed_in_sheet"
+    NOT_FOUND = "not_found"
+
+
+class StatusResult(ApiModel):
+    id: str
+    result: StatusOutcome = Field(
+        description=(
+            "`changed_in_sheet`: the sheet no longer holds the status the client saw, so "
+            "nothing was written for the plant. `not_found`: no such plant in the collection, "
+            "or its row is no longer in the sheet."
+        )
+    )
+
+
 class TakenFrom(StrEnum):
     CAMERA = "camera"
     CLIENT = "client"

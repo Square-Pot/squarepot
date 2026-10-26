@@ -584,6 +584,121 @@
         }
       }
     },
+    "/api/v1/collections/{collection_id}/status": {
+      "post": {
+        "tags": [
+          "plants"
+        ],
+        "summary": "Set one status for many plants",
+        "description": "For an inventory: up to 500 plants, each with the status the client saw. The tab is read once; every plant whose status cell still holds what the client saw is written, all in one write, and the answer says per plant whether it was written. An empty `status` clears it, so a wrong change is undone the same way (ADR 0008). Setting a status is not a sighting by itself: the client sends that separately. Values are checked first: `422` names every value that would not read back as itself, and every column the sheet lacks; Square-Pot never adds columns. `503` when Google cannot be reached. Only collections with `editable` can be edited (ADR 0006).",
+        "operationId": "set_status",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "main"
+              ],
+              "title": "Collection Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkStatus"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StatusResult"
+                  },
+                  "title": "Response Set Status"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "409": {
+            "description": "Nothing was written: the sheet changed, or the collection is read-only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditConflict"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sync": {
       "get": {
         "tags": [
@@ -816,7 +931,7 @@
           "photos"
         ],
         "summary": "Upload a photo of a plant",
-        "description": "The body is the photo itself: a JPEG, PNG or WebP image of at most 30 MB. The server turns it the right way up, drops its EXIF data, including where it was taken, and keeps a large JPEG and a thumbnail. The client chooses the id: sending the same photo again, after a lost answer, changes nothing and returns it. Only a plant with a number can have photos.",
+        "description": "The body is the photo itself: a JPEG, PNG or WebP image of at most 30 MB. The server turns it the right way up, drops its EXIF data, including where it was taken, and keeps a large JPEG and a thumbnail. The client chooses the id: sending the same photo again, after a lost answer, changes nothing and returns it. Only a plant with a number can have photos. A comment given here can be changed later with `PATCH`.",
         "operationId": "upload_photo",
         "security": [
           {
@@ -864,6 +979,19 @@
               "title": "Taken At"
             },
             "description": "When the client took the photo, if the camera did not record it."
+          },
+          {
+            "name": "comment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 1000,
+              "description": "The owner's comment, so that a queued photo is one request.",
+              "default": "",
+              "title": "Comment"
+            },
+            "description": "The owner's comment, so that a queued photo is one request."
           }
         ],
         "responses": {
@@ -1684,6 +1812,55 @@
   },
   "components": {
     "schemas": {
+      "BulkStatus": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "A status key such as `lost`; `null` or empty clears the status.",
+            "examples": [
+              "lost"
+            ]
+          },
+          "status_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Date",
+            "description": "Written into `status_date` with the status; without it that cell is emptied. A tab without a `status_date` column is left so, unless a date is given."
+          },
+          "plants": {
+            "items": {
+              "$ref": "#/components/schemas/StatusSeen"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Plants"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "plants"
+        ],
+        "title": "BulkStatus",
+        "description": "One status for many plants of a collection (ADR 0008)."
+      },
       "Collection": {
         "properties": {
           "id": {
@@ -3309,6 +3486,65 @@
           "result"
         ],
         "title": "SightingResult"
+      },
+      "StatusOutcome": {
+        "type": "string",
+        "enum": [
+          "written",
+          "changed_in_sheet",
+          "not_found"
+        ],
+        "title": "StatusOutcome"
+      },
+      "StatusResult": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "result": {
+            "$ref": "#/components/schemas/StatusOutcome",
+            "description": "`changed_in_sheet`: the sheet no longer holds the status the client saw, so nothing was written for the plant. `not_found`: no such plant in the collection, or its row is no longer in the sheet."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "result"
+        ],
+        "title": "StatusResult"
+      },
+      "StatusSeen": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The plant's `id`.",
+            "examples": [
+              "main:004217"
+            ]
+          },
+          "seen": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seen",
+            "description": "The status the client last saw: the plant's `fields.status`, the rejected `invalid` value if the import rejected the cell, or `null` for none. If the sheet no longer holds it, that plant is not written."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "seen"
+        ],
+        "title": "StatusSeen"
       },
       "Sync": {
         "properties": {

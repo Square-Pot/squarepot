@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from squarepot_server import __version__
 from squarepot_server.api.models import (
     AUTO_TEMPLATE,
+    BulkStatus,
     Collection,
     EditConflict,
     Error,
@@ -31,6 +32,7 @@ from squarepot_server.api.models import (
     NewPlant,
     Plant,
     PlantEdit,
+    StatusResult,
     Sync,
     SyncKind,
     TagLookup,
@@ -339,6 +341,48 @@ def edit_plant(
     runtime: RuntimeDep,
 ) -> Plant | JSONResponse:
     return edited(runtime, lambda: Editor(runtime.syncer).edit(plant_id, body))
+
+
+@router.post(
+    "/collections/{collection_id}/status",
+    tags=["plants"],
+    summary="Set one status for many plants",
+    description=(
+        "For an inventory: up to 500 plants, each with the status the client saw. The tab "
+        "is read once; every plant whose status cell still holds what the client saw is "
+        "written, all in one write, and the answer says per plant whether it was written. "
+        "An empty `status` clears it, so a wrong change is undone the same way (ADR 0008). "
+        "Setting a status is not a sighting by itself: the client sends that separately."
+        + EDIT_RULES
+    ),
+    response_model=list[StatusResult],
+    responses=EDIT_RESPONSES,
+)
+def set_status(
+    collection_id: Annotated[str, Path(examples=["main"])],
+    body: BulkStatus,
+    runtime: RuntimeDep,
+) -> list[StatusResult] | JSONResponse:
+    try:
+        outcomes = Editor(runtime.syncer).set_status(collection_id, body)
+    except NotFound as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(error)) from error
+    except InvalidEdit as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
+    except StoreError as error:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, f"The sheet cannot be reached: {error}."
+        ) from error
+    except NotEditable as error:
+        conflict = EditConflict(code="not_editable", message=str(error), plant=None)
+        return JSONResponse(conflict.model_dump(mode="json"), status_code=status.HTTP_409_CONFLICT)
+    except Conflict as error:
+        conflict = EditConflict(code="changed_in_sheet", message=str(error), plant=None)
+        return JSONResponse(conflict.model_dump(mode="json"), status_code=status.HTTP_409_CONFLICT)
+    return [
+        StatusResult(id=plant.id, result=outcome)
+        for plant, outcome in zip(body.plants, outcomes, strict=True)
+    ]
 
 
 @router.get(

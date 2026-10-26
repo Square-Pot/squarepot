@@ -35,6 +35,8 @@ class FakeStore:
     buggy: set[str] = field(default_factory=set)
     reads: int = 0
     writes: list[tuple[int, list[CellWrite]]] = field(default_factory=list)
+    # Calls of write_rows, each of which writes many rows at once.
+    batches: int = 0
     # Collections shared with the service account as Viewer, and those whose sharing
     # was changed to Viewer since the last sync.
     read_only: set[str] = field(default_factory=set)
@@ -72,6 +74,11 @@ class FakeStore:
             line.extend([None] * (cell.column + 1 - len(line)))
             line[cell.column] = None if cell.value is None else str(cell.value)
         self.versions[collection.id] += 1
+
+    def write_rows(self, collection: CollectionConfig, rows: dict[int, list[CellWrite]]) -> None:
+        self.batches += 1
+        for row, cells in rows.items():
+            self.write(collection, row, cells)
 
     def append(self, collection: CollectionConfig, cells: list[CellWrite]) -> int:
         row = len(self.tabs[collection.id]) + 1

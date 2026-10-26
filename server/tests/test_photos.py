@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import io
+import json
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -127,6 +128,12 @@ def test_the_owner_chooses_the_main_photo(client: TestClient) -> None:
     assert client.put(url, json={"photo_id": None}).status_code == 204
     assert [p["main"] for p in photos(client)] == [False, True]
     assert client.put(url.replace("004217", "004218"), json={"photo_id": FIRST}).status_code == 404
+
+
+def test_a_comment_can_come_with_the_photo(client: TestClient, tmp_path: Path) -> None:
+    assert upload(client, FIRST, comment=" цветёт ").json()["comment"] == "цветёт"
+    [meta] = (tmp_path / "photos/photos/004217").glob("*.json")
+    assert json.loads(meta.read_text())["comment"] == "цветёт"
 
 
 def test_a_comment_and_the_time_taken_can_be_changed(client: TestClient, tmp_path: Path) -> None:

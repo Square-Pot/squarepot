@@ -56,7 +56,14 @@ class Photos:
         query = select(PlantRow.id).where(PlantRow.tag == tag, ~PlantRow.removed).limit(1)
         return session.scalar(query) is not None
 
-    def add(self, photo_id: UUID, tag: str, data: bytes, client_time: datetime | None) -> PhotoRow:
+    def add(
+        self,
+        photo_id: UUID,
+        tag: str,
+        data: bytes,
+        client_time: datetime | None,
+        comment: str = "",
+    ) -> PhotoRow:
         """Store a photo of the plant with this number; the same id again changes nothing."""
         with self.sessions.begin() as session:
             existing = session.get(PhotoRow, str(photo_id))
@@ -85,7 +92,7 @@ class Photos:
             width=processed.width,
             height=processed.height,
             size=len(processed.large),
-            comment="",
+            comment=comment.strip(),
             deleted_at=None,
         )
         self.storage.put(row.key, processed.large, "image/jpeg")
