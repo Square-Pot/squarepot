@@ -24,8 +24,9 @@ import requests
 TIMEOUT_SECONDS = 60
 ALGORITHM = "AWS4-HMAC-SHA256"
 UNSIGNED = "UNSIGNED-PAYLOAD"
-# Keys the server makes: photos/<number>/<name> and sightings/<number>/<name> (ADR 0008).
-KEY = re.compile(r"^(photos|sightings)/[0-9]{6}/[A-Za-z0-9_-][A-Za-z0-9_.-]*$")
+# Keys the server makes: photos/<number>/<name>, sightings/<number>/<name>, and
+# staging/<name> for photos of a batch import not yet filed (ADR 0008).
+KEY = re.compile(r"^(?:(?:photos|sightings)/[0-9]{6}|staging)/[A-Za-z0-9_-][A-Za-z0-9_.-]*$")
 
 
 class PhotoStorageError(Exception):

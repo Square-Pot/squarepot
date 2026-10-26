@@ -1,0 +1,24 @@
+# Adds the import worker to compose.yaml, for batch photo imports (ADR 0008).
+# It reads the label codes in staged photos, one at a time, with half a core
+# and 512 MB, so the server and the host's other services stay responsive.
+# Use it after the photo files, for example with
+# COMPOSE_FILE=compose.yaml:compose.photos.yaml:compose.import.yaml in .env.
+services:
+  importer:
+    image: ${SQUAREPOT_IMAGE:-squarepot-server:local}
+    command: ["python", "-m", "squarepot_server.importer"]
+    cpus: 0.5
+    mem_limit: 512m
+    env_file: .env
+    environment:
+      SQUAREPOT_S3_KEY_FILE: /run/secrets/photos-key
+    secrets:
+      - photos-key
+    volumes:
+      - data:/data
+    # The image's health check asks the API, which this container does not serve.
+    healthcheck:
+      disable: true
+    depends_on:
+      - server
+    restart: unless-stopped

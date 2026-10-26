@@ -132,11 +132,11 @@ was taken, and keeps a large JPEG and a thumbnail, one photo at a time.
 
 Each photo and each sighting also has a small JSON file in the storage. If the
 database is lost, rebuild the photo index and the sightings from them, with
-the server stopped (the changes the phone syncs must have one writer at a
-time):
+the server and the import worker stopped (the changes the phone syncs must
+have one writer at a time):
 
 ```sh
-docker compose stop server
+docker compose stop
 docker compose run --rm server python -m squarepot_server.rebuild
 docker compose up -d
 ```
@@ -144,6 +144,20 @@ docker compose up -d
 It adds only what the database lacks, and prints how many of each it added.
 Only the choice of each plant's main photo is lost: the newest photo is shown
 again. With `s3`, the key must be allowed to list the bucket.
+
+### Batch imports
+
+A batch of photos can be imported at once
+([ADR 0008](../docs/adr/0008-inventory-sightings-and-photo-import.md)):
+`PUT /api/v1/imports/{id}` stages each photo in the photo storage. The import
+worker, a container of its own with half a core and 512 MB
+(`compose.import.yaml`), reads the label codes, one photo at a time. The server
+then files each photo with one known number into that plant. The others wait in
+`GET /api/v1/imports?state=review` until the owner files or discards them.
+Staged files are removed once filed or discarded, and after 30 days in any case.
+
+The worker only reads codes; filing is the server's, so the changes the phone
+syncs keep one writer. Stop the worker too before a rebuild.
 
 ### Demo mode
 

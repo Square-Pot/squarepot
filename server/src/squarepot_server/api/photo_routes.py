@@ -69,6 +69,20 @@ def run[T](action: Callable[[], T]) -> T:
         ) from error
 
 
+async def read_photo(request: Request) -> bytes:
+    """The request's body, refused with 413 above MAX_UPLOAD_BYTES."""
+    if int(request.headers.get("content-length") or 0) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "The photo is larger than 30 MB.")
+    data = bytearray()
+    async for chunk in request.stream():
+        data += chunk
+        if len(data) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status.HTTP_413_CONTENT_TOO_LARGE, "The photo is larger than 30 MB."
+            )
+    return bytes(data)
+
+
 def as_photo(photos: Photos, row: PhotoRow) -> Photo:
     _, main = photos.of_plant(row.tag, deleted=True)
     return photos.to_api(row, main)
@@ -119,20 +133,10 @@ async def upload_photo(
     ] = "",
 ) -> Photo:
     photos = photos_of(runtime)
-    if int(request.headers.get("content-length") or 0) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "The photo is larger than 30 MB.")
-    data = bytearray()
-    async for chunk in request.stream():
-        data += chunk
-        if len(data) > MAX_UPLOAD_BYTES:
-            raise HTTPException(
-                status.HTTP_413_CONTENT_TOO_LARGE, "The photo is larger than 30 MB."
-            )
+    data = await read_photo(request)
     if taken_at is not None and taken_at.tzinfo is None:
         taken_at = taken_at.replace(tzinfo=UTC)
-    row = await run_in_threadpool(
-        run, lambda: photos.add(photo_id, tag, bytes(data), taken_at, comment)
-    )
+    row = await run_in_threadpool(run, lambda: photos.add(photo_id, tag, data, taken_at, comment))
     return await run_in_threadpool(as_photo, photos, row)
 
 
