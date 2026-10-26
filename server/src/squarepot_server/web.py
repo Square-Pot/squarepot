@@ -24,6 +24,15 @@ from squarepot_server.runtime import Runtime
 IMMUTABLE = "public, max-age=31536000, immutable"
 
 
+def origin(url: str) -> str:
+    """scheme://host[:port] of an address, without any user name or password in it."""
+    parts = urlsplit(url)
+    host = parts.hostname or ""
+    if ":" in host:
+        host = f"[{host}]"
+    return f"{parts.scheme}://{host}" + (f":{parts.port}" if parts.port is not None else "")
+
+
 def security_headers(settings: Settings) -> dict[str, str]:
     """The page holds the API token: it runs only its own scripts and talks only to this server.
 
@@ -32,8 +41,7 @@ def security_headers(settings: Settings) -> dict[str, str]:
     """
     images = "'self' blob: data:"
     if settings.photos == PhotoStoreKind.S3:
-        endpoint = urlsplit(settings.s3_endpoint)
-        images += f" {endpoint.scheme}://{endpoint.netloc}"
+        images += f" {origin(settings.s3_endpoint)}"
     return {
         "Content-Security-Policy": (
             f"default-src 'self'; img-src {images}; object-src 'none'; "

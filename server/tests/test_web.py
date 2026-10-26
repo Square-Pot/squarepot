@@ -10,7 +10,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from squarepot_server.app import create_app
 from squarepot_server.config import PhotoStoreKind, Settings
-from squarepot_server.web import security_headers
+from squarepot_server.web import origin, security_headers
 from tests.conftest import TOKEN, FakeStore
 
 INDEX = '<!doctype html><div id="root"></div>'
@@ -68,6 +68,18 @@ def test_images_may_come_from_the_photo_bucket(settings: Settings, tmp_path: Pat
     policy = security_headers(s3)["Content-Security-Policy"]
     assert "img-src 'self' blob: data: https://storage.yandexcloud.net;" in policy
     assert "default-src 'self';" in policy
+
+
+@pytest.mark.parametrize(
+    ("endpoint", "expected"),
+    [
+        ("https://storage.yandexcloud.net/", "https://storage.yandexcloud.net"),
+        ("https://user:secret@s3.example.org:9000/x", "https://s3.example.org:9000"),
+        ("http://[::1]:9000", "http://[::1]:9000"),
+    ],
+)
+def test_the_bucket_origin_has_no_credentials(endpoint: str, expected: str) -> None:
+    assert origin(endpoint) == expected
 
 
 @pytest.mark.parametrize(
