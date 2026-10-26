@@ -286,6 +286,32 @@ jobs:
             [ "$((peak / 1048576))" -lt 600 ] || { echo "${file}: peak above 600 MiB"; exit 1; }
           done
 
+      # The import worker reading codes (ADR 0008), under its own caps: half a core and
+      # 512 MB. Neither photo has a code, so both passes run: the worst case.
+      - name: Measure import worker memory
+        run: |
+          {
+            echo "### Import worker, one photo (0.5 CPU, 512 MB)"
+            echo "| photo | peak | seconds |"
+            echo "| --- | --- | --- |"
+          } >> "${GITHUB_STEP_SUMMARY}"
+          for file in largest.jpg largest.png; do
+            result="$(docker run --rm --cpus 0.5 --memory 512m --volume "${PWD}:/in:ro" \
+              --entrypoint python squarepot-server:ci -c '
+          import sys, time
+          from squarepot_server.photos.codes import read_numbers
+          data = open(sys.argv[1], "rb").read()
+          start = time.monotonic()
+          assert read_numbers(data) == []
+          seconds = time.monotonic() - start
+          peak = int(open("/sys/fs/cgroup/memory.peak").read())
+          print(peak // 1048576, round(seconds, 1))
+          ' "/in/${file}")" || { echo "${file}: the worker failed or ran out of memory"; exit 1; }
+            read -r peak seconds <<< "${result}"
+            echo "| ${file} | ${peak} MiB | ${seconds} |" | tee --append "${GITHUB_STEP_SUMMARY}"
+            [ "${peak}" -lt 450 ] || { echo "${file}: peak above 450 MiB"; exit 1; }
+          done
+
       - name: Save the image for publishing
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: docker save squarepot-server:ci | gzip --fast > server-image.tar.gz
