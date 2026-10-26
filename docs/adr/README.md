@@ -15,3 +15,4 @@ fill it in with status **Proposed**, and open a pull request.
 | [0003](0003-spreadsheet-as-source-of-truth.md) | The spreadsheet is the source of truth, behind a storage adapter | Proposed |
 | [0004](0004-technology-stack.md) | Technology stack | Proposed |
 | [0005](0005-offline-first-phone.md) | The phone works offline from a local copy | Proposed |
+| [0006](0006-editing-plants-from-the-apps.md) | Editing plants from the apps writes cells to the sheet | Proposed |
