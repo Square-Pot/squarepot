@@ -28,7 +28,8 @@ in that copy, never over the network.
   in place.
 - **When.** At app start and on **Refresh**. The sync runs in WorkManager and
   waits for a network, so a sync asked for offline happens once the phone is
-  back in coverage. Network and server errors are retried with backoff.
+  back in coverage. Network and server errors, and a server that asks the
+  app to slow down (HTTP 429), are retried with backoff.
 - **Freshness.** The screen shows when the copy was last refreshed and when the
   server last read each sheet, with the sheet's error if its last read failed.
 - **Changing server.** A new server address drops the cursor, so the next sync

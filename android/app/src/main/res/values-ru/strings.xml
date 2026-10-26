@@ -20,6 +20,7 @@
     <string name="failure_unauthorized">сервер не принял токен</string>
     <string name="failure_network">нет связи с сервером</string>
     <string name="failure_server">сервер ответил ошибкой</string>
+    <string name="failure_rate_limited">сервер занят; приложение скоро попробует снова</string>
     <string name="failure_cleartext">эта сборка подключается только по HTTPS, а адрес начинается с http://</string>
     <string name="failure_bad_response">не удалось прочитать ответ сервера; возможно, нужно обновить приложение</string>
 

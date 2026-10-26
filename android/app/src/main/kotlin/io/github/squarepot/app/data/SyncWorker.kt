@@ -14,7 +14,8 @@ import io.github.squarepot.app.SquarepotApplication
 
 /**
  * Runs a sync as soon as the phone is online, so a sync asked for in the greenhouse happens when
- * the phone gets back into coverage. Network and server failures are retried with backoff.
+ * the phone gets back into coverage. Network and server failures, and a server that asks the app
+ * to slow down, are retried with backoff.
  */
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
@@ -28,7 +29,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     companion object {
         const val NAME = "sync"
 
-        private val RETRIED = setOf(SyncFailure.NETWORK, SyncFailure.SERVER)
+        private val RETRIED = setOf(SyncFailure.NETWORK, SyncFailure.SERVER, SyncFailure.RATE_LIMITED)
 
         /**
          * Queues a sync for when the phone is online. With [restart], a sync already waiting

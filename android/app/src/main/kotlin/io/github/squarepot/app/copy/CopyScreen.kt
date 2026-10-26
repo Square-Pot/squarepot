@@ -255,6 +255,7 @@ private fun failureText(failure: SyncFailure): String = stringResource(
         SyncFailure.UNAUTHORIZED -> R.string.failure_unauthorized
         SyncFailure.NETWORK -> R.string.failure_network
         SyncFailure.SERVER -> R.string.failure_server
+        SyncFailure.RATE_LIMITED -> R.string.failure_rate_limited
         SyncFailure.BAD_RESPONSE -> R.string.failure_bad_response
         SyncFailure.CLEARTEXT -> R.string.failure_cleartext
     },

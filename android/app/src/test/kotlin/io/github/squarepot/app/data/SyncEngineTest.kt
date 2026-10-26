@@ -242,6 +242,18 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `a server that asks to slow down is told apart from a server error`() = runTest {
+        respond(full(cursor = "c1", plants = listOf(plant("p1", "000001"))))
+        respond(SCHEMA_V1)
+        engine.sync(api)
+
+        respond("""{"code": "rate_limited", "message": "Too many requests"}""", code = 429)
+        assertEquals(SyncOutcome.Failed(SyncFailure.RATE_LIMITED), engine.sync(api))
+        assertEquals("c1", db.copy().state()!!.cursor)
+        assertEquals(listOf("000001"), tags())
+    }
+
+    @Test
     fun `without a network the copy still answers lookups`() = runTest {
         respond(full(cursor = "c1", plants = listOf(plant("p1", "000001"))))
         respond(SCHEMA_V1)

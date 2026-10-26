@@ -18,6 +18,7 @@
     <string name="failure_unauthorized">the server rejected the token</string>
     <string name="failure_network">no connection to the server</string>
     <string name="failure_server">the server answered with an error</string>
+    <string name="failure_rate_limited">the server is busy; the app will try again shortly</string>
     <string name="failure_cleartext">this build connects over HTTPS only, and the address starts with http://</string>
     <string name="failure_bad_response">the server\'s answer could not be read; the app may need an update</string>
 

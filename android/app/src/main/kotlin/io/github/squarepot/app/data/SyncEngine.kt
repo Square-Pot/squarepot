@@ -31,6 +31,9 @@ enum class SyncFailure {
     /** The server answered with an error. */
     SERVER,
 
+    /** The server asked the app to slow down (HTTP 429). */
+    RATE_LIMITED,
+
     /** The server answered with something the app cannot read. */
     BAD_RESPONSE,
 
@@ -43,6 +46,7 @@ enum class SyncFailure {
         fun of(e: IOException, cleartext: Boolean) = when {
             e is ApiException && e.isUnauthorized -> UNAUTHORIZED
             e is ApiException && e.status == SquarepotApi.BAD_RESPONSE -> BAD_RESPONSE
+            e is ApiException && e.isRateLimited -> RATE_LIMITED
             e is ApiException -> SERVER
             // OkHttp throws this when the network security config forbids cleartext traffic, and
             // also when TLS versions or cipher suites don't match: only the first is CLEARTEXT.

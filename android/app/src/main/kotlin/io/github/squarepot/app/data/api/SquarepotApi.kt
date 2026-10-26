@@ -68,9 +68,11 @@ class SquarepotApi(server: HttpUrl, private val token: String, private val clien
 class ApiException(val status: Int, val code: String?, message: String, cause: Throwable? = null) :
     IOException(message, cause) {
     val isUnauthorized get() = status == HTTP_UNAUTHORIZED
+    val isRateLimited get() = status == HTTP_TOO_MANY_REQUESTS
 
     companion object {
         private const val HTTP_UNAUTHORIZED = 401
+        private const val HTTP_TOO_MANY_REQUESTS = 429
 
         fun of(status: Int, body: String): ApiException {
             val error = try {
