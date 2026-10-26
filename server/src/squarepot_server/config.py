@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     web_dir: Path | None = Field(
         default=None, description="The built web app, served at /; none serves only the API."
     )
+    api_docs: bool = Field(
+        default=False, description="Serve /docs, /redoc and /openapi.json, for development."
+    )
 
     @model_validator(mode="after")
     def collections_match_the_store(self) -> Settings:

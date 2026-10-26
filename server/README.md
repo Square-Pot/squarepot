@@ -194,6 +194,7 @@ SQUAREPOT_DATABASE_URL=sqlite:///dev.db uv run alembic revision --autogenerate -
 
 To run it outside Docker, export the variables from
 [`deploy/.env.example`](../deploy/.env.example) and start
-`uv run uvicorn squarepot_server.app:create_app --factory --reload`.
+`uv run uvicorn squarepot_server.app:create_app --factory --reload`. Set
+`SQUAREPOT_API_DOCS=true` to browse the API at `/docs`; it is off by default.
 
 Lint and formatting run with the repository's pre-commit hooks.

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -61,6 +62,11 @@ def operation_id(route: APIRoute) -> str:
     return route.name
 
 
+def api_docs_from_environment() -> bool:
+    """SQUAREPOT_API_DOCS, read without the other settings, which may not be set yet."""
+    return os.environ.get("SQUAREPOT_API_DOCS", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def create_app(settings: Settings | None = None, store: CollectionStore | None = None) -> FastAPI:
     """Build the app. Settings come from the environment unless given; tests pass a fake store."""
 
@@ -73,8 +79,14 @@ def create_app(settings: Settings | None = None, store: CollectionStore | None =
         finally:
             runtime.stop()
 
+    # The interactive API docs and the live schema are off unless asked for: the
+    # contract is server/openapi.json in the repository.
+    docs = settings.api_docs if settings else api_docs_from_environment()
     app = FastAPI(
         lifespan=lifespan,
+        docs_url="/docs" if docs else None,
+        redoc_url="/redoc" if docs else None,
+        openapi_url="/openapi.json" if docs else None,
         title="Square-Pot API",
         version=__version__,
         summary="Plant collections kept in Google Sheets, looked up by label number.",

@@ -119,8 +119,26 @@ def test_unknown_path_uses_the_error_body(client: TestClient) -> None:
 
 
 def test_large_responses_are_gzipped(client: TestClient) -> None:
-    response = client.get("/openapi.json", headers={"Accept-Encoding": "gzip"})
+    response = client.get("/api/v1/schema", headers={"Accept-Encoding": "gzip"})
     assert response.headers["content-encoding"] == "gzip"
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+def test_the_api_docs_are_off_by_default(client: TestClient, path: str) -> None:
+    assert client.get(path).status_code == 404
+
+
+def test_the_api_docs_can_be_turned_on(settings: Settings, store: FakeStore) -> None:
+    with TestClient(create_app(settings.model_copy(update={"api_docs": True}), store)) as client:
+        assert client.get("/docs").status_code == 200
+        assert client.get("/openapi.json").json()["info"]["title"] == "Square-Pot API"
+
+
+def test_the_api_docs_flag_is_read_before_the_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SQUAREPOT_API_DOCS", "true")
+    assert create_app().openapi_url == "/openapi.json"
+    monkeypatch.delenv("SQUAREPOT_API_DOCS")
+    assert create_app().openapi_url is None
 
 
 def test_unexpected_error_uses_the_error_body(settings: Settings, store: FakeStore) -> None:
