@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import date
 from enum import StrEnum
 from typing import Annotated, Literal
+from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
@@ -314,6 +315,15 @@ class PlantEdit(ApiModel):
 class NewPlant(ApiModel):
     """A plant to add as a new row at the end of a collection's tab (ADR 0006)."""
 
+    request_id: UUID | None = Field(
+        default=None,
+        description=(
+            "A new random id for this addition, sent again unchanged when retrying it. A "
+            "request id the server has seen adds no row: the plant it added is returned. "
+            "Clients should always send one."
+        ),
+        examples=["6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b"],
+    )
     fields: dict[str, str] = Field(
         description=(
             "Values by field key, in canonical form as in `FieldChange.value`. Every required "

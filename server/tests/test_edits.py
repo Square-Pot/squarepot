@@ -283,3 +283,15 @@ def test_a_collection_read_by_link_cannot_be_edited(read_only: TestClient) -> No
     assert response.json()["code"] == "not_editable"
     response = read_only.post("/api/v1/collections/main/plants", json={"fields": {"genus": "x"}})
     assert response.status_code == 409
+
+
+def test_a_retried_addition_adds_no_second_row(client: TestClient, store: FakeStore) -> None:
+    body = {"request_id": "6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b", "fields": {"genus": "Aloe"}}
+    first = client.post("/api/v1/collections/main/plants", json=body)
+    again = client.post("/api/v1/collections/main/plants", json=body)
+    assert first.status_code == again.status_code == 201
+    assert first.json() == again.json()
+    assert len(store.writes) == 1
+    assert registered(client) == ["004217", "004218", "004219"]
+    other = {**body, "request_id": "0b7e6a3c-1111-4222-8333-944455566677"}
+    assert client.post("/api/v1/collections/main/plants", json=other).json()["tag"] == "004220"

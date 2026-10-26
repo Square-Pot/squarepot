@@ -112,6 +112,18 @@ class RegisteredTag(Base):
     registered_at: Mapped[datetime]
 
 
+class AddedPlant(Base):
+    """A plant added through the API, by the client's request id: a retry returns it."""
+
+    __tablename__ = "added_plants"
+
+    request_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    collection_id: Mapped[str] = mapped_column(String(64))
+    tag: Mapped[str | None] = mapped_column(String(6))
+    row: Mapped[int]
+    added_at: Mapped[datetime]
+
+
 def make_engine(url: str) -> Engine:
     if not url.startswith("sqlite"):
         return create_engine(url)

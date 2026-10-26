@@ -1735,6 +1735,22 @@
       },
       "NewPlant": {
         "properties": {
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id",
+            "description": "A new random id for this addition, sent again unchanged when retrying it. A request id the server has seen adds no row: the plant it added is returned. Clients should always send one.",
+            "examples": [
+              "6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b"
+            ]
+          },
           "fields": {
             "additionalProperties": {
               "type": "string"

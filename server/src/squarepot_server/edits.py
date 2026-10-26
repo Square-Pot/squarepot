@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 
 from squarepot_server.api.models import FieldChange, FieldDefinition, FieldType, NewPlant, PlantEdit
 from squarepot_server.config import CollectionConfig
-from squarepot_server.db import PlantRow, RegisteredTag
+from squarepot_server.db import AddedPlant, PlantRow, RegisteredTag
 from squarepot_server.fields import (
     MAX_CUSTOM_VALUE,
     TAG,
@@ -279,6 +279,14 @@ class Editor:
         with self.syncer.lock:
             collection = self.config(collection_id)
             store = self.store()
+            request_id = str(new.request_id) if new.request_id is not None else None
+            if request_id is not None:
+                with self.syncer.sessions.begin() as session:
+                    added = session.get(AddedPlant, request_id)
+                if added is not None:
+                    if added.collection_id != collection.id:
+                        raise InvalidEdit("request_id: already used for another collection")
+                    return self.found(collection.id, added.tag, added.row)
             given = {key: FieldChange(seen=None, value=value) for key, value in new.fields.items()}
             for definition in self.syncer.schema.fields:
                 if definition.required and definition.key not in given:
@@ -294,6 +302,17 @@ class Editor:
                 tag = self.issue_number(collection.id)
                 cells.append(CellWrite(tab.fields[TAG], tag, number=True))
             row = store.append(collection, cells)
+            if request_id is not None:
+                with self.syncer.sessions.begin() as session:
+                    session.add(
+                        AddedPlant(
+                            request_id=request_id,
+                            collection_id=collection.id,
+                            tag=tag,
+                            row=row,
+                            added_at=self.syncer.clock(),
+                        )
+                    )
             log.info(
                 "collection %s: added row %d with %s",
                 collection.id,
