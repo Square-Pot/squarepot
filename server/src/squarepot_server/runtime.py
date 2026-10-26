@@ -121,7 +121,11 @@ class Runtime:
             chores = [photos.purge] if photos is not None else []
             worker = SyncWorker(syncer, settings.sync_interval_seconds, chores)
             worker.start()
-        sightings = Sightings(sessions, storage, syncer.lock)
+        sightings = (
+            Sightings(sessions, storage, syncer.lock, syncer.run_once)
+            if storage is not None
+            else None
+        )
         return cls(settings, schema, engine, sessions, syncer, worker, photos, sightings)
 
     def stop(self) -> None:

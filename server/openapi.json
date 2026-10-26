@@ -1606,7 +1606,7 @@
           "inventory"
         ],
         "summary": "Record that plants were seen",
-        "description": "For the phone's queue of sightings, sent when it is online. Each sighting has an id the client chose, so sending a batch again records nothing twice. A sighting of a number no plant has is not recorded. The plants seen are sent again in the next sync, with their new `last_seen`.",
+        "description": "For the phone's queue of sightings, sent when it is online. Each sighting has an id the client chose, so sending a batch again records nothing twice. A sighting of a number no plant has is not recorded; the server reads the sheet again first, at most once a minute, in case the plant was just added there. The plants seen are sent again in the next sync, with their new `last_seen`. Without a photo storage the server keeps no sightings and answers 503.",
         "operationId": "record_sightings",
         "requestBody": {
           "content": {
@@ -1655,6 +1655,16 @@
           },
           "429": {
             "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
