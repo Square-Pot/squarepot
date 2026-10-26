@@ -165,10 +165,6 @@ data class PhotoDto(
     val comment: String? = null,
 )
 
-/** `PATCH /api/v1/photos/{id}`: an empty [comment] removes it. */
-@Serializable
-data class PhotoChangeDto(val comment: String)
-
 /** The body of every error response. */
 @Serializable
 data class ErrorDto(val code: String, val message: String)

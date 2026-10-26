@@ -52,7 +52,7 @@ without signal loses nothing.
 
 - **What.** Sightings ("seen, no photo", or a status set) and photos, each with
   an id the phone chooses, so sending one again after a lost answer is
-  harmless. A photo's comment follows the photo.
+  harmless. A photo's comment goes with it.
 - **When.** As soon as something is added, at app start and after the server
   settings change. Sending runs in WorkManager and waits for a network.
   Sightings go out in batches of up to 500, then photos one at a time; then

@@ -26,7 +26,7 @@ sealed interface QueueOutcome {
 }
 
 /**
- * Sends the queue: sightings in batches, then photos one at a time, each followed by its comment.
+ * Sends the queue: sightings in batches, then photos one at a time, each with its comment.
  *
  * Every item has the client's id, so sending it again after a lost answer is harmless. A refusal
  * that is the item's own (a number no plant has, a photo too large or unreadable) is kept on the
@@ -75,7 +75,7 @@ class QueueSender(
         }
     }
 
-    /** Sends [photo], then its comment; returns whether both reached the server. */
+    /** Sends [photo] with its comment; returns whether it reached the server. */
     private suspend fun sendPhoto(api: SquarepotApi, photo: QueuedPhoto): Boolean {
         val file = File(photoDir, photo.file)
         if (!photo.uploaded && !withContext(Dispatchers.IO) { file.exists() }) {
@@ -84,11 +84,9 @@ class QueueSender(
         }
         return try {
             if (!photo.uploaded) {
-                api.uploadPhoto(photo.id, photo.tag, Instant.ofEpochMilli(photo.takenAt).toString(), file)
-                // Kept at once, so a failed comment does not send the photo again.
-                dao.updatePhoto(photo.copy(uploaded = true))
+                val takenAt = Instant.ofEpochMilli(photo.takenAt).toString()
+                api.uploadPhoto(photo.id, photo.tag, takenAt, photo.comment, file)
             }
-            photo.comment?.let { api.changePhotoComment(photo.id, it) }
             dao.updatePhoto(photo.copy(uploaded = true, sentAt = clock()))
             withContext(Dispatchers.IO) { file.delete() }
             true
