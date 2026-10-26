@@ -15,7 +15,7 @@ from squarepot_server.app import create_app
 from squarepot_server.config import CollectionConfig, Settings
 from squarepot_server.fields import Cell
 from squarepot_server.runtime import Runtime
-from squarepot_server.store import CellWrite, StoreError
+from squarepot_server.store import CellWrite, StoreError, StoreRefused
 
 TOKEN = "test-token-0123456789"
 HEADER: list[Cell] = ["tag", "genus", "species", "field_number"]
@@ -35,6 +35,10 @@ class FakeStore:
     buggy: set[str] = field(default_factory=set)
     reads: int = 0
     writes: list[tuple[int, list[CellWrite]]] = field(default_factory=list)
+    # Collections shared with the service account as Viewer, and those whose sharing
+    # was changed to Viewer since the last sync.
+    read_only: set[str] = field(default_factory=set)
+    refusing: set[str] = field(default_factory=set)
 
     def put(self, collection_id: str, values: list[list[Cell]]) -> None:
         self.tabs[collection_id] = values
@@ -51,9 +55,14 @@ class FakeStore:
             raise RuntimeError("a bug")
         return self.tabs[collection.id]
 
+    def can_edit(self, collection: CollectionConfig) -> bool:
+        return collection.id not in self.read_only
+
     def write(self, collection: CollectionConfig, row: int, cells: list[CellWrite]) -> None:
         if collection.id in self.failing:
             raise StoreError("Google is unreachable: test")
+        if collection.id in self.refusing:
+            raise StoreRefused("Google answered 403: The caller does not have permission")
         self.writes.append((row, cells))
         values = self.tabs[collection.id]
         while len(values) < row:

@@ -295,3 +295,24 @@ def test_a_retried_addition_adds_no_second_row(client: TestClient, store: FakeSt
     assert registered(client) == ["004217", "004218", "004219"]
     other = {**body, "request_id": "0b7e6a3c-1111-4222-8333-944455566677"}
     assert client.post("/api/v1/collections/main/plants", json=other).json()["tag"] == "004220"
+
+
+def test_a_sheet_shared_as_viewer_cannot_be_edited(client: TestClient, store: FakeStore) -> None:
+    store.read_only.add("main")
+    [main] = client.get("/api/v1/collections").json()
+    assert main["editable"] is False
+    response = edit(client, "main:004217", {"fields": {"species": change("lesliei", "x")}})
+    assert response.status_code == 409
+    assert response.json()["code"] == "not_editable"
+    assert store.writes == []
+
+
+def test_a_write_refused_by_google_is_not_editable(client: TestClient, store: FakeStore) -> None:
+    store.refusing.add("main")
+    response = edit(client, "main:004217", {"fields": {"species": change("lesliei", "x")}})
+    assert response.status_code == 409
+    assert (
+        response.json()["message"] == "The sheet is not shared with the service account as Editor."
+    )
+    response = client.post("/api/v1/collections/main/plants", json={"fields": {"genus": "x"}})
+    assert response.json()["code"] == "not_editable"

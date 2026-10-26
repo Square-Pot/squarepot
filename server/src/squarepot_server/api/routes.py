@@ -118,9 +118,16 @@ def to_collection(row: CollectionRow, runtime: Runtime) -> Collection:
         synced_at=row.synced_at,
         error=row.error,
         custom_columns=row.custom_columns,
-        editable=isinstance(runtime.syncer.store, EditableStore),
+        editable=editable(runtime, row.id),
         sheet_url=sheet_url(runtime, row.id),
     )
+
+
+def editable(runtime: Runtime, collection_id: str) -> bool:
+    """Whether the collection is read with the service account, which may edit its sheet."""
+    store = runtime.syncer.store
+    config = next((c for c in runtime.settings.collections if c.id == collection_id), None)
+    return config is not None and isinstance(store, EditableStore) and store.can_edit(config)
 
 
 def to_plant(row: PlantRow) -> Plant:

@@ -734,7 +734,7 @@
           "editable": {
             "type": "boolean",
             "title": "Editable",
-            "description": "Whether plants of this collection can be added and edited through the API: only collections read with the service account (ADR 0006). Edits of others get `409`."
+            "description": "Whether plants of this collection can be added and edited through the API: only collections read with the service account, with the sheet shared with it as Editor, as of the last sync (ADR 0006). Edits of others get `409`."
           },
           "sheet_url": {
             "anyOf": [
@@ -1746,7 +1746,7 @@
               }
             ],
             "title": "Request Id",
-            "description": "A new random id for this addition, sent again unchanged when retrying it. A request id the server has seen adds no row: the plant it added is returned. Clients should always send one.",
+            "description": "A new random id for this addition, sent again unchanged when retrying it. A request id the server has seen adds no row: the plant it added is returned. Clients should always send one. If the server added the row but its answer was lost before it could remember the id, a retry still adds a second row.",
             "examples": [
               "6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b"
             ]

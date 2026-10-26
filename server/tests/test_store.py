@@ -19,6 +19,7 @@ from squarepot_server.store import (
     GoogleSheetsStore,
     SheetLinkStore,
     StoreError,
+    StoreRefused,
 )
 
 CONFIG = CollectionConfig(id="main", name="Main", spreadsheet_id="abc/123?x", sheet="It's a tab/1")
@@ -66,7 +67,10 @@ def test_version_is_the_drive_modified_time() -> None:
     assert sheets.version(CONFIG) == "2026-10-12T10:00:00.000Z"
     [(url, params, timeout)] = session.calls
     assert url == "https://www.googleapis.com/drive/v3/files/abc/123%3Fx"
-    assert params == {"fields": "modifiedTime", "supportsAllDrives": "true"}
+    assert params == {
+        "fields": "modifiedTime,capabilities/canEdit",
+        "supportsAllDrives": "true",
+    }
     assert timeout > 0
 
 
@@ -303,14 +307,33 @@ def test_an_append_without_a_row_in_the_answer_is_an_error() -> None:
         sheets.append(CONFIG, [CellWrite(1, "Haworthia")])
 
 
-def test_a_missing_tab_stops_formatting() -> None:
-    sheets, _ = writing_store(response(200, {}), response(200, {"sheets": []}))
-    with pytest.raises(StoreError, match="no tab"):
-        sheets.write(CONFIG, 2, [CellWrite(0, "004219", number=True)])
+@pytest.mark.parametrize(
+    "answer", [response(200, {"sheets": []}), response(500, {"error": {"message": "x"}})]
+)
+def test_a_number_written_but_not_formatted_is_not_an_error(
+    answer: requests.Response, caplog: pytest.LogCaptureFixture
+) -> None:
+    appended = {"updates": {"updatedRange": "'Tab!A1'!A528:C528"}}
+    sheets, _ = writing_store(response(200, appended), answer)
+    assert sheets.append(CONFIG, [CellWrite(0, "004219", number=True)]) == 528
+    assert "number cell not formatted" in caplog.text
+
+
+@pytest.mark.parametrize(("can_edit", "expected"), [(True, True), (False, False), (None, False)])
+def test_the_version_check_learns_whether_the_sheet_can_be_edited(
+    can_edit: bool | None, expected: bool
+) -> None:
+    body: dict[str, Any] = {"modifiedTime": "2026-10-12T10:00:00.000Z"}
+    if can_edit is not None:
+        body["capabilities"] = {"canEdit": can_edit}
+    sheets, _ = store(response(200, body))
+    assert sheets.can_edit(CONFIG) is False
+    sheets.version(CONFIG)
+    assert sheets.can_edit(CONFIG) is expected
 
 
 def test_write_failures_become_store_errors() -> None:
     answer = response(403, {"error": {"message": "The caller does not have permission"}})
     sheets, _ = writing_store(answer)
-    with pytest.raises(StoreError, match="^Google answered 403: The caller does not have"):
+    with pytest.raises(StoreRefused, match="^Google answered 403: The caller does not have"):
         sheets.write(CONFIG, 2, [CellWrite(1, "Lithops")])

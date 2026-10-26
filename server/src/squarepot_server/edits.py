@@ -30,11 +30,12 @@ from squarepot_server.fields import (
     parse_tab,
     read_value,
 )
-from squarepot_server.store import CellWrite, EditableStore
+from squarepot_server.store import CellWrite, EditableStore, StoreRefused
 from squarepot_server.sync import Syncer
 
 log = logging.getLogger(__name__)
 LAST_NUMBER = 999_999
+NOT_SHARED = "The sheet is not shared with the service account as Editor."
 
 
 class NotFound(Exception):
@@ -105,15 +106,14 @@ class Editor:
     def __init__(self, syncer: Syncer) -> None:
         self.syncer = syncer
 
-    def editable(self) -> bool:
-        return isinstance(self.syncer.store, EditableStore)
-
-    def store(self) -> EditableStore:
+    def store(self, collection: CollectionConfig) -> EditableStore:
         store = self.syncer.store
         if not isinstance(store, EditableStore):
             raise NotEditable(
                 "Plants can only be edited in a collection read with the service account."
             )
+        if not store.can_edit(collection):
+            raise NotEditable(NOT_SHARED)
         return store
 
     def config(self, collection_id: str) -> CollectionConfig:
@@ -246,7 +246,7 @@ class Editor:
         with self.syncer.lock:
             plant = self.plant(plant_id)
             collection = self.config(plant.collection_id)
-            store = self.store()
+            store = self.store(collection)
             changes = self.changes(edit.fields, edit.custom)
             tab = self.read(store, collection)
             number = edit.issue_number and plant.tag is None
@@ -270,7 +270,10 @@ class Editor:
                 tag = self.issue_number(collection.id)
                 cells.append(CellWrite(tab.fields[TAG], tag, number=True))
             if cells:
-                store.write(collection, row.row, cells)
+                try:
+                    store.write(collection, row.row, cells)
+                except StoreRefused as error:
+                    raise NotEditable(NOT_SHARED) from error
                 log.info("plant %s: wrote %s", plant.id, written(changes, tag != row.tag))
                 self.syncer.sync_collection(collection, force=True)
             return self.found(collection.id, tag, row.row)
@@ -278,7 +281,7 @@ class Editor:
     def create(self, collection_id: str, new: NewPlant) -> PlantRow:
         with self.syncer.lock:
             collection = self.config(collection_id)
-            store = self.store()
+            store = self.store(collection)
             request_id = str(new.request_id) if new.request_id is not None else None
             if request_id is not None:
                 with self.syncer.sessions.begin() as session:
@@ -301,7 +304,10 @@ class Editor:
             if new.issue_number:
                 tag = self.issue_number(collection.id)
                 cells.append(CellWrite(tab.fields[TAG], tag, number=True))
-            row = store.append(collection, cells)
+            try:
+                row = store.append(collection, cells)
+            except StoreRefused as error:
+                raise NotEditable(NOT_SHARED) from error
             if request_id is not None:
                 with self.syncer.sessions.begin() as session:
                     session.add(

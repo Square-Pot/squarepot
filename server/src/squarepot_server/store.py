@@ -6,6 +6,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import logging
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -21,6 +22,7 @@ from google.oauth2 import service_account
 from squarepot_server.config import CollectionConfig
 from squarepot_server.fields import Cell, column_name
 
+log = logging.getLogger(__name__)
 SCOPES = [
     # Writing too (ADR 0006); the sheet's sharing decides whether the account may.
     "https://www.googleapis.com/auth/spreadsheets",
@@ -31,12 +33,16 @@ EXPORT_URL = "https://docs.google.com/spreadsheets/d/{}/export"
 # A tab of plants is about 100 bytes a row; more than this is not a collection.
 MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024
 SHEETS_URL = "https://sheets.googleapis.com/v4/spreadsheets/{}"
-# The first row of a range such as 'Plants'!A528:F528.
-RANGE_ROW = re.compile(r"![A-Z]+([0-9]+)")
+# The first row of a range such as A528:F528, the part after the tab name's last "!".
+RANGE_ROW = re.compile(r"[A-Z]+([0-9]+)")
 
 
 class StoreError(Exception):
     """The store could not be reached or refused the request."""
+
+
+class StoreRefused(StoreError):
+    """The store refused a request for lack of permission, such as a write to a shared sheet."""
 
 
 class CollectionStore(Protocol):
@@ -67,6 +73,10 @@ class CellWrite:
 @runtime_checkable
 class EditableStore(CollectionStore, Protocol):
     """A store that can write the cells of a collection (ADR 0006)."""
+
+    def can_edit(self, collection: CollectionConfig) -> bool:
+        """Whether writing to the collection is allowed, as of its last version check."""
+        ...
 
     def write(self, collection: CollectionConfig, row: int, cells: list[CellWrite]) -> None:
         """Write cells of one row, by its sheet row number; leaves every other cell alone."""
@@ -158,6 +168,8 @@ class GoogleSheetsStore:
 
     def __init__(self, session: requests.Session) -> None:
         self.session = session
+        # Whether the service account may edit each collection's spreadsheet, by id.
+        self.editable: dict[str, bool] = {}
 
     @classmethod
     def from_key_file(cls, credentials_file: Path) -> GoogleSheetsStore:
@@ -183,7 +195,8 @@ class GoogleSheetsStore:
                 message = response.json()["error"]["message"]
             except (ValueError, KeyError, TypeError):
                 message = response.reason
-            raise StoreError(f"Google answered {response.status_code}: {message}")
+            error_type = StoreRefused if response.status_code == 403 else StoreError
+            raise error_type(f"Google answered {response.status_code}: {message}")
         return cast(dict[str, Any], response.json())
 
     @staticmethod
@@ -197,9 +210,13 @@ class GoogleSheetsStore:
         spreadsheet_id, _ = self.tab(collection)
         body = self.get(
             f"https://www.googleapis.com/drive/v3/files/{quote(spreadsheet_id)}",
-            {"fields": "modifiedTime", "supportsAllDrives": "true"},
+            {"fields": "modifiedTime,capabilities/canEdit", "supportsAllDrives": "true"},
         )
+        self.editable[collection.id] = body.get("capabilities", {}).get("canEdit") is True
         return str(body["modifiedTime"])
+
+    def can_edit(self, collection: CollectionConfig) -> bool:
+        return self.editable.get(collection.id, False)
 
     @staticmethod
     def quoted(sheet: str) -> str:
@@ -270,7 +287,7 @@ class GoogleSheetsStore:
             {"majorDimension": "ROWS", "values": [values]},
         )
         try:
-            match = RANGE_ROW.search(body["updates"]["updatedRange"])
+            match = RANGE_ROW.match(str(body["updates"]["updatedRange"]).rsplit("!", 1)[-1])
         except (KeyError, TypeError):
             match = None
         if match is None:
@@ -282,10 +299,24 @@ class GoogleSheetsStore:
     def format_numbers(
         self, collection: CollectionConfig, row: int, cells: list[CellWrite]
     ) -> None:
-        """Set the plain text format on the cells of plant numbers just written."""
+        """Set the plain text format on the cells of plant numbers just written.
+
+        The numbers are already written as text, so a failure here is logged, not
+        raised: the write itself succeeded, and a retry must not write again.
+        """
         numbers = [cell for cell in cells if cell.number and cell.value is not None]
         if not numbers:
             return
+        try:
+            self.set_text_format(collection, row, numbers)
+        except StoreError as error:
+            log.warning(
+                "collection %s: row %d: number cell not formatted: %s", collection.id, row, error
+            )
+
+    def set_text_format(
+        self, collection: CollectionConfig, row: int, numbers: list[CellWrite]
+    ) -> None:
         spreadsheet_id, sheet = self.tab(collection)
         url = SHEETS_URL.format(quote(spreadsheet_id))
         body = self.get(url, {"fields": "sheets.properties(sheetId,title)"})
