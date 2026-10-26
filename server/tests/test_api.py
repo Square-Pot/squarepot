@@ -49,6 +49,7 @@ def test_every_route_but_health_is_protected() -> None:
         ("PATCH", photo),
         ("PATCH", "/api/v1/plants/main:004217"),
         ("POST", "/api/v1/collections/main/plants"),
+        ("POST", "/api/v1/collections/main/status"),
         ("POST", "/api/v1/labels"),
         ("POST", f"{photo}/restore"),
         ("POST", "/api/v1/sightings"),
