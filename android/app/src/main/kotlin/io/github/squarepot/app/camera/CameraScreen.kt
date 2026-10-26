@@ -44,6 +44,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -141,6 +142,7 @@ private fun InventorySheets(
     shutter: Shutter,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val review by photos.review.collectAsStateWithLifecycle()
     inventory.card?.let { tag ->
@@ -155,7 +157,7 @@ private fun InventorySheets(
                     try {
                         shutter.take(context)?.let { photos.taken(tag.value, it) }
                     } catch (e: ImageCaptureException) {
-                        val message = context.getString(R.string.capture_failed, e.message.orEmpty())
+                        val message = resources.getString(R.string.capture_failed, e.message.orEmpty())
                         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                     }
                 }
