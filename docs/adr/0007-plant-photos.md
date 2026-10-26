@@ -76,8 +76,9 @@ EXIF data.
   key goes in the server's environment, never in git. A leaked key exposes
   only Square-Pot's photos, not the owner's other buckets.
 - The server does the image work for each upload: one photo at a time, about
-  100 MB of memory at the peak for a large phone photo, which fits the 1 GB
-  limit. CI measures it, as it does for labels.
+  120 MB of memory at the peak for a phone photo, and up to about 250 MB for
+  the largest PNG it accepts, which fits the 1 GB limit. CI measures it, as it
+  does for labels.
 - Formats: JPEG, PNG and WebP come in at first. HEIC from iPhones needs an
   extra library and comes later; Android phones send JPEG.
 - Cost, at Yandex Object Storage's standard class: 10 photos for each of
