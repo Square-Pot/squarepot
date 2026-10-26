@@ -5,6 +5,7 @@ package io.github.squarepot.app.data
 import io.github.squarepot.app.data.api.ApiJson
 import io.github.squarepot.app.data.api.FieldSchemaDto
 import io.github.squarepot.app.data.local.CollectionColumns
+import io.github.squarepot.app.data.local.CollectionEntity
 import io.github.squarepot.app.data.local.CopyDao
 import io.github.squarepot.app.data.local.PlantEntity
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +25,9 @@ data class PlantView(
     val name: List<TextRun> = emptyList(),
     /** Values of the collection's custom columns by name. */
     val custom: Map<String, String> = emptyMap(),
+    /** When the plant was last seen, by a sighting or a photo, epoch millis; null when never seen. */
+    val lastSeen: Long? = null,
+    val photoCount: Int = 0,
 )
 
 /** Reads the local copy. Never touches the network: this is what the camera path uses. */
@@ -44,6 +48,12 @@ class LocalCopy(private val dao: CopyDao) {
         val collections = dao.collectionNames().associate { it.id to it.name }
         return longest.toView(collections[longest.collectionId] ?: longest.collectionId, schema, language)
     }
+
+    /** Every plant, for inventory walks. */
+    fun plants(): Flow<List<PlantEntity>> = dao.observePlants()
+
+    /** Each collection, with its custom columns and whether it is editable. */
+    fun collections(): Flow<List<CollectionEntity>> = dao.observeCollections()
 
     /** Each collection's custom columns, for choosing which of them a caption shows. */
     fun customColumns(): Flow<List<CollectionColumns>> = dao.observeCustomColumns()
@@ -68,7 +78,16 @@ fun PlantEntity.toView(collectionName: String, schema: FieldSchemaDto?, language
         .map { FieldValue(it.key, it.label.forLanguage(language), fields.getValue(it.key)) }
     val knownKeys = known.mapTo(HashSet()) { it.key }
     val unknown = fields.filterKeys { it !in knownKeys }.map { (key, value) -> FieldValue(key, key, value) }
-    return PlantView(id, tag, collectionName, known + unknown, botanicalName(schema, fields), custom)
+    return PlantView(
+        id = id,
+        tag = tag,
+        collectionName = collectionName,
+        fields = known + unknown,
+        name = botanicalName(schema, fields),
+        custom = custom,
+        lastSeen = lastSeen,
+        photoCount = photoCount,
+    )
 }
 
 private const val TAG_LENGTH = 6

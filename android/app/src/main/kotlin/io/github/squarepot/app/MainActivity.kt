@@ -17,9 +17,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.squarepot.app.bench.BenchScreen
 import io.github.squarepot.app.camera.CameraScreen
 import io.github.squarepot.app.camera.CaptionSettingsScreen
+import io.github.squarepot.app.camera.QueueScreen
+import io.github.squarepot.app.camera.WalkScreen
 import io.github.squarepot.app.copy.CopyScreen
 
-private enum class Screen { CAMERA, CAPTIONS, BENCH, COPY }
+private enum class Screen { CAMERA, CAPTIONS, BENCH, COPY, WALK, QUEUE }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,8 +37,11 @@ class MainActivity : ComponentActivity() {
                     when (screen) {
                         Screen.CAMERA -> CameraScreen(
                             viewModel(),
+                            viewModel(),
                             onOpenSettings = { screen = Screen.CAPTIONS },
                             onOpenCopy = { screen = Screen.COPY },
+                            onOpenWalk = { screen = Screen.WALK },
+                            onOpenQueue = { screen = Screen.QUEUE },
                         )
                         Screen.CAPTIONS -> CaptionSettingsScreen(
                             viewModel(),
@@ -45,6 +50,8 @@ class MainActivity : ComponentActivity() {
                         )
                         Screen.BENCH -> BenchScreen(viewModel(), onBack = { screen = Screen.CAPTIONS })
                         Screen.COPY -> CopyScreen()
+                        Screen.WALK -> WalkScreen(viewModel(), onBack = { screen = Screen.CAMERA })
+                        Screen.QUEUE -> QueueScreen(viewModel(), onBack = { screen = Screen.CAMERA })
                     }
                 }
             }

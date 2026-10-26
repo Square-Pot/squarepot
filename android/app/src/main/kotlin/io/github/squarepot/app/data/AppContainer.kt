@@ -25,6 +25,7 @@ class AppContainer(context: Context) {
     val queueDatabase = QueueDatabase.open(context)
     val settings = SettingsStore(context.settingsDataStore)
     val captions = CaptionSettingsStore(context.settingsDataStore)
+    val inventory = InventoryStore(context.settingsDataStore)
     val localCopy = LocalCopy(database.copy())
 
     private val photoDir = File(context.filesDir, "queue/photos")

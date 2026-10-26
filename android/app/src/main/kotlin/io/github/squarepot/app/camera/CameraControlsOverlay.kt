@@ -55,11 +55,16 @@ import io.github.squarepot.app.recognition.RollingStats
 import java.time.LocalDate
 import java.util.Locale
 
-/** The status of the local copy, ⚙ for the caption settings and the torch, over the top of the picture. */
+/**
+ * The status of the local copy, inventory mode, ⚙ for the caption settings and the torch, over
+ * the top of the picture.
+ */
 @Composable
 internal fun CameraTopBar(
     state: CameraUiState,
+    inventory: Boolean,
     onOpenCopy: () -> Unit,
+    onInventory: () -> Unit,
     onOpenSettings: () -> Unit,
     onTorch: () -> Unit,
     modifier: Modifier = Modifier,
@@ -74,6 +79,7 @@ internal fun CameraTopBar(
     ) {
         CopyChip(state.refreshedAt, onOpenCopy)
         Spacer(Modifier.weight(1f))
+        ChromeButton(R.drawable.ic_inventory, R.string.inventory_mode, active = inventory, onClick = onInventory)
         ChromeButton(R.drawable.ic_settings, R.string.captions_open, active = false, onClick = onOpenSettings)
         ChromeButton(R.drawable.ic_torch, R.string.torch, active = state.torch, onClick = onTorch)
     }

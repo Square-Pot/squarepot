@@ -110,6 +110,18 @@ to the camera.
   full, on two lines or with the genus as its initial; neighbouring labels
   can show a short name. All of this is in the caption settings and kept on
   the phone.
+- **Inventory mode.** The clipboard button at the top turns it on (ADR 0008,
+  variant A). A tap on any label then opens the plant's card instead of
+  copying: its caption, when it was last seen, its photos and its status,
+  and **Seen, no photo**, which queues a sighting. Only that button counts:
+  a label the camera merely reads records nothing. Numbers seen in the walk
+  carry a ✓ on their tab. The bar at the bottom shows how many plants of the
+  walk were seen since it began and opens the walk: a collection, optionally
+  narrowed to one value of the genus or of one of its own columns (such as a
+  shelf), and the time from which sightings count, which **Start over**
+  resets. The queue chip next to it shows what waits to be sent, and turns
+  red when the server refused something; the queue screen says why and
+  offers retry or discard.
 - **Smoothing panel.** A long press on the version line (in the caption
   settings, or in the bottom panel) opens a hidden panel over the camera with
   the 1€ filter's two settings, the decode rate and latency over the last 120
