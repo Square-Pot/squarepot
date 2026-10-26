@@ -136,6 +136,15 @@
     <string name="walk_progress">Видели %1$d из %2$d · с %3$s</string>
     <string name="queue_chip">↑ %1$d</string>
     <string name="queue_chip_problems">↑ %1$d · %2$d проверить</string>
+    <string name="card_take_photo">Снять</string>
+    <string name="capture_failed">Не удалось снять: %1$s</string>
+    <string name="review_title">Снимок %1$s</string>
+    <string name="review_reading">Ищу бирки на снимке…</string>
+    <string name="review_whose">Чей это снимок?</string>
+    <string name="review_also_seen">Отметить %1$s как увиденное</string>
+    <string name="review_comment">Комментарий (необязательно)</string>
+    <string name="review_retake">Переснять</string>
+    <string name="review_save">Сохранить</string>
     <string name="card_seen_no_photo">Видел, без фото</string>
     <string name="card_seen_in_walk">Уже отмечено в этом обходе</string>
     <string name="card_never_seen">Ещё не видели</string>

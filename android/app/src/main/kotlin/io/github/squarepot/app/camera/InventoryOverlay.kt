@@ -3,6 +3,7 @@
 package io.github.squarepot.app.camera
 
 import android.text.format.DateUtils
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,23 +12,34 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -90,8 +102,8 @@ internal fun WalkBar(
 
 /**
  * The card a tap on a label opens in inventory mode: the plant's caption, when it was last seen,
- * its photos and status, and "Seen, no photo". Only this button records a sighting: the scan that
- * opened the card does not.
+ * its photos and status, "Take photo" and "Seen, no photo". Only these buttons record a sighting:
+ * the scan that opened the card does not.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,6 +112,7 @@ internal fun PlantCardSheet(
     camera: CameraUiState,
     inventory: InventoryUiState,
     onSeen: (TagCode) -> Unit,
+    onTakePhoto: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val texts = rememberCaptionTexts()
@@ -131,13 +144,97 @@ internal fun PlantCardSheet(
                     content.lines.forEach { Text(it.annotated(muted, texts::age)) }
                     camera.plants[tag.value]?.singleOrNull()?.let { plant ->
                         PlantFacts(plant, camera, seen)
-                        Button(onClick = { onSeen(tag) }, modifier = Modifier.fillMaxWidth()) {
+                        Button(onClick = onTakePhoto, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.card_take_photo))
+                        }
+                        OutlinedButton(onClick = { onSeen(tag) }, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.card_seen_no_photo))
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * The photo just taken: what it shows, whose it is when it shows two plants of the copy (the
+ * others can be marked as seen), an optional comment, and "Save" or "Retake". It cannot be swiped
+ * away, so a photo is never lost by accident.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun PhotoReviewSheet(review: PhotoReview, camera: CameraUiState, photos: PhotoViewModel) {
+    val sheet = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden },
+    )
+    ModalBottomSheet(onDismissRequest = {}, sheetState = sheet) {
+        Column(
+            Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                stringResource(R.string.review_title, review.owner),
+                style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
+            )
+            review.preview?.let {
+                Image(
+                    it,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+            if (review.labels == null) {
+                Text(stringResource(R.string.review_reading), style = MaterialTheme.typography.bodySmall)
+            }
+            if (review.askWhose) Whose(review, camera, photos)
+            OutlinedTextField(
+                review.comment,
+                onValueChange = photos::setComment,
+                label = { Text(stringResource(R.string.review_comment)) },
+                maxLines = 3,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = photos::discard) { Text(stringResource(R.string.review_retake)) }
+                Button(onClick = photos::save, enabled = review.labels != null, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.review_save))
+                }
+            }
+        }
+    }
+}
+
+/** "Whose photo is this?": one of the plants on it, and whether to mark the others as seen. */
+@Composable
+private fun Whose(review: PhotoReview, camera: CameraUiState, photos: PhotoViewModel) {
+    Text(stringResource(R.string.review_whose), style = MaterialTheme.typography.titleSmall)
+    review.labels.orEmpty().forEach { tag ->
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .selectable(tag == review.owner, onClick = { photos.setOwner(tag) }, role = Role.RadioButton),
+        ) {
+            RadioButton(selected = tag == review.owner, onClick = null)
+            val name = camera.plants[tag]?.singleOrNull()?.name?.annotated()
+            Text(
+                buildAnnotatedString {
+                    append(tag)
+                    if (name != null) {
+                        append("  ")
+                        append(name)
+                    }
+                },
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(checked = review.alsoSeen, onCheckedChange = photos::setAlsoSeen)
+        Text(stringResource(R.string.review_also_seen, review.others.joinToString()))
     }
 }
 
