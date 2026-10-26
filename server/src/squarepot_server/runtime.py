@@ -25,6 +25,7 @@ from squarepot_server.photos.storage import (
     Signer,
     read_key_file,
 )
+from squarepot_server.sightings import Sightings
 from squarepot_server.store import (
     CollectionStore,
     CsvFileStore,
@@ -93,6 +94,7 @@ class Runtime:
     syncer: Syncer
     worker: SyncWorker | None
     photos: Photos | None = None
+    sightings: Sightings | None = None
     backoff: Backoff = field(default_factory=Backoff)
 
     @classmethod
@@ -119,7 +121,8 @@ class Runtime:
             chores = [photos.purge] if photos is not None else []
             worker = SyncWorker(syncer, settings.sync_interval_seconds, chores)
             worker.start()
-        return cls(settings, schema, engine, sessions, syncer, worker, photos)
+        sightings = Sightings(sessions, storage, syncer.lock)
+        return cls(settings, schema, engine, sessions, syncer, worker, photos, sightings)
 
     def stop(self) -> None:
         if self.worker is not None:

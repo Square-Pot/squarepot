@@ -320,6 +320,157 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "List a collection's plants, filtered for an inventory",
+        "description": "Every plant of the collection, in sheet order, that matches all the filters given. Former plants, those with a `status`, are left out unless `former` is true. The apps filter their own copies the same way; this is for the bot and for scripts.",
+        "operationId": "list_plants",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "main"
+              ],
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "seen_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only plants not seen since this day (UTC), never seen included.",
+              "title": "Seen Before"
+            },
+            "description": "Only plants not seen since this day (UTC), never seen included."
+          },
+          {
+            "name": "photo_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only plants with no photo taken since this day, none included.",
+              "title": "Photo Before"
+            },
+            "description": "Only plants with no photo taken since this day, none included."
+          },
+          {
+            "name": "has_photo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only plants with photos, or only those without.",
+              "title": "Has Photo"
+            },
+            "description": "Only plants with photos, or only those without."
+          },
+          {
+            "name": "former",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include former plants.",
+              "default": false,
+              "title": "Former"
+            },
+            "description": "Include former plants."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Plant"
+                  },
+                  "title": "Response List Plants"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        }
       }
     },
     "/api/v1/plants/{plant_id}": {
@@ -1447,6 +1598,77 @@
             "description": "Service Unavailable"
           }
         }
+      }
+    },
+    "/api/v1/sightings": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Record that plants were seen",
+        "description": "For the phone's queue of sightings, sent when it is online. Each sighting has an id the client chose, so sending a batch again records nothing twice. A sighting of a number no plant has is not recorded. The plants seen are sent again in the next sync, with their new `last_seen`.",
+        "operationId": "record_sightings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SightingBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SightingResult"
+                  },
+                  "type": "array",
+                  "title": "Response Record Sightings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     }
   },
@@ -2827,6 +3049,19 @@
               "2025-06-14"
             ]
           },
+          "last_seen": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen",
+            "description": "When the plant was last seen: its newest sighting or the time its newest photo was taken, whichever is later (ADR 0008). `null` when it was never seen."
+          },
           "photo_count": {
             "type": "integer",
             "minimum": 0.0,
@@ -2887,6 +3122,7 @@
           "fields",
           "custom",
           "status_since",
+          "last_seen",
           "photo_count",
           "last_photo",
           "main_photo_id",
@@ -2968,6 +3204,101 @@
           "fields"
         ],
         "title": "Preset"
+      },
+      "Sighting": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Chosen by the client: sending it again records nothing new."
+          },
+          "tag": {
+            "type": "string",
+            "pattern": "^(?!000000)[0-9]{6}$",
+            "title": "Tag",
+            "description": "Six-digit plant number with leading zeros, as on the label: \"004217\".",
+            "examples": [
+              "004217"
+            ]
+          },
+          "seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Seen At",
+            "description": "When the plant was seen; a time in the future counts as the time received."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SightingKind",
+            "description": "`seen`: marked as seen without a photo. `status`: its status was set."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "tag",
+          "seen_at",
+          "kind"
+        ],
+        "title": "Sighting",
+        "description": "The owner saw the plant with this number (ADR 0008). A photo is a sighting by itself."
+      },
+      "SightingBatch": {
+        "properties": {
+          "sightings": {
+            "items": {
+              "$ref": "#/components/schemas/Sighting"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Sightings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sightings"
+        ],
+        "title": "SightingBatch"
+      },
+      "SightingKind": {
+        "type": "string",
+        "enum": [
+          "seen",
+          "status"
+        ],
+        "title": "SightingKind"
+      },
+      "SightingOutcome": {
+        "type": "string",
+        "enum": [
+          "recorded",
+          "already_recorded",
+          "unknown_number"
+        ],
+        "title": "SightingOutcome"
+      },
+      "SightingResult": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "result": {
+            "$ref": "#/components/schemas/SightingOutcome",
+            "description": "`unknown_number`: no plant has the number, so nothing was recorded; the client can drop the sighting from its queue as for the others."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "result"
+        ],
+        "title": "SightingResult"
       },
       "Sync": {
         "properties": {

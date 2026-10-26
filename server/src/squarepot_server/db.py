@@ -148,6 +148,19 @@ class PhotoRow(Base):
     deleted_at: Mapped[datetime | None]
 
 
+class SightingRow(Base):
+    """A plant seen on a given day: a dated proof that it is still there (ADR 0008)."""
+
+    __tablename__ = "sightings"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    tag: Mapped[str] = mapped_column(String(6), index=True)
+    seen_at: Mapped[datetime]
+    # How: seen (without a photo), or status (the owner set the plant's status).
+    kind: Mapped[str] = mapped_column(String(16))
+    received_at: Mapped[datetime]
+
+
 class MainPhoto(Base):
     """The photo the owner chose to show for a number; else the newest is shown."""
 
