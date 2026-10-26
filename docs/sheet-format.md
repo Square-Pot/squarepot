@@ -164,30 +164,45 @@ Planned in the apps and not built yet:
 
 ## How Square-Pot writes
 
-Square-Pot writes to the sheet only when a user acts, never on its own.
+Square-Pot writes to the sheet only when a user acts, never on its own, and
+only to a sheet shared with the service account as Editor. A sheet read by
+link is read-only ([ADR 0006](adr/0006-editing-plants-from-the-apps.md)).
 
-In the first release there is exactly one write: **assigning numbers**. It
-needs a sheet shared with the service account; a sheet read by link is
-read-only. In the
-web app's label designer, the owner selects plants that have no number and
-asks for numbers before printing their labels. Square-Pot writes each new
-number into the empty `tag` cell of that plant's row, and sets that cell's
-format to plain text. Plant data is otherwise edited in the sheet itself.
+From the web app and the phone, while online, the owner can:
 
-Before writing, Square-Pot re-reads the target rows. A row has no number yet,
-so it is identified by its position together with the values of its known
-cells as of the last sync. If any of them has changed, or the `tag` cell is
-no longer empty, nothing is written for that row, the collection is synced
-again, and the owner is asked to retry. Edits made directly in the sheet always
-win ([ADR 0003](adr/0003-spreadsheet-as-source-of-truth.md)).
+- **edit a plant's cells**: Square-Pot writes only the cells that change,
+  never the whole row;
+- **add a plant**: Square-Pot adds a row after the last row of the tab;
+- **give a plant a number**, when it is added or later: Square-Pot writes the
+  next free number into the empty `tag` cell, and sets that cell's format to
+  plain text.
 
-Square-Pot never deletes rows, reorders rows, changes headers, or touches cells
-outside the known columns. The only formatting it changes is that of the
-`tag` cells it writes.
+Before writing, Square-Pot reads the tab again and finds the plant's row: by
+its number when it has one, otherwise by its position together with the
+values of its cells as of the last sync. Each edit carries the value the app
+showed for every cell it changes. If the row cannot be found, or one of those
+cells now holds something else, nothing is written, and the app shows the
+plant as the sheet now has it. Edits made directly in the sheet always win
+([ADR 0003](adr/0003-spreadsheet-as-source-of-truth.md)). Right after a write,
+Square-Pot reads the tab again, so the apps see the plant as the sheet has
+it. Editing a cell of a plant without a number gives it a new id in the apps.
 
-Adding plants and editing fields from Square-Pot's own clients may come later.
-They will follow the same rule: re-check the row (then identified by its
-`tag`) before writing, and let the sheet win.
+Values are written so that they read back as themselves:
+
+- text as typed text, never as a formula, number or date;
+- a date as a date and a decimal as a number, so the cell keeps its format;
+- a value from a list, such as a status, as its key: `dead`;
+- an empty value empties the cell.
+
+A value the field does not accept, or one not in canonical form, such as
+`15.03.2024` for a date, is refused with a message naming the field, and
+nothing is written.
+
+Square-Pot never deletes rows, reorders rows, adds or renames columns,
+changes headers, or touches cells outside the known columns. A field with no
+column in the sheet cannot be set: the app says which column to add. A plant
+leaves the collection through its status, and its row stays. The only
+formatting Square-Pot changes is that of the `tag` cells it writes.
 
 ## Validation and errors
 

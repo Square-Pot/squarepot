@@ -211,6 +211,228 @@
         }
       }
     },
+    "/api/v1/collections/{collection_id}/plants": {
+      "post": {
+        "tags": [
+          "plants"
+        ],
+        "summary": "Add a plant as a new row of the sheet",
+        "description": "Appends a row after the last row of the collection's tab, with the next free number unless `issue_number` is false, then reads the tab again and returns the plant as the sheet has it. Values are checked first: `422` names every value that would not read back as itself, and every column the sheet lacks; Square-Pot never adds columns. `503` when Google cannot be reached. Only collections with `editable` can be edited (ADR 0006).",
+        "operationId": "create_plant",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "main"
+              ],
+              "title": "Collection Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewPlant"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plant"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "409": {
+            "description": "Nothing was written: the sheet changed, or the collection is read-only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditConflict"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/plants/{plant_id}": {
+      "patch": {
+        "tags": [
+          "plants"
+        ],
+        "summary": "Change cells of a plant's row in the sheet",
+        "description": "Reads the plant's row from the sheet first. If any cell to change no longer holds the value the client `seen`, nothing is written, and `409` carries the plant as it now is. Otherwise only the changed cells are written, and the plant is returned as the sheet then has it. A plant without a number gets a new `id` when its cells change. Values are checked first: `422` names every value that would not read back as itself, and every column the sheet lacks; Square-Pot never adds columns. `503` when Google cannot be reached. Only collections with `editable` can be edited (ADR 0006).",
+        "operationId": "edit_plant",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "main:004217"
+              ],
+              "title": "Plant Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlantEdit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plant"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "409": {
+            "description": "Nothing was written: the sheet changed, or the collection is read-only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditConflict"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sync": {
       "get": {
         "tags": [
@@ -509,6 +731,11 @@
               ]
             ]
           },
+          "editable": {
+            "type": "boolean",
+            "title": "Editable",
+            "description": "Whether plants of this collection can be added and edited through the API: only collections read with the service account (ADR 0006). Edits of others get `409`."
+          },
           "sheet_url": {
             "anyOf": [
               {
@@ -535,6 +762,7 @@
           "synced_at",
           "error",
           "custom_columns",
+          "editable",
           "sheet_url"
         ],
         "title": "Collection",
@@ -631,6 +859,44 @@
         "title": "Display",
         "description": "How a field renders inside a plant name or caption."
       },
+      "EditConflict": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "changed_in_sheet",
+              "not_editable"
+            ],
+            "title": "Code",
+            "description": "`changed_in_sheet`: the sheet no longer holds what the client saw. `not_editable`: the collection is not read with the service account."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable explanation, in English."
+          },
+          "plant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Plant"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The plant as it now is in the sheet, to show the owner before trying again; `null` when its row cannot be found."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "plant"
+        ],
+        "title": "EditConflict",
+        "description": "The body of a `409` response to an edit: nothing was written."
+      },
       "Error": {
         "properties": {
           "code": {
@@ -655,6 +921,42 @@
         ],
         "title": "Error",
         "description": "The body of every error response."
+      },
+      "FieldChange": {
+        "properties": {
+          "seen": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seen",
+            "description": "The value the client last saw: the plant's value in `fields` or `custom`, the rejected `invalid` value for a cell the import rejected, or `null` for an empty cell. If the sheet no longer holds it, nothing is written and the server responds `409`."
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "The new value, in the canonical form of `Plant.fields`: `YYYY-MM-DD` for a date, a plain decimal such as `12.50`, a status key such as `dead`. Any text for a custom column. `null` or an empty string empties the cell."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "seen",
+          "value"
+        ],
+        "title": "FieldChange",
+        "description": "A new value for one cell of a plant, with the value the client last saw there."
       },
       "FieldDefinition": {
         "properties": {
@@ -1431,6 +1733,46 @@
         ],
         "title": "LabelTemplate"
       },
+      "NewPlant": {
+        "properties": {
+          "fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Fields",
+            "description": "Values by field key, in canonical form as in `FieldChange.value`. Every required field must have one. `tag` cannot be set: see `issue_number`.",
+            "examples": [
+              {
+                "genus": "Lithops",
+                "seeding_date": "2026-03-15",
+                "species": "lesliei"
+              }
+            ]
+          },
+          "custom": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Custom",
+            "description": "Values by custom column name, as in `Collection.custom_columns`."
+          },
+          "issue_number": {
+            "type": "boolean",
+            "title": "Issue Number",
+            "description": "Give the new plant the next free number, so that a label can be printed.",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fields"
+        ],
+        "title": "NewPlant",
+        "description": "A plant to add as a new row at the end of a collection's tab (ADR 0006)."
+      },
       "PageSize": {
         "type": "string",
         "enum": [
@@ -1551,6 +1893,44 @@
         ],
         "title": "Plant",
         "description": "One plant: one row of a collection's tab."
+      },
+      "PlantEdit": {
+        "properties": {
+          "fields": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldChange"
+            },
+            "type": "object",
+            "title": "Fields",
+            "description": "Changes by field key. `tag` cannot be set: ask for `issue_number` instead.",
+            "examples": [
+              {
+                "species": {
+                  "seen": "lesliei",
+                  "value": "lesliei var. albinica"
+                }
+              }
+            ]
+          },
+          "custom": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldChange"
+            },
+            "type": "object",
+            "title": "Custom",
+            "description": "Changes by custom column name, as in `Collection.custom_columns`."
+          },
+          "issue_number": {
+            "type": "boolean",
+            "title": "Issue Number",
+            "description": "Give the plant the next free number, if it has none. The number is taken from the server's registry and never issued again, even if writing it fails.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PlantEdit",
+        "description": "Changes to one plant, written into its row of the sheet (ADR 0006)."
       },
       "Preset": {
         "properties": {

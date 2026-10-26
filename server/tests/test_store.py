@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import date
+from decimal import Decimal
 from typing import Any, cast
 
 import pytest
@@ -13,6 +15,7 @@ import requests
 from squarepot_server.config import CollectionConfig
 from squarepot_server.store import (
     MAX_DOWNLOAD_BYTES,
+    CellWrite,
     GoogleSheetsStore,
     SheetLinkStore,
     StoreError,
@@ -45,6 +48,12 @@ class StubSession:
         if isinstance(self.answer, Exception):
             raise self.answer
         return self.answer
+
+    def request(
+        self, method: str, url: str, params: dict[str, str], json: Any, timeout: float
+    ) -> requests.Response:
+        assert (method, json) == ("GET", None)
+        return self.get(url, params, timeout)
 
 
 def store(answer: requests.Response | Exception) -> tuple[GoogleSheetsStore, StubSession]:
@@ -196,3 +205,112 @@ def test_link_failures_become_store_errors(
     sheets, _ = link_store(answer)
     with pytest.raises(StoreError, match=f"^{message}$"):
         sheets.read(LINKED)
+
+
+@dataclass
+class RecordingSession:
+    """Answers each request with the next of `answers`, and records it."""
+
+    answers: list[requests.Response]
+    calls: list[tuple[str, str, dict[str, str], Any]] = field(default_factory=list)
+
+    def request(
+        self, method: str, url: str, params: dict[str, str], json: Any, timeout: float
+    ) -> requests.Response:
+        self.calls.append((method, url, params, json))
+        return self.answers.pop(0)
+
+
+def writing_store(*answers: requests.Response) -> tuple[GoogleSheetsStore, RecordingSession]:
+    session = RecordingSession(list(answers))
+    return GoogleSheetsStore(cast(requests.Session, session)), session
+
+
+SHEETS = "https://sheets.googleapis.com/v4/spreadsheets/abc/123%3Fx"
+TABS = {
+    "sheets": [
+        {"properties": {"sheetId": 0, "title": "Other"}},
+        {"properties": {"sheetId": 7, "title": "It's a tab/1"}},
+    ]
+}
+
+
+def test_cells_are_written_as_if_typed_and_keep_their_format() -> None:
+    sheets, session = writing_store(response(200, {}))
+    cells = [
+        CellWrite(1, "=1+1"),
+        CellWrite(3, date(2025, 1, 2)),
+        CellWrite(4, Decimal("12.50")),
+        CellWrite(5, Decimal("3")),
+        CellWrite(27, None),
+    ]
+    sheets.write(CONFIG, 12, cells)
+    [(method, url, params, body)] = session.calls
+    assert (method, url, params) == ("POST", f"{SHEETS}/values:batchUpdate", {})
+    assert body == {
+        "valueInputOption": "USER_ENTERED",
+        "data": [
+            {"range": "'It''s a tab/1'!B12", "values": [["'=1+1"]]},
+            {"range": "'It''s a tab/1'!D12", "values": [["2025-01-02"]]},
+            {"range": "'It''s a tab/1'!E12", "values": [[12.5]]},
+            {"range": "'It''s a tab/1'!F12", "values": [[3]]},
+            {"range": "'It''s a tab/1'!AB12", "values": [[""]]},
+        ],
+    }
+
+
+def test_a_number_cell_is_set_to_plain_text() -> None:
+    sheets, session = writing_store(response(200, {}), response(200, TABS), response(200, {}))
+    sheets.write(CONFIG, 12, [CellWrite(0, "004219", number=True)])
+    write, tabs, format_ = session.calls
+    assert write[3]["data"] == [{"range": "'It''s a tab/1'!A12", "values": [["'004219"]]}]
+    assert tabs[:3] == ("GET", SHEETS, {"fields": "sheets.properties(sheetId,title)"})
+    assert format_[:2] == ("POST", f"{SHEETS}:batchUpdate")
+    assert format_[3] == {
+        "requests": [
+            {
+                "repeatCell": {
+                    "range": {
+                        "sheetId": 7,
+                        "startRowIndex": 11,
+                        "endRowIndex": 12,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": 1,
+                    },
+                    "cell": {"userEnteredFormat": {"numberFormat": {"type": "TEXT"}}},
+                    "fields": "userEnteredFormat.numberFormat",
+                }
+            }
+        ]
+    }
+
+
+def test_a_row_is_appended_after_the_last_and_its_number_is_returned() -> None:
+    appended = {"updates": {"updatedRange": "'It''s a tab/1'!A528:C528"}}
+    sheets, session = writing_store(response(200, appended), response(200, TABS), response(200, {}))
+    row = sheets.append(CONFIG, [CellWrite(2, "cooperi"), CellWrite(0, "004219", number=True)])
+    assert row == 528
+    method, url, params, body = session.calls[0]
+    assert (method, url) == ("POST", f"{SHEETS}/values/%27It%27%27s%20a%20tab%2F1%27:append")
+    assert params == {"valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS"}
+    assert body == {"majorDimension": "ROWS", "values": [["'004219", "", "'cooperi"]]}
+    assert session.calls[2][3]["requests"][0]["repeatCell"]["range"]["startRowIndex"] == 527
+
+
+def test_an_append_without_a_row_in_the_answer_is_an_error() -> None:
+    sheets, _ = writing_store(response(200, {"updates": {}}))
+    with pytest.raises(StoreError, match="did not say which row"):
+        sheets.append(CONFIG, [CellWrite(1, "Haworthia")])
+
+
+def test_a_missing_tab_stops_formatting() -> None:
+    sheets, _ = writing_store(response(200, {}), response(200, {"sheets": []}))
+    with pytest.raises(StoreError, match="no tab"):
+        sheets.write(CONFIG, 2, [CellWrite(0, "004219", number=True)])
+
+
+def test_write_failures_become_store_errors() -> None:
+    answer = response(403, {"error": {"message": "The caller does not have permission"}})
+    sheets, _ = writing_store(answer)
+    with pytest.raises(StoreError, match="^Google answered 403: The caller does not have"):
+        sheets.write(CONFIG, 2, [CellWrite(1, "Lithops")])

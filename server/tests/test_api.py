@@ -14,7 +14,12 @@ from squarepot_server.fields import load_schema
 from tests.conftest import HEADER, TOKEN, FakeStore, collection, runtime
 
 PROTECTED = [
-    (method.upper(), path.replace("{tag}", "004217"))
+    (
+        method.upper(),
+        path.replace("{tag}", "004217")
+        .replace("{plant_id}", "main:004217")
+        .replace("{collection_id}", "main"),
+    )
     for path, operations in openapi.document()["paths"].items()
     for method, operation in operations.items()
     if operation.get("security")
@@ -34,6 +39,8 @@ def test_every_route_but_health_is_protected() -> None:
         ("GET", "/api/v1/plants/by-tag/004217"),
         ("GET", "/api/v1/schema"),
         ("GET", "/api/v1/sync"),
+        ("PATCH", "/api/v1/plants/main:004217"),
+        ("POST", "/api/v1/collections/main/plants"),
         ("POST", "/api/v1/labels"),
     ]
 
@@ -102,6 +109,7 @@ def test_collections(client: TestClient) -> None:
     assert main["id"] == "main"
     assert main["name"] == "Main"
     assert main["plant_count"] == 3
+    assert main["editable"] is True
     assert main["error"] is None
     assert main["synced_at"].endswith("Z") or main["synced_at"].endswith("+00:00")
 

@@ -21,12 +21,24 @@ def test_committed_openapi_is_up_to_date() -> None:
 
 
 def test_every_error_response_uses_the_error_body() -> None:
-    for path, operations in openapi.document()["paths"].items():
+    document = openapi.document()
+    for path, operations in document["paths"].items():
         for method, operation in operations.items():
             for status, response in operation["responses"].items():
-                if status.startswith(("4", "5")):
-                    schema = response["content"]["application/json"]["schema"]
-                    assert schema == {"$ref": "#/components/schemas/Error"}, (method, path, status)
+                if not status.startswith(("4", "5")):
+                    continue
+                expected = "Error"
+                if status == "409" and operation["operationId"] in ("create_plant", "edit_plant"):
+                    # An edit's conflict also carries the plant as it now is.
+                    expected = "EditConflict"
+                schema = response["content"]["application/json"]["schema"]
+                assert schema == {"$ref": f"#/components/schemas/{expected}"}, (
+                    method,
+                    path,
+                    status,
+                )
+    conflict = document["components"]["schemas"]["EditConflict"]["properties"]
+    assert set(document["components"]["schemas"]["Error"]["properties"]) <= set(conflict)
 
 
 def test_field_schema_model_reads_fields_yaml() -> None:

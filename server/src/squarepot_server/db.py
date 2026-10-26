@@ -6,9 +6,10 @@ sequence (`seq`). A sync cursor is a position in that sequence, so the changes
 since a cursor are the rows with a greater `seq`. Removed rows are kept as
 tombstones (`removed`), so that removals can be synced too.
 
-The sequence is safe because there is one writer: the sync worker of a single
-server process. Running several server processes on one database would need a
-database sequence instead.
+The sequence is safe because there is one writer at a time: the sync worker
+and the edits of a single server process take turns under the syncer's lock.
+Running several server processes on one database would need a database
+sequence instead.
 """
 
 from __future__ import annotations

@@ -31,6 +31,8 @@ fails when the committed file is out of date.
 | `GET /api/v1/sync?cursor=…` | Returns the changes to the phone's local copy since a cursor, or a full copy ([ADR 0005](../docs/adr/0005-offline-first-phone.md)). |
 | `GET /api/v1/labels/templates` | Lists the built-in label sizes and sheet layouts. |
 | `POST /api/v1/labels` | Prints labels for plants, as a PDF or one SVG page. |
+| `POST /api/v1/collections/{collection_id}/plants` | Adds a plant as a new row of the sheet, with the next free number ([ADR 0006](../docs/adr/0006-editing-plants-from-the-apps.md)). |
+| `PATCH /api/v1/plants/{plant_id}` | Changes cells of a plant's row, unless the sheet changed them first, or gives it a number. |
 
 Every route except `health` needs the operator's API token as
 `Authorization: Bearer <token>`. A client address that sends 10 wrong or
@@ -95,14 +97,16 @@ instead, through the Sheets and Drive APIs.
    a service account and a JSON key for it. Save the key as
    `deploy/service-account.json`, which git ignores. Never commit it.
 2. **Share the sheet** with the service account's email
-   (`…@….iam.gserviceaccount.com`) as **Viewer**.
+   (`…@….iam.gserviceaccount.com`): as **Editor** to add and edit plants from
+   the apps, or as **Viewer** to only read it.
 3. **Configure.** In `.env`, set `SQUAREPOT_STORE=google` and
    `COMPOSE_FILE=compose.yaml:compose.google.yaml`, which passes the key to the
    server. Each collection in `SQUAREPOT_COLLECTIONS` names its tab with
    `sheet` instead of `gid`.
 
-Assigning numbers, when it comes, will write to the sheet, and so will need a
-service account: a link gives read-only access.
+Adding and editing plants writes to the sheet, and so needs the service
+account: a link gives read-only access
+([sheet-format.md](../docs/sheet-format.md#how-square-pot-writes)).
 
 ### Demo mode
 

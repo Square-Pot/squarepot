@@ -6,11 +6,12 @@ from __future__ import annotations
 import logging
 import re
 import secrets
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import date
 from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,25 +20,30 @@ from squarepot_server import __version__
 from squarepot_server.api.models import (
     AUTO_TEMPLATE,
     Collection,
+    EditConflict,
     Error,
     FieldSchema,
     Health,
     LabelFormat,
     LabelRequest,
     LabelTemplate,
+    NewPlant,
     Plant,
+    PlantEdit,
     Sync,
     SyncKind,
     TagLookup,
 )
 from squarepot_server.backoff import client_key
 from squarepot_server.db import CollectionRow, PlantRow, current_seq, get_meta
+from squarepot_server.edits import Conflict, Editor, InvalidEdit, NotEditable, NotFound
 from squarepot_server.fields import STATUS, STATUS_DATE
 from squarepot_server.labels.caption import NAME, caption, entries, extra_text
 from squarepot_server.labels.layout import TEMPLATES, Item, LayoutError, Page, layout_pages
 from squarepot_server.labels.render import to_pdf, to_svg
 from squarepot_server.labels.text import Run
 from squarepot_server.runtime import Runtime
+from squarepot_server.store import EditableStore, StoreError
 
 log = logging.getLogger(__name__)
 bearer = HTTPBearer(
@@ -112,6 +118,7 @@ def to_collection(row: CollectionRow, runtime: Runtime) -> Collection:
         synced_at=row.synced_at,
         error=row.error,
         custom_columns=row.custom_columns,
+        editable=isinstance(runtime.syncer.store, EditableStore),
         sheet_url=sheet_url(runtime, row.id),
     )
 
@@ -219,6 +226,87 @@ def get_plants_by_tag(
     if not rows:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"No plant has the number {tag}.")
     return TagLookup(tag=tag, plants=[to_plant(row) for row in rows])
+
+
+EDIT_RESPONSES: dict[int | str, dict[str, Any]] = {
+    **errors(
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        status.HTTP_503_SERVICE_UNAVAILABLE,
+    ),
+    status.HTTP_409_CONFLICT: {
+        "model": EditConflict,
+        "description": "Nothing was written: the sheet changed, or the collection is read-only.",
+    },
+}
+EDIT_RULES = (
+    " Values are checked first: `422` names every value that would not read back as "
+    "itself, and every column the sheet lacks; Square-Pot never adds columns. `503` when "
+    "Google cannot be reached. Only collections with `editable` can be edited (ADR 0006)."
+)
+
+
+def edited(action: Callable[[], PlantRow]) -> Plant | JSONResponse:
+    """The plant an edit left, or the error response an edit failed with."""
+    try:
+        return to_plant(action())
+    except NotFound as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(error)) from error
+    except InvalidEdit as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
+    except StoreError as error:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, f"The sheet cannot be reached: {error}."
+        ) from error
+    except NotEditable as error:
+        body = EditConflict(code="not_editable", message=str(error), plant=None)
+    except Conflict as error:
+        plant = to_plant(error.plant) if error.plant is not None else None
+        body = EditConflict(code="changed_in_sheet", message=str(error), plant=plant)
+    return JSONResponse(body.model_dump(mode="json"), status_code=status.HTTP_409_CONFLICT)
+
+
+@router.post(
+    "/collections/{collection_id}/plants",
+    tags=["plants"],
+    summary="Add a plant as a new row of the sheet",
+    description=(
+        "Appends a row after the last row of the collection's tab, with the next free number "
+        "unless `issue_number` is false, then reads the tab again and returns the plant as "
+        "the sheet has it." + EDIT_RULES
+    ),
+    status_code=status.HTTP_201_CREATED,
+    response_model=Plant,
+    responses=EDIT_RESPONSES,
+)
+def create_plant(
+    collection_id: Annotated[str, Path(examples=["main"])],
+    body: NewPlant,
+    runtime: RuntimeDep,
+) -> Plant | JSONResponse:
+    return edited(lambda: Editor(runtime.syncer).create(collection_id, body))
+
+
+@router.patch(
+    "/plants/{plant_id}",
+    tags=["plants"],
+    summary="Change cells of a plant's row in the sheet",
+    description=(
+        "Reads the plant's row from the sheet first. If any cell to change no longer holds "
+        "the value the client `seen`, nothing is written, and `409` carries the plant as it "
+        "now is. Otherwise only the changed cells are written, and the plant is returned as "
+        "the sheet then has it. A plant without a number gets a new `id` when its cells "
+        "change." + EDIT_RULES
+    ),
+    response_model=Plant,
+    responses=EDIT_RESPONSES,
+)
+def edit_plant(
+    plant_id: Annotated[str, Path(examples=["main:004217"])],
+    body: PlantEdit,
+    runtime: RuntimeDep,
+) -> Plant | JSONResponse:
+    return edited(lambda: Editor(runtime.syncer).edit(plant_id, body))
 
 
 @router.get(

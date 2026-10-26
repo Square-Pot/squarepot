@@ -6,8 +6,12 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import re
+from dataclasses import dataclass
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, Protocol, cast, runtime_checkable
 from urllib.parse import quote
 
 import requests
@@ -15,16 +19,20 @@ from google.auth.transport.requests import AuthorizedSession
 from google.oauth2 import service_account
 
 from squarepot_server.config import CollectionConfig
-from squarepot_server.fields import Cell
+from squarepot_server.fields import Cell, column_name
 
 SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets.readonly",
+    # Writing too (ADR 0006); the sheet's sharing decides whether the account may.
+    "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.metadata.readonly",
 ]
 TIMEOUT_SECONDS = 30
 EXPORT_URL = "https://docs.google.com/spreadsheets/d/{}/export"
 # A tab of plants is about 100 bytes a row; more than this is not a collection.
 MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024
+SHEETS_URL = "https://sheets.googleapis.com/v4/spreadsheets/{}"
+# The first row of a range such as 'Plants'!A528:F528.
+RANGE_ROW = re.compile(r"![A-Z]+([0-9]+)")
 
 
 class StoreError(Exception):
@@ -38,6 +46,34 @@ class CollectionStore(Protocol):
 
     def read(self, collection: CollectionConfig) -> list[list[Cell]]:
         """Every row of the collection's tab, header first."""
+        ...
+
+
+@dataclass(frozen=True)
+class CellWrite:
+    """A value to write into one cell of a row, by zero-based column index.
+
+    Text is written as typed text, never as a formula or a number. A decimal is
+    written as a number and a date as a date, so the cell keeps its format.
+    None empties the cell. A plant number is text, and its cell is also set to
+    the plain text format (docs/sheet-format.md, "The plant number").
+    """
+
+    column: int
+    value: str | Decimal | date | None
+    number: bool = False
+
+
+@runtime_checkable
+class EditableStore(CollectionStore, Protocol):
+    """A store that can write the cells of a collection (ADR 0006)."""
+
+    def write(self, collection: CollectionConfig, row: int, cells: list[CellWrite]) -> None:
+        """Write cells of one row, by its sheet row number; leaves every other cell alone."""
+        ...
+
+    def append(self, collection: CollectionConfig, cells: list[CellWrite]) -> int:
+        """Add a row after the last row of the tab, and return its row number."""
         ...
 
 
@@ -130,8 +166,15 @@ class GoogleSheetsStore:
         return cls(AuthorizedSession(credentials))  # type: ignore[no-untyped-call]
 
     def get(self, url: str, params: dict[str, str]) -> dict[str, Any]:
+        return self.call("GET", url, params)
+
+    def call(
+        self, method: str, url: str, params: dict[str, str], body: Any = None
+    ) -> dict[str, Any]:
         try:
-            response = self.session.get(url, params=params, timeout=TIMEOUT_SECONDS)
+            response = self.session.request(
+                method, url, params=params, json=body, timeout=TIMEOUT_SECONDS
+            )
         except Exception as error:
             # The class name only: requests puts the URL, and so the sheet id, in the text.
             raise StoreError(f"Google is unreachable ({type(error).__name__})") from error
@@ -158,12 +201,20 @@ class GoogleSheetsStore:
         )
         return str(body["modifiedTime"])
 
-    def read(self, collection: CollectionConfig) -> list[list[Cell]]:
+    @staticmethod
+    def quoted(sheet: str) -> str:
+        """A tab name as the start of a range: 'It''s a tab'."""
+        return "'{}'".format(sheet.replace("'", "''"))
+
+    def values_url(self, collection: CollectionConfig) -> str:
+        """The address of the collection's whole tab in the Sheets values API."""
         spreadsheet_id, sheet = self.tab(collection)
-        sheet = sheet.replace("'", "''")
+        tab = quote(self.quoted(sheet), safe="")
+        return f"{SHEETS_URL.format(quote(spreadsheet_id))}/values/{tab}"
+
+    def read(self, collection: CollectionConfig) -> list[list[Cell]]:
         body = self.get(
-            f"https://sheets.googleapis.com/v4/spreadsheets/{quote(spreadsheet_id)}"
-            f"/values/{quote(f"'{sheet}'", safe='')}",
+            self.values_url(collection),
             {
                 "valueRenderOption": "UNFORMATTED_VALUE",
                 "dateTimeRenderOption": "SERIAL_NUMBER",
@@ -171,6 +222,97 @@ class GoogleSheetsStore:
             },
         )
         return cast(list[list[Cell]], body.get("values", []))
+
+    @staticmethod
+    def entered(cell: CellWrite) -> str | int | float:
+        """A value as if typed into the cell, which then keeps its format."""
+        match cell.value:
+            case None:
+                return ""
+            case Decimal():
+                return (
+                    int(cell.value) if cell.value == cell.value.to_integral() else float(cell.value)
+                )
+            case date():
+                # Read as a date whatever the sheet's locale.
+                return cell.value.isoformat()
+            case str():
+                # The apostrophe keeps text as text: never a formula, number or date.
+                return "'" + cell.value
+
+    def write(self, collection: CollectionConfig, row: int, cells: list[CellWrite]) -> None:
+        spreadsheet_id, sheet = self.tab(collection)
+        data = [
+            {
+                "range": f"{self.quoted(sheet)}!{column_name(cell.column)}{row}",
+                "values": [[self.entered(cell)]],
+            }
+            for cell in cells
+        ]
+        self.call(
+            "POST",
+            f"{SHEETS_URL.format(quote(spreadsheet_id))}/values:batchUpdate",
+            {},
+            {"valueInputOption": "USER_ENTERED", "data": data},
+        )
+        self.format_numbers(collection, row, cells)
+
+    def append(self, collection: CollectionConfig, cells: list[CellWrite]) -> int:
+        by_column = {cell.column: cell for cell in cells}
+        values = [
+            self.entered(by_column.get(column, CellWrite(column, None)))
+            for column in range(max(by_column, default=0) + 1)
+        ]
+        body = self.call(
+            "POST",
+            f"{self.values_url(collection)}:append",
+            {"valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS"},
+            {"majorDimension": "ROWS", "values": [values]},
+        )
+        try:
+            match = RANGE_ROW.search(body["updates"]["updatedRange"])
+        except (KeyError, TypeError):
+            match = None
+        if match is None:
+            raise StoreError("Google did not say which row it added")
+        row = int(match.group(1))
+        self.format_numbers(collection, row, cells)
+        return row
+
+    def format_numbers(
+        self, collection: CollectionConfig, row: int, cells: list[CellWrite]
+    ) -> None:
+        """Set the plain text format on the cells of plant numbers just written."""
+        numbers = [cell for cell in cells if cell.number and cell.value is not None]
+        if not numbers:
+            return
+        spreadsheet_id, sheet = self.tab(collection)
+        url = SHEETS_URL.format(quote(spreadsheet_id))
+        body = self.get(url, {"fields": "sheets.properties(sheetId,title)"})
+        sheet_ids = [
+            tab["properties"]["sheetId"]
+            for tab in body.get("sheets", [])
+            if tab.get("properties", {}).get("title") == sheet
+        ]
+        if not sheet_ids:
+            raise StoreError(f"the spreadsheet has no tab {sheet!r}")
+        formats = [
+            {
+                "repeatCell": {
+                    "range": {
+                        "sheetId": sheet_ids[0],
+                        "startRowIndex": row - 1,
+                        "endRowIndex": row,
+                        "startColumnIndex": cell.column,
+                        "endColumnIndex": cell.column + 1,
+                    },
+                    "cell": {"userEnteredFormat": {"numberFormat": {"type": "TEXT"}}},
+                    "fields": "userEnteredFormat.numberFormat",
+                }
+            }
+            for cell in numbers
+        ]
+        self.call("POST", f"{url}:batchUpdate", {}, {"requests": formats})
 
 
 class CsvFileStore:

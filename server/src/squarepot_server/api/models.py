@@ -188,6 +188,12 @@ class Collection(ApiModel):
         ),
         examples=[["Marathon", "soil"]],
     )
+    editable: bool = Field(
+        description=(
+            "Whether plants of this collection can be added and edited through the API: only "
+            "collections read with the service account (ADR 0006). Edits of others get `409`."
+        ),
+    )
     sheet_url: str | None = Field(
         description=(
             "Address of the collection's sheet in Google Sheets, opening its tab when the "
@@ -260,6 +266,85 @@ class TagLookup(ApiModel):
         description=(
             "Every plant with this number. Numbers are unique, so this holds one plant, "
             "except while an import collision is unresolved (ADR 0002)."
+        ),
+    )
+
+
+class FieldChange(ApiModel):
+    """A new value for one cell of a plant, with the value the client last saw there."""
+
+    seen: str | None = Field(
+        description=(
+            "The value the client last saw: the plant's value in `fields` or `custom`, the "
+            "rejected `invalid` value for a cell the import rejected, or `null` for an empty "
+            "cell. If the sheet no longer holds it, nothing is written and the server "
+            "responds `409`."
+        ),
+    )
+    value: str | None = Field(
+        description=(
+            "The new value, in the canonical form of `Plant.fields`: `YYYY-MM-DD` for a date, "
+            "a plain decimal such as `12.50`, a status key such as `dead`. Any text for a "
+            "custom column. `null` or an empty string empties the cell."
+        ),
+    )
+
+
+class PlantEdit(ApiModel):
+    """Changes to one plant, written into its row of the sheet (ADR 0006)."""
+
+    fields: dict[str, FieldChange] = Field(
+        default_factory=dict,
+        description=("Changes by field key. `tag` cannot be set: ask for `issue_number` instead."),
+        examples=[{"species": {"seen": "lesliei", "value": "lesliei var. albinica"}}],
+    )
+    custom: dict[str, FieldChange] = Field(
+        default_factory=dict,
+        description="Changes by custom column name, as in `Collection.custom_columns`.",
+    )
+    issue_number: bool = Field(
+        default=False,
+        description=(
+            "Give the plant the next free number, if it has none. The number is taken from "
+            "the server's registry and never issued again, even if writing it fails."
+        ),
+    )
+
+
+class NewPlant(ApiModel):
+    """A plant to add as a new row at the end of a collection's tab (ADR 0006)."""
+
+    fields: dict[str, str] = Field(
+        description=(
+            "Values by field key, in canonical form as in `FieldChange.value`. Every required "
+            "field must have one. `tag` cannot be set: see `issue_number`."
+        ),
+        examples=[{"genus": "Lithops", "species": "lesliei", "seeding_date": "2026-03-15"}],
+    )
+    custom: dict[str, str] = Field(
+        default_factory=dict,
+        description="Values by custom column name, as in `Collection.custom_columns`.",
+    )
+    issue_number: bool = Field(
+        default=True,
+        description="Give the new plant the next free number, so that a label can be printed.",
+    )
+
+
+class EditConflict(ApiModel):
+    """The body of a `409` response to an edit: nothing was written."""
+
+    code: Literal["changed_in_sheet", "not_editable"] = Field(
+        description=(
+            "`changed_in_sheet`: the sheet no longer holds what the client saw. "
+            "`not_editable`: the collection is not read with the service account."
+        )
+    )
+    message: str = Field(description="Human-readable explanation, in English.")
+    plant: Plant | None = Field(
+        description=(
+            "The plant as it now is in the sheet, to show the owner before trying again; "
+            "`null` when its row cannot be found."
         ),
     )
 

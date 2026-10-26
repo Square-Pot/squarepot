@@ -12,6 +12,7 @@ const MAIN: Collection = {
   synced_at: null,
   error: null,
   custom_columns: [],
+  editable: false,
   sheet_url: null,
 };
 

@@ -89,10 +89,13 @@ class Syncer:
         self.schema = schema
         self.collections = collections
         self.clock = clock
+        # Held while reading a sheet into the copy, and by edits (ADR 0006) from their
+        # check of the sheet until the copy has their change: one writer at a time.
+        self.lock = threading.RLock()
 
     def prepare(self) -> None:
         """Set up server-wide state, and drop collections no longer configured."""
-        with self.sessions.begin() as session:
+        with self.lock, self.sessions.begin() as session:
             if get_meta(session, "epoch") is None:
                 set_meta(session, "epoch", secrets.token_hex(8))
             if get_meta(session, "schema_version") != str(self.schema.version):
@@ -121,7 +124,7 @@ class Syncer:
                 self.record_failure(collection)
 
     def record_failure(self, collection: CollectionConfig) -> None:
-        with self.sessions.begin() as session:
+        with self.lock, self.sessions.begin() as session:
             row = session.get(CollectionRow, collection.id)
             if row is None:
                 row = CollectionRow(id=collection.id, name=collection.name, seq=0, issues=[])
@@ -131,8 +134,9 @@ class Syncer:
                 row.error = UNEXPECTED_ERROR
                 row.seq = next_seq(session)
 
-    def sync_collection(self, collection: CollectionConfig) -> None:
-        with self.sessions.begin() as session:
+    def sync_collection(self, collection: CollectionConfig, force: bool = False) -> None:
+        """Read the collection if its store version changed, or always when forced."""
+        with self.lock, self.sessions.begin() as session:
             row = session.get(CollectionRow, collection.id)
             if row is None:
                 row = CollectionRow(id=collection.id, name=collection.name, seq=0, issues=[])
@@ -141,7 +145,7 @@ class Syncer:
             row.name = collection.name
             try:
                 version = self.store.version(collection)
-                if version != row.store_version or row.error is not None:
+                if force or version != row.store_version or row.error is not None:
                     parsed = parse_tab(self.schema, self.store.read(collection))
                     self.apply(session, collection.id, parsed)
                     row.store_version = version

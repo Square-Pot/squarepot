@@ -15,7 +15,7 @@ from squarepot_server.app import create_app
 from squarepot_server.config import CollectionConfig, Settings
 from squarepot_server.fields import Cell
 from squarepot_server.runtime import Runtime
-from squarepot_server.store import StoreError
+from squarepot_server.store import CellWrite, StoreError
 
 TOKEN = "test-token-0123456789"
 HEADER: list[Cell] = ["tag", "genus", "species", "field_number"]
@@ -23,13 +23,18 @@ HEADER: list[Cell] = ["tag", "genus", "species", "field_number"]
 
 @dataclass
 class FakeStore:
-    """Tabs by collection id. Bump `versions` (or use `put`) when a tab changes."""
+    """Tabs by collection id. Bump `versions` (or use `put`) when a tab changes.
+
+    It can be written to, as the service account's store can: written values
+    land in the tab as text, and `writes` records each write.
+    """
 
     tabs: dict[str, list[list[Cell]]] = field(default_factory=dict)
     versions: dict[str, int] = field(default_factory=dict)
     failing: set[str] = field(default_factory=set)
     buggy: set[str] = field(default_factory=set)
     reads: int = 0
+    writes: list[tuple[int, list[CellWrite]]] = field(default_factory=list)
 
     def put(self, collection_id: str, values: list[list[Cell]]) -> None:
         self.tabs[collection_id] = values
@@ -45,6 +50,24 @@ class FakeStore:
         if collection.id in self.buggy:
             raise RuntimeError("a bug")
         return self.tabs[collection.id]
+
+    def write(self, collection: CollectionConfig, row: int, cells: list[CellWrite]) -> None:
+        if collection.id in self.failing:
+            raise StoreError("Google is unreachable: test")
+        self.writes.append((row, cells))
+        values = self.tabs[collection.id]
+        while len(values) < row:
+            values.append([])
+        for cell in cells:
+            line = values[row - 1]
+            line.extend([None] * (cell.column + 1 - len(line)))
+            line[cell.column] = None if cell.value is None else str(cell.value)
+        self.versions[collection.id] += 1
+
+    def append(self, collection: CollectionConfig, cells: list[CellWrite]) -> int:
+        row = len(self.tabs[collection.id]) + 1
+        self.write(collection, row, cells)
+        return row
 
 
 def collection(collection_id: str) -> CollectionConfig:
