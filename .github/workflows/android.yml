@@ -56,6 +56,14 @@ jobs:
           SQUAREPOT_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: ./gradlew --no-daemon assembleDebug
 
+      # Room exports the queue's schema at build time; a migration test opens the old version from
+      # it, so each version's file must be committed with the change that makes it.
+      - name: Exported Room schemas are committed
+        if: success() || failure()
+        run: |
+          git add --intent-to-add app/schemas
+          git diff --exit-code -- app/schemas
+
       - name: Upload debug APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

@@ -21,6 +21,8 @@ repos:
       - id: check-yaml
       - id: detect-private-key
       - id: end-of-file-fixer
+        # Room writes its exported schemas without a final newline, and CI checks them byte for byte.
+        exclude: '^android/app/schemas/'
       - id: mixed-line-ending
         args: ["--fix=lf"]
         # .gitattributes checks Windows scripts out with CRLF.

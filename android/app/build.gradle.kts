@@ -49,6 +49,12 @@ android {
     }
 }
 
+ksp {
+    // Room writes the schema of each database that exports it here (only the queue does), for
+    // migration tests to open its earlier versions. CI checks that it is committed.
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 detekt {
     buildUponDefaultConfig = true
     config.setFrom(rootProject.file("config/detekt/detekt.yml"))

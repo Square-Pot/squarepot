@@ -31,3 +31,7 @@ indent_size = unset
 
 [Makefile]
 indent_style = tab
+
+[android/app/schemas/**]
+# Room writes its exported schemas without a final newline, and CI checks them byte for byte.
+insert_final_newline = false

@@ -13,9 +13,10 @@ import androidx.room.migration.Migration
  *
  * Unlike the local copy, this holds data that exists nowhere else yet, so it is never dropped.
  * Every change to these tables needs a migration in [MIGRATIONS], with a test that opens a
- * database of the previous version; without one, Room refuses to open the database.
+ * database of the previous version from its exported schema (`android/app/schemas`); without a
+ * migration, Room refuses to open the database.
  */
-@Database(entities = [QueuedPhoto::class, QueuedSighting::class], version = 1, exportSchema = false)
+@Database(entities = [QueuedPhoto::class, QueuedSighting::class], version = 1, exportSchema = true)
 abstract class QueueDatabase : RoomDatabase() {
     abstract fun queue(): QueueDao
 
