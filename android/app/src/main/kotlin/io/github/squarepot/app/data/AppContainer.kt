@@ -29,7 +29,11 @@ class AppContainer(context: Context) {
 
     private val photoDir = File(context.filesDir, "queue/photos")
     val outbox = Outbox(queueDatabase.queue(), photoDir, onAdded = { QueueWorker.enqueue(app) })
-    private val sender = QueueSender(queueDatabase.queue(), photoDir)
+    private val sender = QueueSender(
+        queueDatabase.queue(),
+        photoDir,
+        inCopy = { database.copy().plantsByTag(it).isNotEmpty() },
+    )
 
     private val engine = SyncEngine(database)
     private val http = OkHttpClient.Builder()

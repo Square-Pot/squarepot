@@ -45,6 +45,9 @@ class QueueSenderTest {
     private var ids = 0
     private var added = 0
 
+    /** Numbers the local copy has. */
+    private val copy = mutableSetOf("004217", "004218", "004219")
+
     @Before
     fun setUp() {
         server.start()
@@ -54,7 +57,7 @@ class QueueSenderTest {
         dao = db.queue()
         photoDir = folder.newFolder("queue")
         outbox = Outbox(dao, photoDir, onAdded = { added++ }, clock = { now }, newId = { "id-${++ids}" })
-        sender = QueueSender(dao, photoDir) { now }
+        sender = QueueSender(dao, photoDir, inCopy = { it in copy }) { now }
         api = SquarepotApi(server.url("/"), "secret", OkHttpClient())
     }
 
@@ -161,6 +164,16 @@ class QueueSenderTest {
         assertTrue(waiting.isEmpty())
         assertEquals(1, outbox.problems.first())
         assertTrue("the refused photo is kept", File(photoDir, "id-1.jpg").exists())
+    }
+
+    @Test
+    fun `a 404 for a plant the copy has is a server too old for photos, retried`() = runTest {
+        outbox.addPhoto("004217", shot(), takenAt = 1_000L, comment = null)
+        respond("""{"code": "not_found", "message": "Not Found"}""", code = 404)
+
+        assertEquals(QueueOutcome.Failed(SyncFailure.SERVER, sent = 0), sender.send(api))
+        assertEquals(1, dao.pendingPhotos().size)
+        assertEquals(0, outbox.problems.first())
     }
 
     @Test
