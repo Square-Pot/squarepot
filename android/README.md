@@ -113,8 +113,13 @@ to the camera.
 - **Inventory mode.** The clipboard button at the top turns it on (ADR 0008,
   variant A). A tap on any label then opens the plant's card instead of
   copying: its caption, when it was last seen, its photos and its status,
-  and **Seen, no photo**, which queues a sighting. Only that button counts:
-  a label the camera merely reads records nothing. Numbers seen in the walk
+  **Take photo** and **Seen, no photo**. Only these buttons count: a label
+  the camera merely reads records nothing. **Take photo** takes a
+  full-resolution photo (inventory mode binds photo capture next to
+  analysis) and shows it with an optional comment, then **Save** queues it
+  for upload, or **Retake** drops it. The photo is decoded first: when it
+  shows a second plant of the copy, the app asks whose photo it is, and can
+  mark the other one as seen. Numbers seen in the walk
   carry a ✓ on their tab. The bar at the bottom shows how many plants of the
   walk were seen since it began and opens the walk: a collection, optionally
   narrowed to one value of the genus or of one of its own columns (such as a

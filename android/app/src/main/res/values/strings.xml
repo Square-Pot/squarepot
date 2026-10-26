@@ -129,6 +129,15 @@
     <string name="walk_progress">Seen %1$d of %2$d · since %3$s</string>
     <string name="queue_chip">↑ %1$d</string>
     <string name="queue_chip_problems">↑ %1$d · %2$d to check</string>
+    <string name="card_take_photo">Take photo</string>
+    <string name="capture_failed">Could not take the photo: %1$s</string>
+    <string name="review_title">Photo of %1$s</string>
+    <string name="review_reading">Looking for labels on the photo…</string>
+    <string name="review_whose">Whose photo is this?</string>
+    <string name="review_also_seen">Mark %1$s as seen too</string>
+    <string name="review_comment">Comment (optional)</string>
+    <string name="review_retake">Retake</string>
+    <string name="review_save">Save</string>
     <string name="card_seen_no_photo">Seen, no photo</string>
     <string name="card_seen_in_walk">Already seen in this walk</string>
     <string name="card_never_seen">Not seen yet</string>

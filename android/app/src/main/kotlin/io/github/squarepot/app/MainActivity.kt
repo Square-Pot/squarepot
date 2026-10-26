@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
                         Screen.CAMERA -> CameraScreen(
                             viewModel(),
                             viewModel(),
+                            viewModel(),
                             onOpenSettings = { screen = Screen.CAPTIONS },
                             onOpenCopy = { screen = Screen.COPY },
                             onOpenWalk = { screen = Screen.WALK },
