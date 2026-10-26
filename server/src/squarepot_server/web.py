@@ -10,30 +10,44 @@ the app's own addresses (`/c/main?genus=Lithops`) open directly. Paths under
 from __future__ import annotations
 
 from pathlib import PurePosixPath
+from urllib.parse import urlsplit
 
 from fastapi import HTTPException, Request, status
 from fastapi.responses import FileResponse
 from starlette.types import Receive, Scope, Send
 from starlette.websockets import WebSocketClose
 
+from squarepot_server.config import PhotoStoreKind, Settings
 from squarepot_server.runtime import Runtime
 
 # Vite names every file in assets/ by a hash of its content.
 IMMUTABLE = "public, max-age=31536000, immutable"
-# The page holds the API token: it runs only its own scripts and talks only to this server.
-SECURITY_HEADERS = {
-    "Content-Security-Policy": (
-        "default-src 'self'; img-src 'self' blob: data:; object-src 'none'; "
-        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
-    ),
-    "Referrer-Policy": "no-referrer",
-    "X-Content-Type-Options": "nosniff",
-}
+
+
+def security_headers(settings: Settings) -> dict[str, str]:
+    """The page holds the API token: it runs only its own scripts and talks only to this server.
+
+    Images may also come from the photo bucket, whose signed addresses are on its
+    endpoint's host (path style: <endpoint>/<bucket>/<key>).
+    """
+    images = "'self' blob: data:"
+    if settings.photos == PhotoStoreKind.S3:
+        endpoint = urlsplit(settings.s3_endpoint)
+        images += f" {endpoint.scheme}://{endpoint.netloc}"
+    return {
+        "Content-Security-Policy": (
+            f"default-src 'self'; img-src {images}; object-src 'none'; "
+            "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+        ),
+        "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff",
+    }
 
 
 def web_file(request: Request) -> FileResponse:
     runtime: Runtime = request.app.state.runtime
     root = runtime.settings.web_dir
+    headers = security_headers(runtime.settings)
     path = request.url.path.lstrip("/")
     if root is None or path == "api" or path.startswith("api/"):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
@@ -47,12 +61,10 @@ def web_file(request: Request) -> FileResponse:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found") from error
     if found:
         cache = IMMUTABLE if file.parent == root / "assets" else "no-cache"
-        return FileResponse(file, headers={"Cache-Control": cache, **SECURITY_HEADERS})
+        return FileResponse(file, headers={"Cache-Control": cache, **headers})
     if PurePosixPath(path).suffix:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
-    return FileResponse(
-        root / "index.html", headers={"Cache-Control": "no-cache", **SECURITY_HEADERS}
-    )
+    return FileResponse(root / "index.html", headers={"Cache-Control": "no-cache", **headers})
 
 
 async def serve(scope: Scope, receive: Receive, send: Send) -> None:

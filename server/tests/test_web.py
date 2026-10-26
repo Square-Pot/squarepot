@@ -9,7 +9,8 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from squarepot_server.app import create_app
-from squarepot_server.config import Settings
+from squarepot_server.config import PhotoStoreKind, Settings
+from squarepot_server.web import security_headers
 from tests.conftest import TOKEN, FakeStore
 
 INDEX = '<!doctype html><div id="root"></div>'
@@ -48,6 +49,25 @@ def test_hashed_assets_are_cached_for_good(web: TestClient) -> None:
     assert response.status_code == 200
     assert response.headers["cache-control"] == "public, max-age=31536000, immutable"
     assert web.get("/favicon.svg").headers["cache-control"] == "no-cache"
+
+
+def test_images_come_only_from_the_page_without_a_bucket(web: TestClient) -> None:
+    policy = web.get("/").headers["content-security-policy"]
+    assert "img-src 'self' blob: data:;" in policy
+
+
+def test_images_may_come_from_the_photo_bucket(settings: Settings, tmp_path: Path) -> None:
+    s3 = settings.model_copy(
+        update={
+            "photos": PhotoStoreKind.S3,
+            "s3_endpoint": "https://storage.yandexcloud.net/",
+            "s3_bucket": "square-pot",
+            "s3_key_file": tmp_path / "key",
+        }
+    )
+    policy = security_headers(s3)["Content-Security-Policy"]
+    assert "img-src 'self' blob: data: https://storage.yandexcloud.net;" in policy
+    assert "default-src 'self';" in policy
 
 
 @pytest.mark.parametrize(
