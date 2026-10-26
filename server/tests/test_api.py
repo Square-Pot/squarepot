@@ -38,6 +38,7 @@ def test_every_route_but_health_is_protected() -> None:
     assert sorted(PROTECTED) == [
         ("DELETE", photo),
         ("GET", "/api/v1/collections"),
+        ("GET", "/api/v1/collections/main/plants"),
         ("GET", "/api/v1/labels/templates"),
         ("GET", f"{photo}/image"),
         ("GET", f"{photo}/thumbnail"),
@@ -50,6 +51,7 @@ def test_every_route_but_health_is_protected() -> None:
         ("POST", "/api/v1/collections/main/plants"),
         ("POST", "/api/v1/labels"),
         ("POST", f"{photo}/restore"),
+        ("POST", "/api/v1/sightings"),
         ("PUT", photo),
         ("PUT", "/api/v1/plants/by-tag/004217/main-photo"),
     ]
@@ -82,6 +84,7 @@ def test_lookup_by_tag(client: TestClient) -> None:
         "custom": {},
         "invalid": {},
         "status_since": None,
+        "last_seen": None,
         "photo_count": 0,
         "last_photo": None,
         "main_photo_id": None,

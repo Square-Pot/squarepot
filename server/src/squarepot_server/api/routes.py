@@ -7,7 +7,7 @@ import logging
 import re
 import secrets
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Any, cast
 from uuid import UUID
 
@@ -45,6 +45,7 @@ from squarepot_server.labels.render import to_pdf, to_svg
 from squarepot_server.labels.text import Run
 from squarepot_server.photos.summary import PhotoSummary, summaries
 from squarepot_server.runtime import Runtime
+from squarepot_server.sightings import last_sightings
 from squarepot_server.store import EditableStore, StoreError
 
 log = logging.getLogger(__name__)
@@ -132,8 +133,13 @@ def editable(runtime: Runtime, collection_id: str) -> bool:
     return config is not None and isinstance(store, EditableStore) and store.can_edit(config)
 
 
-def to_plant(row: PlantRow, photos: Mapping[str, PhotoSummary]) -> Plant:
+def to_plant(
+    row: PlantRow, photos: Mapping[str, PhotoSummary], seen: Mapping[str, datetime]
+) -> Plant:
     summary = photos.get(row.tag) if row.tag is not None else None
+    times = [summary.last] if summary else []
+    if row.tag is not None and row.tag in seen:
+        times.append(seen[row.tag])
     return Plant(
         id=row.id,
         collection_id=row.collection_id,
@@ -143,6 +149,7 @@ def to_plant(row: PlantRow, photos: Mapping[str, PhotoSummary]) -> Plant:
         custom=row.custom,
         invalid=row.invalid,
         status_since=status_since(row),
+        last_seen=max(times, default=None),
         photo_count=summary.count if summary else 0,
         last_photo=summary.last if summary else None,
         main_photo_id=UUID(summary.main_id) if summary else None,
@@ -150,8 +157,10 @@ def to_plant(row: PlantRow, photos: Mapping[str, PhotoSummary]) -> Plant:
 
 
 def to_plants(session: Session, rows: Sequence[PlantRow]) -> list[Plant]:
-    photos = summaries(session, (row.tag for row in rows if row.tag is not None))
-    return [to_plant(row, photos) for row in rows]
+    tags = [row.tag for row in rows if row.tag is not None]
+    photos = summaries(session, tags)
+    seen = last_sightings(session, tags)
+    return [to_plant(row, photos, seen) for row in rows]
 
 
 def plant_out(runtime: Runtime, row: PlantRow) -> Plant:
