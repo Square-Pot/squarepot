@@ -32,12 +32,19 @@ router = APIRouter(
     description=(
         "For the phone's queue of sightings, sent when it is online. Each sighting has an id "
         "the client chose, so sending a batch again records nothing twice. A sighting of a "
-        "number no plant has is not recorded. The plants seen are sent again in the next "
-        "sync, with their new `last_seen`."
+        "number no plant has is not recorded; the server reads the sheet again first, at "
+        "most once a minute, in case the plant was just added there. The plants seen are "
+        "sent again in the next sync, with their new `last_seen`. Without a photo storage "
+        "the server keeps no sightings and answers 503."
     ),
+    responses=errors(status.HTTP_503_SERVICE_UNAVAILABLE),
 )
 def record_sightings(body: SightingBatch, runtime: RuntimeDep) -> list[SightingResult]:
-    assert runtime.sightings is not None
+    if runtime.sightings is None:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Sightings need the photo storage, which is not set up on this server.",
+        )
     outcomes = runtime.sightings.record(body.sightings)
     return [
         SightingResult(id=sighting.id, result=outcome)

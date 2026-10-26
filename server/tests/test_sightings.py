@@ -10,9 +10,10 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from squarepot_server.app import create_app
 from squarepot_server.config import PhotoStoreKind, Settings
 from squarepot_server.fields import Cell
-from tests.conftest import FakeStore
+from tests.conftest import TOKEN, FakeStore
 from tests.test_photo_images import photo
 
 FIRST = "6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b"
@@ -103,6 +104,25 @@ def test_a_sighting_sends_the_plant_again_in_the_sync(client: TestClient) -> Non
 def test_a_batch_holds_at_most_500(client: TestClient) -> None:
     many = [sighting(FIRST, "004217", "2026-10-26T10:00:00Z")] * 501
     assert client.post("/api/v1/sightings", json={"sightings": many}).status_code == 422
+
+
+def test_a_number_just_added_to_the_sheet_is_found(client: TestClient, store: FakeStore) -> None:
+    rows = store.tabs["main"]
+    store.put("main", [*rows, ["004220", "Lithops", "olivacea"]])
+    assert send(client, sighting(FIRST, "004220", "2026-10-26T10:00:00Z")) == ["recorded"]
+    # The sheet is read again at most once a minute.
+    store.put("main", [*rows, ["004221", "Lithops", "karasmontana"]])
+    assert send(client, sighting(SECOND, "004221", "2026-10-26T10:00:00Z")) == ["unknown_number"]
+
+
+def test_sightings_need_a_storage(settings: Settings, store: FakeStore) -> None:
+    off = settings.model_copy(update={"photos": PhotoStoreKind.NONE})
+    with TestClient(create_app(off, store), headers={"Authorization": f"Bearer {TOKEN}"}) as c:
+        response = c.post(
+            "/api/v1/sightings",
+            json={"sightings": [sighting(FIRST, "004217", "2026-10-26T10:00:00Z")]},
+        )
+    assert response.status_code == 503
 
 
 def listed(client: TestClient, **query: str) -> list[str | None]:
