@@ -7,6 +7,7 @@ import { api, apiError } from "./api/client";
 import { getToken, setToken } from "./api/token";
 import type { Photo } from "./api/types";
 import { refresh } from "./data";
+import { newPhotoId } from "./domain/photos";
 
 /** Ask again this long before the addresses expire. */
 const EXPIRY_MARGIN_MS = 5 * 60_000;
@@ -140,7 +141,7 @@ export function usePlantPhotos(tag: string | null): PlantPhotos {
     upload: (files) => {
       setQueue([
         ...queue.current,
-        ...files.map((file) => ({ id: crypto.randomUUID(), file, state: "waiting" as const, error: null })),
+        ...files.map((file) => ({ id: newPhotoId(), file, state: "waiting" as const, error: null })),
       ]);
       void pump();
     },

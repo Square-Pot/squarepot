@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from "vitest";
 import type { Photo } from "../api/types";
-import { ageAt, byYear, mainPhoto, newest, pinned, uploadProblem } from "./photos";
+import { ageAt, byYear, mainPhoto, newest, newPhotoId, pinned, uploadProblem } from "./photos";
 
 const photo = (id: string, taken_at: string, main = false): Photo => ({
   id,
@@ -62,5 +62,15 @@ describe("upload", () => {
     expect(uploadProblem({ type: "image/webp", size: 30 * 1024 * 1024 })).toBeNull();
     expect(uploadProblem({ type: "image/heic", size: 1000 })).toBe("type");
     expect(uploadProblem({ type: "image/png", size: 30 * 1024 * 1024 + 1 })).toBe("size");
+  });
+});
+
+describe("photo ids", () => {
+  it("are UUIDs v4 even where randomUUID is missing, as over plain http", () => {
+    const insecure = { getRandomValues: <T extends ArrayBufferView>(array: T): T => crypto.getRandomValues(array) };
+    const id = newPhotoId(insecure);
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(newPhotoId(insecure)).not.toBe(id);
+    expect(newPhotoId({ getRandomValues: insecure.getRandomValues, randomUUID: () => "a-b-c-d-e" })).toBe("a-b-c-d-e");
   });
 });
