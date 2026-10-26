@@ -35,6 +35,15 @@ def test_a_request_is_signed_as_in_the_aws_example() -> None:
     )
 
 
+def test_a_listing_is_signed_as_in_the_aws_example() -> None:
+    url = "https://examplebucket.s3.amazonaws.com/"
+    query = {"max-keys": "2", "prefix": "J"}
+    headers = EXAMPLE.headers("GET", url, b"", {}, MOMENT, query)
+    assert headers["authorization"].endswith(
+        "Signature=34b48302e7b5fa45bde8084f4b7868a86f0a534bc59db6670ed5711ef69dc6f7"
+    )
+
+
 def test_an_address_is_presigned_as_in_the_aws_example() -> None:
     url = EXAMPLE.presign("https://examplebucket.s3.amazonaws.com/test.txt", "GET", 86400, MOMENT)
     parts = urlsplit(url)
@@ -105,6 +114,55 @@ def test_deleting_a_missing_file_is_no_error() -> None:
     storage, session = bucket(404)
     storage.delete("photos/004217/x.jpg")
     assert session.calls[0][0] == "DELETE"
+
+
+LISTING = """<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+  <Contents><Key>{first}</Key></Contents>
+  <Contents><Key>photos/004217/../../secret</Key></Contents>
+  {more}
+</ListBucketResult>"""
+
+
+@dataclass
+class ListingSession:
+    calls: list[str] = field(default_factory=list)
+
+    def request(
+        self, method: str, url: str, data: bytes, headers: dict[str, str], timeout: float
+    ) -> requests.Response:
+        self.calls.append(url)
+        first = "photos/004217/a.json" if len(self.calls) == 1 else "photos/004218/b.json"
+        more = (
+            "<IsTruncated>true</IsTruncated><NextContinuationToken>t/2=</NextContinuationToken>"
+            if len(self.calls) == 1
+            else "<IsTruncated>false</IsTruncated>"
+        )
+        result = answer(200)
+        result._content = LISTING.format(first=first, more=more).encode()
+        return result
+
+
+def test_the_bucket_is_listed_page_by_page() -> None:
+    session = ListingSession()
+    storage = S3Storage(
+        cast(requests.Session, session), "https://s3.example.org/b", EXAMPLE, lambda: MOMENT
+    )
+    assert list(storage.keys("photos/")) == ["photos/004217/a.json", "photos/004218/b.json"]
+    assert session.calls == [
+        "https://s3.example.org/b?list-type=2&prefix=photos%2F",
+        "https://s3.example.org/b?continuation-token=t%2F2%3D&list-type=2&prefix=photos%2F",
+    ]
+
+
+def test_a_folder_lists_its_keys(tmp_path: Path) -> None:
+    storage = DiskStorage(tmp_path, b"secret", "/files")
+    storage.put("photos/004217/a.json", b"{}", "application/json")
+    storage.put("sightings/004217/b.json", b"{}", "application/json")
+    assert list(storage.keys("photos/")) == ["photos/004217/a.json"]
+    assert storage.get("photos/004217/a.json") == b"{}"
+    with pytest.raises(PhotoStorageError):
+        storage.get("photos/004217/missing.json")
 
 
 def test_a_bucket_address_expires_when_asked() -> None:

@@ -130,6 +130,18 @@ Photos are off until `SQUAREPOT_PHOTOS` is set
 The server turns each photo upright, drops its EXIF data, including where it
 was taken, and keeps a large JPEG and a thumbnail, one photo at a time.
 
+Each photo and each sighting also has a small JSON file in the storage. If the
+database is lost, rebuild the photo index and the sightings from them, while
+the server runs:
+
+```sh
+docker compose exec server python -m squarepot_server.rebuild
+```
+
+It adds only what the database lacks, and prints how many of each it added.
+Only the choice of each plant's main photo is lost: the newest photo is shown
+again. With `s3`, the key must be allowed to list the bucket.
+
 ### Demo mode
 
 To try the server, or to test a client end to end, without a Google account:

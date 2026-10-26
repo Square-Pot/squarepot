@@ -12,11 +12,12 @@ import hashlib
 import hmac
 import os
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 from urllib.parse import quote, urlencode, urlsplit
+from xml.etree import ElementTree
 
 import requests
 
@@ -40,6 +41,12 @@ class PhotoStorage(Protocol):
 
     def url(self, key: str, expires_at: datetime) -> str:
         """An address that serves the file until `expires_at`, to anyone who has it."""
+        ...
+
+    def get(self, key: str) -> bytes: ...
+
+    def keys(self, prefix: str) -> Iterator[str]:
+        """Every key that starts with `prefix` and is a key the server makes."""
         ...
 
 
@@ -119,9 +126,15 @@ class Signer:
         return f"{url}?{canonical_query(query)}"
 
     def headers(
-        self, method: str, url: str, body: bytes, extra: dict[str, str], moment: datetime
+        self,
+        method: str,
+        url: str,
+        body: bytes,
+        extra: dict[str, str],
+        moment: datetime,
+        query: dict[str, str] | None = None,
     ) -> dict[str, str]:
-        """The headers that sign a request with this body."""
+        """The headers that sign a request with this body (and this query, sent as is)."""
         parts = urlsplit(url)
         payload_hash = hashlib.sha256(body).hexdigest()
         signed = {
@@ -130,7 +143,7 @@ class Signer:
             "x-amz-date": amz_date(moment),
             **{name.lower(): value for name, value in extra.items()},
         }
-        signature = self.signature(method, parts.path, {}, signed, payload_hash, moment)
+        signature = self.signature(method, parts.path, query or {}, signed, payload_hash, moment)
         authorization = (
             f"{ALGORITHM} Credential={self.key_id}/{self.scope(moment)}, "
             f"SignedHeaders={';'.join(sorted(signed))}, Signature={signature}"
@@ -198,6 +211,55 @@ class S3Storage:
         expires = max(1, int((expires_at - now).total_seconds()))
         return self.signer.presign(self.object_url(key), "GET", expires, now)
 
+    def get(self, key: str) -> bytes:
+        response = self.request("GET", key)
+        if not response.ok:
+            raise PhotoStorageError(f"the photo storage answered {response.status_code}")
+        return response.content
+
+    def keys(self, prefix: str) -> Iterator[str]:
+        """The bucket's keys under `prefix`, a page of up to 1000 at a time (ListObjectsV2)."""
+        token = None
+        while True:
+            query = {"list-type": "2", "prefix": prefix}
+            if token is not None:
+                query["continuation-token"] = token
+            headers = self.signer.headers("GET", self.base_url, b"", {}, self.clock(), query)
+            del headers["host"]
+            try:
+                response = self.session.request(
+                    "GET",
+                    f"{self.base_url}?{canonical_query(query)}",
+                    data=b"",
+                    headers=headers,
+                    timeout=TIMEOUT_SECONDS,
+                )
+            except requests.RequestException as error:
+                raise PhotoStorageError(
+                    f"the photo storage is unreachable ({type(error).__name__})"
+                ) from error
+            if not response.ok:
+                raise PhotoStorageError(f"the photo storage answered {response.status_code}")
+            try:
+                root = ElementTree.fromstring(response.content)
+            except ElementTree.ParseError as error:
+                raise PhotoStorageError(
+                    "the photo storage sent a listing it cannot read"
+                ) from error
+            for element in root.iter():
+                if element.tag.rsplit("}", 1)[-1] == "Key" and KEY.fullmatch(element.text or ""):
+                    yield element.text or ""
+            token = next(
+                (
+                    element.text
+                    for element in root.iter()
+                    if element.tag.rsplit("}", 1)[-1] == "NextContinuationToken"
+                ),
+                None,
+            )
+            if not token:
+                return
+
 
 class DiskStorage:
     """A folder on the server; the API serves its files at addresses it signs."""
@@ -221,6 +283,18 @@ class DiskStorage:
 
     def delete(self, key: str) -> None:
         self.path(key).unlink(missing_ok=True)
+
+    def get(self, key: str) -> bytes:
+        try:
+            return self.path(key).read_bytes()
+        except OSError as error:
+            raise PhotoStorageError(f"{key} cannot be read ({type(error).__name__})") from error
+
+    def keys(self, prefix: str) -> Iterator[str]:
+        for path in sorted(self.root.rglob("*")):
+            key = path.relative_to(self.root).as_posix()
+            if path.is_file() and key.startswith(prefix) and KEY.fullmatch(key):
+                yield key
 
     def token(self, key: str, expires: int) -> str:
         return hmac.new(self.secret, f"{key}\n{expires}".encode(), hashlib.sha256).hexdigest()
