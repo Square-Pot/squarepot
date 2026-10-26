@@ -297,6 +297,31 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `the copy keeps when a plant was seen and photographed, and which collections are editable`() = runTest {
+        val seen = """
+            {"id": "p1", "collection_id": "main", "tag": "000001", "row": 2, "fields": {"genus": "Lithops"},
+                "status_since": "2026-10-01", "last_seen": "2026-10-26T14:03:11Z", "photo_count": 3,
+                "last_photo": "2026-10-20T09:00:00+03:00", "main_photo_id": "6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b"}
+        """.trimIndent()
+        val editable = """{"id": "main", "name": "Main", "plant_count": 1, "editable": true}"""
+        respond(full(cursor = "c1", plants = listOf(seen, plant("p2", "000002")), collections = listOf(editable)))
+        respond(SCHEMA_V1)
+        engine.sync(api)
+
+        val plants = db.copy().allPlants().associateBy { it.id }
+        val p1 = plants.getValue("p1")
+        assertEquals("2026-10-01", p1.statusSince)
+        assertEquals(1_793_023_391_000L, p1.lastSeen)
+        assertEquals(3, p1.photoCount)
+        assertEquals(1_792_476_000_000L, p1.lastPhoto)
+        assertEquals("6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b", p1.mainPhotoId)
+        val p2 = plants.getValue("p2")
+        assertNull(p2.lastSeen)
+        assertEquals(0, p2.photoCount)
+        assertTrue(db.copy().observeCollections().first().single().editable)
+    }
+
+    @Test
     fun `a forgotten cursor asks for a full copy`() = runTest {
         respond(full(cursor = "c1", plants = listOf(plant("p1", "000001"))))
         respond(SCHEMA_V1)

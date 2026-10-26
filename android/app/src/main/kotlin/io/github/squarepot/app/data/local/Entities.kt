@@ -17,6 +17,8 @@ data class CollectionEntity(
     val serverError: String?,
     /** The sheet's custom columns, in column order. */
     val customColumns: List<String>,
+    /** Whether plants can be edited through the API (ADR 0006). */
+    val editable: Boolean = false,
 )
 
 data class CollectionName(val id: String, val name: String)
@@ -36,6 +38,15 @@ data class PlantEntity(
     val fields: Map<String, String>,
     /** Values of the collection's custom columns by name. */
     val custom: Map<String, String>,
+    /** Since when the plant has its status, YYYY-MM-DD; null without a status. */
+    val statusSince: String? = null,
+    /** When the plant was last seen, by a sighting or a photo, epoch millis; null when never seen. */
+    val lastSeen: Long? = null,
+    val photoCount: Int = 0,
+    /** When the newest photo was taken, epoch millis; null without photos. */
+    val lastPhoto: Long? = null,
+    /** The photo to show for the plant. */
+    val mainPhotoId: String? = null,
 )
 
 /** The single row describing the copy as a whole. */

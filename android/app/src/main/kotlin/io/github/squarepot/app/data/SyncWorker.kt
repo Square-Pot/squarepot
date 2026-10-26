@@ -29,7 +29,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     companion object {
         const val NAME = "sync"
 
-        private val RETRIED = setOf(SyncFailure.NETWORK, SyncFailure.SERVER, SyncFailure.RATE_LIMITED)
+        /** Failures that pass, retried with backoff; the queue retries the same ones. */
+        internal val RETRIED = setOf(SyncFailure.NETWORK, SyncFailure.SERVER, SyncFailure.RATE_LIMITED)
 
         /**
          * Queues a sync for when the phone is online. With [restart], a sync already waiting
