@@ -6,7 +6,7 @@
 ## Context
 
 The owner wants to walk the whole collection and confirm that each plant is
-still there, by photographing it or just by scanning its label. Many rows are
+still there, by photographing it or just by marking it as seen. Many rows are
 thought to belong to plants that are gone. The apps should then show the
 plants with no photo, with no recent photo, or not seen since a date, and the
 owner should be able to give many of them a status at once
@@ -33,20 +33,19 @@ it read 24 of 32, so a batch of older photos will leave a share unread.
 ### Sightings
 
 - **A sighting records that a plant was seen at a time.** It has an id the
-  client generates, the plant's number, the time it was seen, and how: a
-  scan, a photo, or a batch import. Like photos, sightings belong to numbered
-  plants only, and a plant without a label cannot be scanned anyway.
-- **The phone records a sighting on each scan in inventory mode.** Opening a
-  plant's card from a scanned label is the proof. Live captions do not record
-  sightings: they read many labels a second without the owner looking at
-  them. A repeat scan of the same plant within ten minutes is not recorded
-  again.
+  client generates, the plant's number, the time it was seen, and how: seen
+  without a photo, a photo, a status set, or a batch import. Like photos,
+  sightings belong to numbered plants only.
+- **A sighting is recorded when the owner acts on the plant's card.** In
+  inventory mode, a scan opens the plant's card, and the owner then takes a
+  photo, taps "seen, no photo", or sets a status. Scanning alone records
+  nothing, so a label read by chance, or in live captions, proves nothing.
 - **Sightings are queued on the phone and sent when online.** Adding
   sightings cannot conflict, so offline is safe here, as for photos. The
   client's id makes a resend harmless.
 - **A photo is a sighting at the time it was taken.** No separate record is
-  kept for it; a plant's last sighting is the later of its last scan and its
-  last photo. An old photo from a batch import therefore never makes a plant
+  kept for it; a plant's last sighting is the later of its last other
+  sighting and its last photo. An old photo from a batch import therefore never makes a plant
   look recently seen.
 - **Sightings live in the server's database, and copies go to the bucket.**
   Each sighting is also written as a small object, as in
@@ -59,7 +58,8 @@ it read 24 of 32, so a batch of older photos will leave a share unread.
 
 ### What the apps receive
 
-- **Each plant carries `last_seen`, `last_photo` and `photo_count`.**
+- **Each plant carries `last_seen`, `last_photo` and `photo_count`.** Its
+  main photo is the newest until the owner picks another (ADR 0007).
   A sighting or a photo changes the plant in the sync, so the phone and the
   web app filter their local copies, as they already do for other filters.
 - **The plant list also takes inventory filters**, for the bot and for
@@ -78,6 +78,9 @@ it read 24 of 32, so a batch of older photos will leave a share unread.
   server.
 - **Clearing a status is the same request with an empty status**, so a wrong
   bulk change can be undone the same way.
+- **The apps suggest `lost` for plants a walk did not find**, and `dead` when
+  the owner is sure. Setting a status from a plant's card is also a
+  sighting.
 
 ### Batch photo import
 
@@ -91,9 +94,10 @@ it read 24 of 32, so a batch of older photos will leave a share unread.
   read. One known number files the photo into that plant, through the same
   steps as an upload (ADR 0007), with a sighting at the time it was taken.
 - **Everything else waits for the owner** in a review queue: no code read, a
-  number that no plant has, or two or more different numbers. The owner picks
-  the plant, or discards the photo. Staged files are removed once filed or
-  discarded, and after 30 days in any case.
+  number that no plant has, or two or more different numbers, such as two
+  pots in one photo. The owner picks the plant, or discards the photo.
+  Staged files are removed once filed or discarded, and after 30 days in any
+  case.
 - **The time taken comes from the photo's EXIF data**, with its time zone
   offset when present, else from the file's own date as the browser gives
   it, else from the upload time. The location is never kept (ADR 0007).
@@ -101,13 +105,12 @@ it read 24 of 32, so a batch of older photos will leave a share unread.
   has the decoder. Photos it reads go to its normal upload queue as photos of
   that plant; the others go to the same review queue.
 
-### Event tags
+### Photo comments
 
-- **A photo can carry event tags:** seedling, transplant, bloom, disease. A
-  photo may have several, and a whole batch can be given one. They are kept
-  in the photo index and in the object's metadata, so a rebuild keeps them.
-  The list is fixed in the schema, like status values, so a new tag is a
-  schema change.
+- **A photo can carry one comment**, free text, optional and usually left
+  empty: "first flower", "repotted", "mealybugs". It is kept in the photo
+  index and with the object in the bucket, so a rebuild keeps it, and the
+  owner can change it later.
 
 ## Consequences
 
@@ -125,25 +128,26 @@ it read 24 of 32, so a batch of older photos will leave a share unread.
 - The bucket holds the staged originals while a batch is processed: about
   4 GB for 1000 phone photos, a few cents for those days.
 - The API gains endpoints for sightings, bulk status, imports and the review
-  queue, and the plant gains three fields. All are additive. The phone's
+  queue, the plant gains three fields, and a photo gains its comment. All are additive. The phone's
   first release of inventory mode needs only sightings and photos; bulk
   status needs the service account (ADR 0006).
-- The schema gains the list of event tags.
 
 ## Alternatives considered
 
 - **"Last seen" as a column in the sheet.** Visible without the apps, but
-  each scan would be a write to the sheet, a walk through the collection
+  each sighting would be a write to the sheet, a walk through the collection
   would be hundreds of writes, and the phone would need the network. It can
   be added later as a copy of what the server records.
 - **Sightings only in the server's database.** Simpler, but the server would
   hold data that exists nowhere else, which ADR 0003 rules out.
-- **Every scan is a sighting, in any mode.** No mode to switch to, but live
-  captions would record plants the owner never looked at.
+- **Every scan in inventory mode is a sighting.** One tap fewer per plant,
+  but a label read by chance would count as proof, and the owner chose to
+  confirm each plant on its card.
 - **Decoding batches in the browser** with zxing-cpp built for WebAssembly.
   It would spare the host, but a browser tab would have to stay open for the
   whole batch, and the review queue would still need the server.
 - **Decoding in the API process.** No new container, but a batch would hold a
   core for hours next to the requests of the apps.
-- **Free event tags.** More flexible, but the timeline and filters need a
-  known list, and Russian and English names for each tag.
+- **Event tags from a fixed list**, such as seedling, transplant, bloom or
+  disease. They would allow filters by event, but the owner rarely needs to
+  describe a photo, and a free comment covers the cases that matter.
