@@ -173,7 +173,7 @@ private fun InventorySheets(
     statusOf?.let { plant ->
         StatusSheet(
             tag = plant.tag.orEmpty(),
-            current = plant.fields[STATUS],
+            current = plant.fields[STATUS] ?: plant.rejectedStatus,
             schema = camera.schema,
             editable = inventory.collections.any { it.id == plant.collectionId && it.editable },
             busy = edit.busy,

@@ -72,7 +72,13 @@ data class PlantDto(
     @SerialName("last_photo") val lastPhoto: String? = null,
     /** The photo to show for the plant: the owner's choice, else the newest. */
     @SerialName("main_photo_id") val mainPhotoId: String? = null,
+    /** Cells the import rejected, by field key; such a field is missing from [fields]. */
+    val invalid: Map<String, InvalidCellDto> = emptyMap(),
 )
+
+/** A cell the import rejected: where it is, what it held (as text), and why. */
+@Serializable
+data class InvalidCellDto(val cell: String, val value: String, val reason: String)
 
 /** `GET /api/v1/schema`: schema/fields.yaml as JSON. */
 @Serializable

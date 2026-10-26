@@ -47,6 +47,8 @@ data class PlantEntity(
     val lastPhoto: Long? = null,
     /** The photo to show for the plant. */
     val mainPhotoId: String? = null,
+    /** What the `status` cell holds when the import rejected it (a typo); the server compares edits with it. */
+    val rejectedStatus: String? = null,
 )
 
 /** The single row describing the copy as a whole. */

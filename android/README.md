@@ -133,7 +133,9 @@ to the camera.
   find, then "dead", "gifted", "sold"; a card can also clear one. The sheet
   holds the English key, the app shows the schema's label. One request per
   collection and per 500 plants, each plant with the status the copy has,
-  so a cell changed in the sheet meanwhile is kept and reported. Status
+  so a cell changed in the sheet meanwhile is kept and reported. A status
+  cell the import rejected (a typo) is sent as the text it holds, so it can
+  still be set or cleared from the app. Status
   needs the server and a collection read with the service account
   (ADR 0006): offline nothing is queued, and a collection read by link says
   why it cannot be written. A status set from a card is also a sighting.
