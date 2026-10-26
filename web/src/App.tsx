@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { setToken, useToken } from "./api/token";
 import { useData, resetData } from "./data";
 import { plantsOf } from "./domain/copy";
-import { filterRows, makeRows, parseListState, serializeListState, sortRows, type ListState, type Row } from "./domain/query";
+import { filterRows, isFormer, makeRows, parseListState, serializeListState, sortRows, type ListState, type Row } from "./domain/query";
 import { I18nContext, initialLang, makeI18n, saveLang, useI18n, type Lang } from "./i18n";
 import { navigate, routePath, useLocation } from "./router";
 import { Header } from "./views/Header";
@@ -43,7 +43,7 @@ function Browse() {
     [schema, copy, collection],
   );
   const result = useMemo(
-    () => (schema ? sortRows(schema, filterRows(rows, state), state.sort, now) : []),
+    () => (schema ? sortRows(schema, filterRows(rows, state, now), state.sort, now) : []),
     [schema, rows, state, now],
   );
 
@@ -96,7 +96,7 @@ function Browse() {
 
   return (
     <div className="app">
-      <Header collections={collections} current={collection} plantCount={rows.length} onForget={forget} />
+      <Header collections={collections} current={collection} plantCount={rows.filter((row) => !isFormer(row)).length} onForget={forget} />
       {error && (
         <p className="problem inline" role="status">
           {t("Не удалось обновить данные: ", "Could not refresh the data: ")}

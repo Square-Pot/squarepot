@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from "vitest";
+import type { Plant } from "../api/types";
 import { plant, SCHEMA } from "./fixtures";
 import {
+  clearFilters,
   EMPTY_STATE,
   facets,
   filterRows,
@@ -26,6 +28,7 @@ const ROWS = makeRows(SCHEMA, [
     Marathon: "Конкурсный 2023",
   }),
 ]);
+const NOW = new Date(2026, 9, 26, 12);
 const state = (change: Partial<ListState>): ListState => ({ ...EMPTY_STATE, ...change });
 const rows = (list: typeof ROWS) => list.map((row) => row.plant.row);
 
@@ -61,16 +64,16 @@ describe("search", () => {
 
 describe("filters", () => {
   it("are OR inside a group and AND between groups", () => {
-    expect(rows(filterRows(ROWS, state({ genus: ["Lithops", "Conophytum"] })))).toEqual([2, 3, 4, 5]);
+    expect(rows(filterRows(ROWS, state({ genus: ["Lithops", "Conophytum"] }), NOW))).toEqual([2, 3, 4, 5]);
     expect(
-      rows(filterRows(ROWS, state({ genus: ["Conophytum"], custom: { Marathon: ["Конкурсный 2023"] } }))),
+      rows(filterRows(ROWS, state({ genus: ["Conophytum"], custom: { Marathon: ["Конкурсный 2023"] } }), NOW)),
     ).toEqual([5]);
-    expect(rows(filterRows(ROWS, state({ custom: { Marathon: [""] } })))).toEqual([4]);
-    expect(rows(filterRows(ROWS, state({ tagged: "no" })))).toEqual([4]);
+    expect(rows(filterRows(ROWS, state({ custom: { Marathon: [""] } }), NOW))).toEqual([4]);
+    expect(rows(filterRows(ROWS, state({ tagged: "no" }), NOW))).toEqual([4]);
   });
 
   it("count each value under the other groups, listing values with none", () => {
-    const result = facets(ROWS, state({ genus: ["Lithops"] }), ["Marathon"]);
+    const result = facets(ROWS, state({ genus: ["Lithops"] }), ["Marathon"], NOW);
     // The genus group ignores its own choice; genus is merged by its display case.
     expect(result.genus).toEqual([
       { value: "Conophytum", count: 2 },
@@ -82,6 +85,64 @@ describe("filters", () => {
       { value: "Резерв", count: 1 },
       { value: "", count: 0 },
     ]);
+  });
+});
+
+describe("inventory filters", () => {
+  const seen = (row: number, tag: string | null, change: Partial<Plant>, fields: Record<string, string> = {}) => ({
+    ...plant(row, tag, { genus: "Lithops", ...fields }),
+    ...change,
+  });
+  const INVENTORY = makeRows(SCHEMA, [
+    seen(2, "000002", {}),
+    seen(3, "000003", { photo_count: 2, last_photo: "2026-10-01T10:00:00Z", last_seen: "2026-10-01T10:00:00Z" }),
+    seen(4, "000004", { photo_count: 1, last_photo: "2025-05-01T10:00:00Z", last_seen: "2026-09-01T10:00:00Z" }),
+    seen(5, "000005", { last_seen: "2026-10-20T10:00:00Z" }),
+    seen(6, "000006", {}, { status: "dead" }),
+  ]);
+  const found = (change: Partial<ListState>) => rows(filterRows(INVENTORY, state(change), NOW));
+
+  it("leave former plants out unless asked, but find them by their whole number", () => {
+    expect(found({})).toEqual([2, 3, 4, 5]);
+    expect(found({ former: "show" })).toEqual([2, 3, 4, 5, 6]);
+    expect(found({ former: "only" })).toEqual([6]);
+    expect(found({ q: "6" })).toEqual([6]);
+    expect(found({ q: "000006" })).toEqual([6]);
+  });
+
+  it("pick plants with no photo, or an old one", () => {
+    expect(found({ photo: "none" })).toEqual([2, 5]);
+    expect(found({ photo: "old" })).toEqual([4]);
+    expect(found({ photo: "old", photoAge: 24 })).toEqual([]);
+  });
+
+  it("pick plants not seen since a day, never seen ones too, or never seen", () => {
+    expect(found({ seen: "since", since: "2026-10-01" })).toEqual([2, 4]);
+    expect(found({ seen: "since", since: "2026-10-02" })).toEqual([2, 3, 4]);
+    expect(found({ seen: "never" })).toEqual([2]);
+  });
+
+  it("count each choice under the other filters", () => {
+    const result = facets(INVENTORY, state({ photo: "none" }), [], NOW);
+    expect(result.photo).toEqual({ any: 4, none: 2, old: 1 });
+    expect(result.seen).toEqual({ any: 2, since: 2, never: 1 });
+    expect(result.former).toEqual({ hide: 2, show: 3, only: 1 });
+    expect(result.tagged).toEqual({ yes: 2, no: 0 });
+  });
+
+  it("sort by the last photo and the last visit, never last", () => {
+    expect(rows(sortRows(SCHEMA, INVENTORY, { key: "last_photo", desc: false }, NOW))).toEqual([4, 3, 2, 5, 6]);
+    expect(rows(sortRows(SCHEMA, INVENTORY, { key: "last_seen", desc: true }, NOW))).toEqual([5, 3, 4, 2, 6]);
+  });
+
+  it("are counted, cleared, and kept in the URL", () => {
+    const chosen = state({ q: "x", photo: "old", photoAge: 24, seen: "since", since: "2026-10-01", former: "show" });
+    const params = serializeListState(chosen);
+    expect(params.toString()).toBe("q=x&photo=old&photo_age=24&since=2026-10-01&former=show");
+    expect(parseListState(params)).toEqual(chosen);
+    expect(parseListState(new URLSearchParams("seen=never"))).toEqual(state({ seen: "never" }));
+    expect(parseListState(new URLSearchParams("since=yesterday&photo_age=5&photo=all&former=no"))).toEqual(EMPTY_STATE);
+    expect(clearFilters(chosen)).toEqual(state({ q: "x" }));
   });
 });
 
@@ -122,7 +183,7 @@ describe("URL state", () => {
     expect(Object.keys(parsed.custom)).toEqual(["__proto__", "constructor"]);
     expect(own(parsed.custom, "__proto__")).toEqual(["x"]);
     expect(own({}, "__proto__")).toBeUndefined();
-    expect(rows(filterRows(ROWS, parsed))).toEqual([]);
+    expect(rows(filterRows(ROWS, parsed, NOW))).toEqual([]);
     expect(serializeListState(parsed).toString()).toBe("c.__proto__=x&c.constructor=y");
   });
 });

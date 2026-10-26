@@ -43,6 +43,7 @@ const ICONS = {
   download: <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
   print: <><path d="M7 9V4h10v5" /><rect x="4" y="9" width="16" height="7" rx="1" /><path d="M7 14h10v6H7z" /></>,
   key: <><circle cx="8" cy="15" r="4" /><path d="M11 12l8-8M16 7l3 3" /></>,
+  camera: <><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></>,
 };
 
 export function Icon({ name, size = 16 }: { name: keyof typeof ICONS; size?: number }) {

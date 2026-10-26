@@ -1,8 +1,9 @@
 # Web app
 
 The browser client. It shows the collections read-only: the list with search,
-sorting and filters (custom sheet columns too), a plant card with its label
-preview, and the print editor (`/c/<collection>/print`): pick plants, one label
+sorting and filters (custom sheet columns too, and the inventory filters: no
+photo or an old one, not seen since a day, former plants), a plant card with its
+label preview and its photos, and the print editor (`/c/<collection>/print`): pick plants, one label
 type a sheet, what the labels show, the server's own A4 preview, and the PDF. Plant data is edited in the spreadsheet, not here. Later: the label
 designer, onboarding and the spreadsheet connection.
 
@@ -21,6 +22,14 @@ URL. A rejected token is forgotten and asked for again.
 The app loads every plant once with `GET /api/v1/sync`, then fetches changes
 every minute. Search, filters and sorting run in the browser, and their state
 is in the address, so a filtered list can be bookmarked or sent.
+
+The sheet's data stays read-only here; photos are the exception, because they
+live on the server, not in the sheet ([ADR 0007](../docs/adr/0007-plant-photos.md)).
+On a numbered plant's card the owner adds photos (JPEG, PNG or WebP, one upload
+at a time, each with an id chosen in the browser so a retry makes no copy),
+picks the main one, edits a photo's comment or date, and deletes or restores
+one. The card loads the plant's photos with their signed addresses, which it
+fetches again before they expire.
 
 ## Develop
 
