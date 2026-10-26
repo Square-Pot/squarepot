@@ -17,3 +17,4 @@ fill it in with status **Proposed**, and open a pull request.
 | [0005](0005-offline-first-phone.md) | The phone works offline from a local copy | Proposed |
 | [0006](0006-editing-plants-from-the-apps.md) | Editing plants from the apps writes cells to the sheet | Proposed |
 | [0007](0007-plant-photos.md) | Plant photos live in object storage, indexed by the server | Proposed |
+| [0008](0008-inventory-sightings-and-photo-import.md) | Inventory: sightings, inventory filters and batch photo import | Proposed |
