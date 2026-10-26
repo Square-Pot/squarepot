@@ -16,11 +16,21 @@ from decimal import Decimal
 
 from sqlalchemy import func, select
 
-from squarepot_server.api.models import FieldChange, FieldDefinition, FieldType, NewPlant, PlantEdit
+from squarepot_server.api.models import (
+    BulkStatus,
+    FieldChange,
+    FieldDefinition,
+    FieldType,
+    NewPlant,
+    PlantEdit,
+    StatusOutcome,
+)
 from squarepot_server.config import CollectionConfig
 from squarepot_server.db import AddedPlant, PlantRow, RegisteredTag
 from squarepot_server.fields import (
     MAX_CUSTOM_VALUE,
+    STATUS,
+    STATUS_DATE,
     TAG,
     InvalidValue,
     Row,
@@ -327,6 +337,67 @@ class Editor:
             )
             self.syncer.sync_collection(collection, force=True)
             return self.found(collection.id, tag, row)
+
+    def set_status(self, collection_id: str, bulk: BulkStatus) -> list[StatusOutcome]:
+        """One status for many plants (ADR 0008): one read of the tab, one write.
+
+        Each plant is written only if its status cell still holds what the client saw.
+        """
+        ids = [plant.id for plant in bulk.plants]
+        if len(set(ids)) < len(ids):
+            raise InvalidEdit("plants: a plant is named more than once")
+        day = bulk.status_date.isoformat() if bulk.status_date is not None else None
+        with self.syncer.lock:
+            collection = self.config(collection_id)
+            store = self.store(collection)
+            changes = self.changes(
+                {
+                    STATUS: FieldChange(seen=None, value=bulk.status),
+                    STATUS_DATE: FieldChange(seen=None, value=day),
+                },
+                {},
+            )
+            tab = self.read(store, collection)
+            if STATUS_DATE not in tab.fields and day is None:
+                changes = [change for change in changes if change.name != STATUS_DATE]
+            cells = self.cells(tab, changes, number=False)
+            with self.syncer.sessions.begin() as session:
+                plants = {
+                    plant.id: plant
+                    for plant in session.scalars(
+                        select(PlantRow).where(
+                            PlantRow.id.in_(ids),
+                            PlantRow.collection_id == collection.id,
+                            ~PlantRow.removed,
+                        )
+                    )
+                }
+            status = changes[0]
+            outcomes = []
+            writes: dict[int, list[CellWrite]] = {}
+            for wanted in bulk.plants:
+                plant = plants.get(wanted.id)
+                row = self.row(tab, plant) if plant is not None else None
+                if row is None:
+                    outcomes.append(StatusOutcome.NOT_FOUND)
+                elif current(row, status) != wanted.seen:
+                    outcomes.append(StatusOutcome.CHANGED_IN_SHEET)
+                else:
+                    writes[row.row] = cells
+                    outcomes.append(StatusOutcome.WRITTEN)
+            if writes:
+                try:
+                    store.write_rows(collection, writes)
+                except StoreRefused as error:
+                    raise NotEditable(NOT_SHARED) from error
+                log.info(
+                    "collection %s: wrote %s in %d rows",
+                    collection.id,
+                    written(changes, False),
+                    len(writes),
+                )
+                self.syncer.sync_collection(collection, force=True)
+            return outcomes
 
     @staticmethod
     def row(tab: Tab, plant: PlantRow) -> Row | None:

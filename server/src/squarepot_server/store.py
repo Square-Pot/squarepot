@@ -82,6 +82,10 @@ class EditableStore(CollectionStore, Protocol):
         """Write cells of one row, by its sheet row number; leaves every other cell alone."""
         ...
 
+    def write_rows(self, collection: CollectionConfig, rows: dict[int, list[CellWrite]]) -> None:
+        """Write cells of many rows in one call, as `write` does for one."""
+        ...
+
     def append(self, collection: CollectionConfig, cells: list[CellWrite]) -> int:
         """Add a row after the last row of the tab, and return its row number."""
         ...
@@ -258,12 +262,16 @@ class GoogleSheetsStore:
                 return "'" + cell.value
 
     def write(self, collection: CollectionConfig, row: int, cells: list[CellWrite]) -> None:
+        self.write_rows(collection, {row: cells})
+
+    def write_rows(self, collection: CollectionConfig, rows: dict[int, list[CellWrite]]) -> None:
         spreadsheet_id, sheet = self.tab(collection)
         data = [
             {
                 "range": f"{self.quoted(sheet)}!{column_name(cell.column)}{row}",
                 "values": [[self.entered(cell)]],
             }
+            for row, cells in rows.items()
             for cell in cells
         ]
         self.call(
@@ -272,7 +280,8 @@ class GoogleSheetsStore:
             {},
             {"valueInputOption": "USER_ENTERED", "data": data},
         )
-        self.format_numbers(collection, row, cells)
+        for row, cells in rows.items():
+            self.format_numbers(collection, row, cells)
 
     def append(self, collection: CollectionConfig, cells: list[CellWrite]) -> int:
         by_column = {cell.column: cell for cell in cells}

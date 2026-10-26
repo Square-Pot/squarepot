@@ -76,7 +76,7 @@ def as_photo(photos: Photos, row: PhotoRow) -> Photo:
         "server turns it the right way up, drops its EXIF data, including where it was taken, "
         "and keeps a large JPEG and a thumbnail. The client chooses the id: sending the same "
         "photo again, after a lost answer, changes nothing and returns it. Only a plant with "
-        "a number can have photos."
+        "a number can have photos. A comment given here can be changed later with `PATCH`."
     ),
     status_code=status.HTTP_201_CREATED,
     responses=errors(status.HTTP_413_CONTENT_TOO_LARGE),
@@ -100,6 +100,13 @@ async def upload_photo(
         datetime | None,
         Query(description="When the client took the photo, if the camera did not record it."),
     ] = None,
+    comment: Annotated[
+        str,
+        Query(
+            max_length=1000,
+            description="The owner's comment, so that a queued photo is one request.",
+        ),
+    ] = "",
 ) -> Photo:
     photos = photos_of(runtime)
     if int(request.headers.get("content-length") or 0) > MAX_UPLOAD_BYTES:
@@ -113,7 +120,9 @@ async def upload_photo(
             )
     if taken_at is not None and taken_at.tzinfo is None:
         taken_at = taken_at.replace(tzinfo=UTC)
-    row = await run_in_threadpool(run, lambda: photos.add(photo_id, tag, bytes(data), taken_at))
+    row = await run_in_threadpool(
+        run, lambda: photos.add(photo_id, tag, bytes(data), taken_at, comment)
+    )
     return await run_in_threadpool(as_photo, photos, row)
 
 

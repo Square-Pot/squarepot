@@ -28,8 +28,9 @@ def test_every_error_response_uses_the_error_body() -> None:
                 if not status.startswith(("4", "5")):
                     continue
                 expected = "Error"
-                if status == "409" and operation["operationId"] in ("create_plant", "edit_plant"):
-                    # An edit's conflict also carries the plant as it now is.
+                edits = ("create_plant", "edit_plant", "set_status")
+                if status == "409" and operation["operationId"] in edits:
+                    # An edit's conflict also carries the plant as it now is (or null).
                     expected = "EditConflict"
                 schema = response["content"]["application/json"]["schema"]
                 assert schema == {"$ref": f"#/components/schemas/{expected}"}, (
