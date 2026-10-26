@@ -8,7 +8,7 @@ main photo is not in the storage, so it falls back to the newest photo.
 
 Stop the server first: this is a second writer of the change sequence, which
 must have one writer at a time (see db.py). With the server's own settings:
-    docker compose stop server
+    docker compose stop
     docker compose run --rm server python -m squarepot_server.rebuild
     docker compose up -d
 """

@@ -18,6 +18,8 @@ dependencies = [
     "requests>=2.34.2",
     "sqlalchemy>=2.1.4",
     "uvicorn[standard]>=0.54.0",
+    # Reads the label codes in batch imports (ADR 0008).
+    "zxing-cpp>=3.1.1",
 ]
 
 [dependency-groups]
@@ -29,7 +31,6 @@ dev = [
     "resvg-py>=0.5.0",
     "types-pyyaml>=6.0.12.20260906",
     "types-requests>=2.33.0.20261006",
-    "zxing-cpp>=3.1.1",
 ]
 
 [build-system]

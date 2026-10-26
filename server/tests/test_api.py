@@ -19,7 +19,8 @@ PROTECTED = [
         path.replace("{tag}", "004217")
         .replace("{plant_id}", "main:004217")
         .replace("{collection_id}", "main")
-        .replace("{photo_id}", "6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b"),
+        .replace("{photo_id}", "6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b")
+        .replace("{import_id}", "6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b"),
     )
     for path, operations in openapi.document()["paths"].items()
     for method, operation in operations.items()
@@ -35,10 +36,13 @@ def test_health_needs_no_token(client: TestClient) -> None:
 
 def test_every_route_but_health_is_protected() -> None:
     photo = "/api/v1/photos/6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b"
+    imported = "/api/v1/imports/6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b"
     assert sorted(PROTECTED) == [
         ("DELETE", photo),
         ("GET", "/api/v1/collections"),
         ("GET", "/api/v1/collections/main/plants"),
+        ("GET", "/api/v1/imports"),
+        ("GET", imported),
         ("GET", "/api/v1/labels/templates"),
         ("GET", f"{photo}/image"),
         ("GET", f"{photo}/thumbnail"),
@@ -50,10 +54,13 @@ def test_every_route_but_health_is_protected() -> None:
         ("PATCH", "/api/v1/plants/main:004217"),
         ("POST", "/api/v1/collections/main/plants"),
         ("POST", "/api/v1/collections/main/status"),
+        ("POST", f"{imported}/discard"),
+        ("POST", f"{imported}/file"),
         ("POST", "/api/v1/labels"),
         ("POST", f"{photo}/restore"),
         ("POST", "/api/v1/photos/thumbnails"),
         ("POST", "/api/v1/sightings"),
+        ("PUT", imported),
         ("PUT", photo),
         ("PUT", "/api/v1/plants/by-tag/004217/main-photo"),
     ]

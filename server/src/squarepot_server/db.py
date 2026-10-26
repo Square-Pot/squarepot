@@ -161,6 +161,32 @@ class SightingRow(Base):
     received_at: Mapped[datetime]
 
 
+class ImportRow(Base):
+    """A photo of a batch import, staged until it is filed or discarded (ADR 0008).
+
+    The import worker only decodes: it moves a photo from queued to decoded and
+    records the numbers read. The server files it, under the syncer's lock, so
+    the change sequence keeps one writer.
+    """
+
+    __tablename__ = "imports"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    staged_key: Mapped[str] = mapped_column(Text)
+    # The file's own date, as the browser gives it: used when the photo has no EXIF time.
+    file_time: Mapped[datetime | None]
+    uploaded_at: Mapped[datetime]
+    # queued, decoding, decoded, review, filed or discarded.
+    state: Mapped[str] = mapped_column(String(16), index=True)
+    # The label numbers read in the photo, in the order found.
+    numbers: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # Why it waits for the owner: no_code, unknown_number, several_numbers, unreadable.
+    reason: Mapped[str | None] = mapped_column(String(32))
+    # The plant it was filed into.
+    tag: Mapped[str | None] = mapped_column(String(6))
+    decoded_at: Mapped[datetime | None]
+
+
 class MainPhoto(Base):
     """The photo the owner chose to show for a number; else the newest is shown."""
 

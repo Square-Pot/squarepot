@@ -510,6 +510,40 @@ class Thumbnails(ApiModel):
     expires_at: AwareDatetime
 
 
+class ImportedPhoto(ApiModel):
+    """A photo of a batch import, until it is filed into a plant or discarded (ADR 0008)."""
+
+    id: UUID
+    state: Literal["queued", "decoding", "decoded", "review", "filed", "discarded"] = Field(
+        description=(
+            "`queued` and `decoding`: its codes are not read yet. `decoded`: it is about to be "
+            "filed. `review`: it waits for the owner to pick the plant or discard it. "
+            "`filed` and `discarded` are final."
+        )
+    )
+    reason: str | None = Field(
+        description=(
+            "Why it waits for the owner: `no_code`, `unknown_number`, `several_numbers` or "
+            "`unreadable`; `expired` for a photo discarded after 30 days."
+        )
+    )
+    numbers: list[str] = Field(description="The label numbers read in it, in the order found.")
+    tag: Tag | None = Field(description="The plant it was filed into.")
+    file_time: AwareDatetime | None
+    uploaded_at: AwareDatetime
+    url: str | None = Field(
+        description=(
+            "The staged file, without the token, until `url_expires_at`; `null` once filed "
+            "or discarded. It may be relative to the server."
+        )
+    )
+    url_expires_at: AwareDatetime | None
+
+
+class ImportFiling(ApiModel):
+    tag: Tag = Field(description="The plant to file the photo into, whatever its codes said.")
+
+
 class SightingKind(StrEnum):
     SEEN = "seen"
     STATUS = "status"

@@ -17,6 +17,7 @@ from squarepot_server.backoff import Backoff
 from squarepot_server.config import CollectionConfig, PhotoStoreKind, Settings, StoreKind
 from squarepot_server.db import make_engine
 from squarepot_server.fields import Cell, load_schema
+from squarepot_server.photos.imports import Imports
 from squarepot_server.photos.service import Photos
 from squarepot_server.photos.storage import (
     DiskStorage,
@@ -95,6 +96,7 @@ class Runtime:
     worker: SyncWorker | None
     photos: Photos | None = None
     sightings: Sightings | None = None
+    imports: Imports | None = None
     backoff: Backoff = field(default_factory=Backoff)
 
     @classmethod
@@ -116,9 +118,14 @@ class Runtime:
         syncer.prepare()
         storage = photo_storage(settings)
         photos = Photos(sessions, storage, syncer.lock) if storage is not None else None
+        imports = Imports(sessions, photos.storage, photos) if photos is not None else None
         worker = None
         if settings.sync_interval_seconds > 0:
-            chores = [photos.purge] if photos is not None else []
+            chores = (
+                [photos.purge, imports.file_decoded, imports.purge]
+                if photos is not None and imports is not None
+                else []
+            )
             worker = SyncWorker(syncer, settings.sync_interval_seconds, chores)
             worker.start()
         sightings = (
@@ -126,7 +133,7 @@ class Runtime:
             if storage is not None
             else None
         )
-        return cls(settings, schema, engine, sessions, syncer, worker, photos, sightings)
+        return cls(settings, schema, engine, sessions, syncer, worker, photos, sightings, imports)
 
     def stop(self) -> None:
         if self.worker is not None:
