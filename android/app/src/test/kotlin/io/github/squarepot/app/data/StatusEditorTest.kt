@@ -64,6 +64,13 @@ class StatusEditorTest {
     }
 
     @Test
+    fun `a status cell the import rejected is sent as the client saw it`() = runTest {
+        respond(results("1" to "written"))
+        editor.set(api, listOf(plant("1").copy(rejectedStatus = "умерр")), "dead")
+        assertTrue("""{"id":"1","seen":"умерр"}""" in server.takeRequest().body!!.utf8())
+    }
+
+    @Test
     fun `more plants than a request takes go in several`() = runTest {
         respond("[]")
         respond("[]")

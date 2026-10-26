@@ -58,7 +58,8 @@ class StatusEditor {
             members.chunked(SquarepotApi.MAX_STATUS_PLANTS).map { collection to it }
         }
         for ((collection, batch) in batches) {
-            val seen = batch.map { StatusSeenDto(it.id, it.fields[STATUS]) }
+            // What the sheet's cell holds: the status, or the text the import rejected, which the server compares too.
+            val seen = batch.map { StatusSeenDto(it.id, it.fields[STATUS] ?: it.rejectedStatus) }
             val results = try {
                 api.setStatus(collection, status?.ifEmpty { null }, seen)
             } catch (e: IOException) {

@@ -21,7 +21,7 @@ import kotlinx.serialization.builtins.serializer
  */
 @Database(
     entities = [CollectionEntity::class, PlantEntity::class, SyncStateEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 @TypeConverters(FieldsConverter::class)

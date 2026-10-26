@@ -160,6 +160,7 @@ private fun PlantDto.toEntity() = PlantEntity(
     photoCount = photoCount,
     lastPhoto = lastPhoto?.let(::epochMillis),
     mainPhotoId = mainPhotoId,
+    rejectedStatus = invalid["status"]?.value,
 )
 
 private fun epochMillis(timestamp: String): Long? = try {
