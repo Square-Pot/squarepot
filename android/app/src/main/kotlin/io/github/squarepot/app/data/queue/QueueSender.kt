@@ -32,10 +32,14 @@ sealed interface QueueOutcome {
  * that is the item's own (a number no plant has, a photo too large or unreadable) is kept on the
  * item for the owner, and the rest of the queue goes on. Any other failure stops sending, and
  * everything not sent stays queued for the next attempt.
+ *
+ * A 404 for a photo of a plant that [inCopy] has is not taken as a number no plant has: a server
+ * without the photo routes (an older one) answers that way too, so it is retried as a server error.
  */
 class QueueSender(
     private val dao: QueueDao,
     private val photoDir: File,
+    private val inCopy: suspend (tag: String) -> Boolean,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     suspend fun send(api: SquarepotApi): QueueOutcome {
@@ -89,7 +93,8 @@ class QueueSender(
             withContext(Dispatchers.IO) { file.delete() }
             true
         } catch (e: ApiException) {
-            val problem = QueueProblem.of(e) ?: throw e
+            val problem = QueueProblem.of(e)?.takeUnless { it == QueueProblem.UNKNOWN_NUMBER && inCopy(photo.tag) }
+                ?: throw e
             dao.updatePhoto(photo.copy(problem = problem, problemMessage = e.message))
             false
         }
