@@ -16,3 +16,4 @@ fill it in with status **Proposed**, and open a pull request.
 | [0004](0004-technology-stack.md) | Technology stack | Proposed |
 | [0005](0005-offline-first-phone.md) | The phone works offline from a local copy | Proposed |
 | [0006](0006-editing-plants-from-the-apps.md) | Editing plants from the apps writes cells to the sheet | Proposed |
+| [0007](0007-plant-photos.md) | Plant photos live in object storage, indexed by the server | Proposed |
