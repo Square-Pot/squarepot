@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import io
+import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -11,8 +12,10 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
+from sqlalchemy.orm import sessionmaker
 
 from squarepot_server.config import PhotoStoreKind, Settings
+from squarepot_server.db import make_engine
 from squarepot_server.importer import Importer
 from squarepot_server.labels.datamatrix import encode
 from squarepot_server.photos.codes import read_numbers
@@ -126,6 +129,35 @@ def test_the_owner_wins_over_the_worker(client: TestClient) -> None:
     client.post(f"/api/v1/imports/{FIRST}/file", json={"tag": "004218"})
     assert not importer.move(row.id, ImportState.DECODING, ImportState.DECODED)
     assert imported(client, FIRST)["tag"] == "004218"
+
+
+def test_two_processes_never_claim_the_same_photo(client: TestClient, settings: Settings) -> None:
+    # Each worker has its own engine on the database file, as a second process would.
+    ids = [f"6f1c2b9e-3d4a-4e8f-9b7c-{index:012d}" for index in range(40)]
+    for import_id in ids:
+        stage(client, import_id, b"x")
+    state = runtime(client)
+    assert state.photos is not None
+    storage = state.photos.storage
+    claimed: list[list[str]] = [[], []]
+    engines = [make_engine(settings.database_url) for _ in claimed]
+
+    def claim_all(found: list[str], engine: Any) -> None:
+        importer = Importer(sessionmaker(engine, expire_on_commit=False), storage)
+        while (row := importer.claim()) is not None:
+            found.append(row.id)
+
+    threads = [
+        threading.Thread(target=claim_all, args=(found, engine))
+        for found, engine in zip(claimed, engines, strict=True)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    for engine in engines:
+        engine.dispose()
+    assert sorted(claimed[0] + claimed[1]) == ids
 
 
 def test_a_stopped_worker_leaves_nothing_half_done(client: TestClient) -> None:
