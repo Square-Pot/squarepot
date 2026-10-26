@@ -64,15 +64,21 @@ export function usePlantPhotos(tag: string | null): PlantPhotos {
   const queue = useRef<Upload[]>([]);
   const sending = useRef(false);
 
-  const reload = useCallback(async () => {
-    if (!tag) return;
-    try {
-      setPhotos(await list(tag));
-      setError(null);
-    } catch (failure) {
-      setError(message(failure));
-    }
-  }, [tag]);
+  const reload = useCallback(
+    (): Promise<void> =>
+      tag
+        ? list(tag).then(
+            (loaded) => {
+              setPhotos(loaded);
+              setError(null);
+            },
+            (failure: unknown) => {
+              setError(message(failure));
+            },
+          )
+        : Promise.resolve(),
+    [tag],
+  );
 
   useEffect(() => {
     void reload();
