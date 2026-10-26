@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import io
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -170,3 +171,55 @@ def test_photos_need_a_storage(settings: Settings, store: FakeStore) -> None:
         response = c.get("/api/v1/plants/by-tag/004217/photos")
     assert response.status_code == 503
     assert response.json()["message"] == "Photos are not set up on this server."
+
+
+def plant_in_sync(client: TestClient, tag: str, cursor: str | None = None) -> tuple[Any, str]:
+    params = {"cursor": cursor} if cursor else {}
+    body = client.get("/api/v1/sync", params=params).json()
+    plants = [plant for plant in body["plants"] if plant["tag"] == tag]
+    return (plants[0] if plants else None), body["cursor"]
+
+
+def test_a_plant_in_the_sync_shows_its_photos(client: TestClient) -> None:
+    plant, cursor = plant_in_sync(client, "004217")
+    assert (plant["photo_count"], plant["last_photo"], plant["main_photo_id"]) == (0, None, None)
+    upload(client, FIRST)
+    plant, cursor = plant_in_sync(client, "004217", cursor)
+    assert plant["photo_count"] == 1
+    assert plant["last_photo"].startswith("2025-06-01T07:00:00")
+    assert plant["main_photo_id"] == FIRST
+    assert plant_in_sync(client, "004218", cursor)[0] is None
+
+
+def test_every_photo_change_sends_the_plant_again(client: TestClient) -> None:
+    upload(client, FIRST)
+    client.put(f"/api/v1/photos/{SECOND}", params={"tag": "004217"}, content=photo(taken=None))
+    _, cursor = plant_in_sync(client, "004217")
+    url = "/api/v1/plants/by-tag/004217/main-photo"
+    changes: list[Callable[[], Any]] = [
+        lambda: client.put(url, json={"photo_id": FIRST}),
+        lambda: client.patch(f"/api/v1/photos/{FIRST}", json={"comment": "x"}),
+        lambda: client.delete(f"/api/v1/photos/{FIRST}"),
+        lambda: client.post(f"/api/v1/photos/{FIRST}/restore"),
+    ]
+    for change in changes:
+        assert change().status_code < 300
+        plant, cursor = plant_in_sync(client, "004217", cursor)
+        assert plant is not None
+    client.delete(f"/api/v1/photos/{FIRST}")
+    plant, _ = plant_in_sync(client, "004217", cursor)
+    assert (plant["photo_count"], plant["main_photo_id"]) == (1, SECOND)
+
+
+def test_a_photo_has_stable_addresses_that_redirect(client: TestClient) -> None:
+    upload(client, FIRST)
+    [listed] = photos(client)
+    for kind, field in (("thumbnail", "thumbnail_url"), ("image", "url")):
+        response = client.get(f"/api/v1/photos/{FIRST}/{kind}", follow_redirects=False)
+        assert response.status_code == 307
+        assert response.headers["cache-control"] == "private, max-age=3600"
+        location = response.headers["location"]
+        assert location.split("?")[0] == listed[field].split("?")[0]
+        image = client.get(location, headers={"Authorization": ""})
+        assert image.headers["content-type"] == "image/jpeg"
+    assert client.get(f"/api/v1/photos/{SECOND}/thumbnail").status_code == 404

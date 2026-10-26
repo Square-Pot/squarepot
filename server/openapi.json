@@ -439,7 +439,7 @@
           "sync"
         ],
         "summary": "Get changes to the local copy since a cursor",
-        "description": "Without `cursor`, returns a full copy of every collection. With the `cursor` of the previous response, returns only what changed since then, or a full copy when the cursor can no longer be served. See `kind`. Responses are gzip-compressed when the client accepts it.",
+        "description": "Without `cursor`, returns a full copy of every collection. With the `cursor` of the previous response, returns only what changed since then, or a full copy when the cursor can no longer be served. See `kind`. A plant is sent again when its photos change. Responses are gzip-compressed when the client accepts it.",
         "operationId": "sync",
         "security": [
           {
@@ -1137,6 +1137,170 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/photos/{photo_id}/thumbnail": {
+      "get": {
+        "tags": [
+          "photos"
+        ],
+        "summary": "Show a photo's thumbnail",
+        "description": "Redirects to the JPEG at most 480 pixels on its longer side. A stable address for `Plant.main_photo_id`, whose own addresses would expire.",
+        "operationId": "photo_thumbnail",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "photo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Photo Id"
+            }
+          }
+        ],
+        "responses": {
+          "307": {
+            "description": "To an address of the file that works without the token for six hours."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/photos/{photo_id}/image": {
+      "get": {
+        "tags": [
+          "photos"
+        ],
+        "summary": "Show a photo",
+        "description": "Redirects to the JPEG at most 2560 pixels on its longer side.",
+        "operationId": "photo_image",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "photo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Photo Id"
+            }
+          }
+        ],
+        "responses": {
+          "307": {
+            "description": "To an address of the file that works without the token for six hours."
           },
           "401": {
             "content": {
@@ -2663,6 +2827,38 @@
               "2025-06-14"
             ]
           },
+          "photo_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Photo Count",
+            "description": "How many photos the plant's number has, deleted ones left out (ADR 0007). A plant without a number has none."
+          },
+          "last_photo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Photo",
+            "description": "When the newest photo was taken; `null` without photos."
+          },
+          "main_photo_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Photo Id",
+            "description": "The photo to show for the plant: the one the owner chose, or else the newest. `GET /api/v1/photos/{photo_id}/thumbnail` shows it. `null` without photos."
+          },
           "invalid": {
             "additionalProperties": {
               "$ref": "#/components/schemas/InvalidCell"
@@ -2691,6 +2887,9 @@
           "fields",
           "custom",
           "status_since",
+          "photo_count",
+          "last_photo",
+          "main_photo_id",
           "invalid"
         ],
         "title": "Plant",

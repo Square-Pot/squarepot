@@ -21,6 +21,7 @@ from squarepot_server.api.models import Photo, PhotoChange, TakenFrom
 from squarepot_server.db import MainPhoto, PhotoRow, PlantRow, next_seq
 from squarepot_server.photos.images import process, resolve_time
 from squarepot_server.photos.storage import PhotoStorage
+from squarepot_server.photos.summary import touch_plants
 
 log = logging.getLogger(__name__)
 URLS_LAST = timedelta(hours=6)
@@ -93,6 +94,7 @@ class Photos:
         with self.lock, self.sessions.begin() as session:
             row.seq = next_seq(session)
             session.add(row)
+            touch_plants(session, tag)
         log.info("plant %s: photo %s added", tag, photo_id)
         return row
 
@@ -128,6 +130,7 @@ class Photos:
             apply(row)
             if session.is_modified(row):
                 row.seq = next_seq(session)
+                touch_plants(session, row.tag)
                 self.write_meta(row)
         return row
 
@@ -177,6 +180,7 @@ class Photos:
     def choose_main(self, tag: str, photo_id: UUID | None) -> None:
         with self.lock, self.sessions.begin() as session:
             chosen = session.get(MainPhoto, tag)
+            touch_plants(session, tag)
             if photo_id is None:
                 if chosen is not None:
                     session.delete(chosen)

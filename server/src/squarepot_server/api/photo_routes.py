@@ -5,18 +5,18 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
 from squarepot_server.api.models import MainPhotoChoice, Photo, PhotoChange
 from squarepot_server.api.routes import RuntimeDep, errors, require_token
 from squarepot_server.db import PhotoRow
 from squarepot_server.photos.images import UnsupportedImage
-from squarepot_server.photos.service import PhotoIdTaken, PhotoNotFound, Photos
+from squarepot_server.photos.service import URLS_LAST, PhotoIdTaken, PhotoNotFound, Photos
 from squarepot_server.photos.storage import DiskStorage, PhotoStorageError
 from squarepot_server.runtime import PHOTO_FILES_ROUTE, Runtime
 
@@ -157,6 +157,50 @@ def delete_photo(photo_id: UUID, runtime: RuntimeDep) -> Photo:
 def restore_photo(photo_id: UUID, runtime: RuntimeDep) -> Photo:
     photos = photos_of(runtime)
     return as_photo(photos, run(lambda: photos.restore(photo_id)))
+
+
+def redirect_to(photos: Photos, photo_id: UUID, thumbnail: bool) -> RedirectResponse:
+    row = run(lambda: photos.get(photo_id))
+    key = row.thumbnail_key if thumbnail else row.key
+    url = run(lambda: photos.storage.url(key, photos.clock() + URLS_LAST))
+    # The address lasts six hours; a client may keep the redirect for one.
+    return RedirectResponse(
+        url, status.HTTP_307_TEMPORARY_REDIRECT, headers={"Cache-Control": "private, max-age=3600"}
+    )
+
+
+REDIRECT: dict[int | str, dict[str, Any]] = {
+    status.HTTP_307_TEMPORARY_REDIRECT: {
+        "description": "To an address of the file that works without the token for six hours."
+    }
+}
+
+
+@router.get(
+    "/photos/{photo_id}/thumbnail",
+    summary="Show a photo's thumbnail",
+    description=(
+        "Redirects to the JPEG at most 480 pixels on its longer side. A stable address for "
+        "`Plant.main_photo_id`, whose own addresses would expire."
+    ),
+    response_class=RedirectResponse,
+    status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+    responses=REDIRECT,
+)
+def photo_thumbnail(photo_id: UUID, runtime: RuntimeDep) -> RedirectResponse:
+    return redirect_to(photos_of(runtime), photo_id, thumbnail=True)
+
+
+@router.get(
+    "/photos/{photo_id}/image",
+    summary="Show a photo",
+    description="Redirects to the JPEG at most 2560 pixels on its longer side.",
+    response_class=RedirectResponse,
+    status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+    responses=REDIRECT,
+)
+def photo_image(photo_id: UUID, runtime: RuntimeDep) -> RedirectResponse:
+    return redirect_to(photos_of(runtime), photo_id, thumbnail=False)
 
 
 @router.put(

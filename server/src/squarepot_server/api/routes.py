@@ -6,9 +6,10 @@ from __future__ import annotations
 import logging
 import re
 import secrets
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from datetime import date
 from typing import Annotated, Any, cast
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from fastapi.responses import JSONResponse
@@ -42,6 +43,7 @@ from squarepot_server.labels.caption import NAME, caption, entries, extra_text
 from squarepot_server.labels.layout import TEMPLATES, Item, LayoutError, Page, layout_pages
 from squarepot_server.labels.render import to_pdf, to_svg
 from squarepot_server.labels.text import Run
+from squarepot_server.photos.summary import PhotoSummary, summaries
 from squarepot_server.runtime import Runtime
 from squarepot_server.store import EditableStore, StoreError
 
@@ -130,7 +132,8 @@ def editable(runtime: Runtime, collection_id: str) -> bool:
     return config is not None and isinstance(store, EditableStore) and store.can_edit(config)
 
 
-def to_plant(row: PlantRow) -> Plant:
+def to_plant(row: PlantRow, photos: Mapping[str, PhotoSummary]) -> Plant:
+    summary = photos.get(row.tag) if row.tag is not None else None
     return Plant(
         id=row.id,
         collection_id=row.collection_id,
@@ -140,7 +143,20 @@ def to_plant(row: PlantRow) -> Plant:
         custom=row.custom,
         invalid=row.invalid,
         status_since=status_since(row),
+        photo_count=summary.count if summary else 0,
+        last_photo=summary.last if summary else None,
+        main_photo_id=UUID(summary.main_id) if summary else None,
     )
+
+
+def to_plants(session: Session, rows: Sequence[PlantRow]) -> list[Plant]:
+    photos = summaries(session, (row.tag for row in rows if row.tag is not None))
+    return [to_plant(row, photos) for row in rows]
+
+
+def plant_out(runtime: Runtime, row: PlantRow) -> Plant:
+    with runtime.sessions.begin() as session:
+        return to_plants(session, [row])[0]
 
 
 def status_since(row: PlantRow) -> date | None:
@@ -232,7 +248,7 @@ def get_plants_by_tag(
     ).all()
     if not rows:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"No plant has the number {tag}.")
-    return TagLookup(tag=tag, plants=[to_plant(row) for row in rows])
+    return TagLookup(tag=tag, plants=to_plants(session, rows))
 
 
 EDIT_RESPONSES: dict[int | str, dict[str, Any]] = {
@@ -253,10 +269,10 @@ EDIT_RULES = (
 )
 
 
-def edited(action: Callable[[], PlantRow]) -> Plant | JSONResponse:
+def edited(runtime: Runtime, action: Callable[[], PlantRow]) -> Plant | JSONResponse:
     """The plant an edit left, or the error response an edit failed with."""
     try:
-        return to_plant(action())
+        return plant_out(runtime, action())
     except NotFound as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(error)) from error
     except InvalidEdit as error:
@@ -268,7 +284,7 @@ def edited(action: Callable[[], PlantRow]) -> Plant | JSONResponse:
     except NotEditable as error:
         body = EditConflict(code="not_editable", message=str(error), plant=None)
     except Conflict as error:
-        plant = to_plant(error.plant) if error.plant is not None else None
+        plant = plant_out(runtime, error.plant) if error.plant is not None else None
         body = EditConflict(code="changed_in_sheet", message=str(error), plant=plant)
     return JSONResponse(body.model_dump(mode="json"), status_code=status.HTTP_409_CONFLICT)
 
@@ -291,7 +307,7 @@ def create_plant(
     body: NewPlant,
     runtime: RuntimeDep,
 ) -> Plant | JSONResponse:
-    return edited(lambda: Editor(runtime.syncer).create(collection_id, body))
+    return edited(runtime, lambda: Editor(runtime.syncer).create(collection_id, body))
 
 
 @router.patch(
@@ -313,7 +329,7 @@ def edit_plant(
     body: PlantEdit,
     runtime: RuntimeDep,
 ) -> Plant | JSONResponse:
-    return edited(lambda: Editor(runtime.syncer).edit(plant_id, body))
+    return edited(runtime, lambda: Editor(runtime.syncer).edit(plant_id, body))
 
 
 @router.get(
@@ -323,8 +339,8 @@ def edit_plant(
     description=(
         "Without `cursor`, returns a full copy of every collection. With the `cursor` of the "
         "previous response, returns only what changed since then, or a full copy when the "
-        "cursor can no longer be served. See `kind`. Responses are gzip-compressed when the "
-        "client accepts it."
+        "cursor can no longer be served. See `kind`. A plant is sent again when its photos "
+        "change. Responses are gzip-compressed when the client accepts it."
     ),
     responses=errors(status.HTTP_422_UNPROCESSABLE_CONTENT),
 )
@@ -361,7 +377,7 @@ def sync(
         schema_version=runtime.schema.version,
         collections=[to_collection(row, runtime) for row in collection_rows if not row.removed],
         removed_collections=[row.id for row in collection_rows if row.removed],
-        plants=[to_plant(row) for row in plant_rows if not row.removed],
+        plants=to_plants(session, [row for row in plant_rows if not row.removed]),
         removed_plants=[row.id for row in plant_rows if row.removed],
     )
 
