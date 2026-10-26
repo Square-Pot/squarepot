@@ -14,6 +14,7 @@ import org.junit.Test
 
 /** Which plants a walk covers, what counts as seen in it, and what narrows it. */
 class InventoryTest {
+    @Suppress("LongParameterList") // One per thing a walk looks at.
     private fun plant(
         tag: String?,
         collection: String = "main",

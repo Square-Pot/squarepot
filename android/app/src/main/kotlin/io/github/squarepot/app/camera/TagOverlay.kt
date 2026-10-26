@@ -57,8 +57,6 @@ fun TagOverlay(
     reservedBottom: Dp = 0.dp,
     seen: Set<String> = emptySet(),
 ) {
-    // In inventory mode, the numbers seen in the walk carry a check mark.
-    fun number(code: TagCode) = if (code.value in seen) "✓ ${code.value}" else code.value
     val measurer = rememberTextMeasurer()
     val texts = rememberCaptionTexts()
     val selected = state.selected
@@ -81,20 +79,23 @@ fun TagOverlay(
                 val area = ViewBox(0f, reservedTop.toPx(), size.width, size.height - reservedBottom.toPx())
                 val note = if (state.selectedByTap) texts.yourPick else null
                 val card = CaptionCard(content, state.captions.look, color, note)
-                painter.caption(card, number(selected.code), label, area)
+                painter.caption(card, selected.code.shown(seen), label, area)
             } else {
-                painter.tab(number(selected.code), label, selectedTab(color))
+                painter.tab(selected.code.shown(seen), label, selectedTab(color))
             }
         }
         val withNames = atLabel && state.captions.neighbours == NeighbourNames.SHORT_NAME
         neighbours.sortedByDescending { it.area }.forEach { neighbour ->
             val plant = state.plants[neighbour.code.value]?.singleOrNull()
             val name = plant?.takeIf { withNames }?.let { shortName(it, state.schema) }.orEmpty()
-            painter.neighbour(number(neighbour.code), painter.bounds(neighbour, map), name.annotated(), taken)
+            painter.neighbour(neighbour.code.shown(seen), painter.bounds(neighbour, map), name.annotated(), taken)
                 ?.let { taken += it }
         }
     }
 }
+
+/** The number on a label's tab; in inventory mode, those seen in the walk carry a check mark. */
+private fun TagCode.shown(seen: Set<String>) = if (value in seen) "✓ $value" else value
 
 /**
  * A caption as the camera draws it at the label, on a dark ground with a stand-in label, for the
