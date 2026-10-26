@@ -6,8 +6,11 @@ database every one it lacks, for example after the database was lost; it never
 changes or removes what the database already holds. The choice of a plant's
 main photo is not in the storage, so it falls back to the newest photo.
 
-Usage, with the server's own settings (it may keep running):
-    docker compose exec server python -m squarepot_server.rebuild
+Stop the server first: this is a second writer of the change sequence, which
+must have one writer at a time (see db.py). With the server's own settings:
+    docker compose stop server
+    docker compose run --rm server python -m squarepot_server.rebuild
+    docker compose up -d
 """
 
 from __future__ import annotations

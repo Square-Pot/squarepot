@@ -131,11 +131,14 @@ The server turns each photo upright, drops its EXIF data, including where it
 was taken, and keeps a large JPEG and a thumbnail, one photo at a time.
 
 Each photo and each sighting also has a small JSON file in the storage. If the
-database is lost, rebuild the photo index and the sightings from them, while
-the server runs:
+database is lost, rebuild the photo index and the sightings from them, with
+the server stopped (the changes the phone syncs must have one writer at a
+time):
 
 ```sh
-docker compose exec server python -m squarepot_server.rebuild
+docker compose stop server
+docker compose run --rm server python -m squarepot_server.rebuild
+docker compose up -d
 ```
 
 It adds only what the database lacks, and prints how many of each it added.
