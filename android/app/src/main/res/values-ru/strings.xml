@@ -131,4 +131,46 @@
     <string name="bench_progress">Фото %1$d из %2$d</string>
     <string name="bench_saved">Сохранено: %1$s</string>
     <string name="bench_failed">Ошибка замера: %1$s</string>
+    <!-- Inventory mode -->
+    <string name="inventory_mode">Режим инвентаризации</string>
+    <string name="walk_progress">Видели %1$d из %2$d · с %3$s</string>
+    <string name="queue_chip">↑ %1$d</string>
+    <string name="queue_chip_problems">↑ %1$d · %2$d проверить</string>
+    <string name="card_seen_no_photo">Видел, без фото</string>
+    <string name="card_seen_in_walk">Уже отмечено в этом обходе</string>
+    <string name="card_never_seen">Ещё не видели</string>
+    <string name="card_last_seen">Последний визит: %1$s</string>
+    <string name="card_status">Статус: %1$s</string>
+    <string name="card_collision_hint">Сначала исправьте номер в таблице.</string>
+    <plurals name="card_photos">
+        <item quantity="one">%d фото</item>
+        <item quantity="few">%d фото</item>
+        <item quantity="many">%d фото</item>
+        <item quantity="other">%d фото</item>
+    </plurals>
+    <string name="walk_title">Обход</string>
+    <string name="walk_mode">Режим инвентаризации</string>
+    <string name="walk_mode_hint">Тап по бирке открывает карточку растения. Растение засчитывается только кнопкой в карточке, а не сканированием.</string>
+    <string name="walk_collection">Коллекция</string>
+    <string name="walk_all_collections">Все коллекции</string>
+    <string name="walk_column">Только где</string>
+    <string name="walk_column_none">Везде</string>
+    <string name="walk_genus">Род</string>
+    <string name="walk_no_values">В этой колонке ни у одного растения нет значения.</string>
+    <string name="walk_since_title">С какого момента</string>
+    <string name="walk_since">Визиты считаются с %1$s.</string>
+    <string name="walk_in_scope">Растений в обходе: %1$d · видели: %2$d</string>
+    <string name="walk_restart">Начать заново с этого момента</string>
+    <string name="queue_title">Очередь</string>
+    <string name="queue_empty">Ничего не ждёт отправки.</string>
+    <string name="queue_hint">Отправится, как только появится сеть.</string>
+    <string name="queue_photo">Фото %1$s</string>
+    <string name="queue_seen">Визит %1$s</string>
+    <string name="queue_status">Статус %1$s</string>
+    <string name="queue_retry">Повторить</string>
+    <string name="queue_discard">Удалить</string>
+    <string name="problem_unknown_number">Ни у одного растения нет этого номера.</string>
+    <string name="problem_too_large">Фото слишком большое для сервера.</string>
+    <string name="problem_rejected">Сервер не принял фото.</string>
+    <string name="problem_missing_file">Файл фото пропал с телефона.</string>
 </resources>

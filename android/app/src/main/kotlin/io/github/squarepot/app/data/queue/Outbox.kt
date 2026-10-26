@@ -5,6 +5,7 @@ package io.github.squarepot.app.data.queue
 import io.github.squarepot.app.data.api.SightingKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -52,4 +53,49 @@ class Outbox(
     fun seenSince(since: Long): Flow<Set<String>> = dao.observeSeenSince(since).map { it.toSet() }
 
     suspend fun hasPending(): Boolean = dao.pendingCount() > 0
+
+    /** Everything not yet on the server, oldest first, for the queue screen. */
+    val items: Flow<List<QueueItem>> = combine(dao.observeWaitingPhotos(), dao.observeWaitingSightings()) { p, s ->
+        (p.map { QueueItem.Photo(it) } + s.map { QueueItem.Sighting(it) }).sortedBy { it.at }
+    }
+
+    /** Sends [item] again, after the owner fixed what the server refused. */
+    suspend fun retry(item: QueueItem) {
+        when (item) {
+            is QueueItem.Photo -> dao.retryPhoto(item.photo.id)
+            is QueueItem.Sighting -> dao.retrySighting(item.sighting.id)
+        }
+        onAdded()
+    }
+
+    /** Drops [item] from the queue, with its photo's file. */
+    suspend fun discard(item: QueueItem) {
+        when (item) {
+            is QueueItem.Photo -> {
+                dao.deletePhoto(item.photo.id)
+                withContext(Dispatchers.IO) { File(photoDir, item.photo.file).delete() }
+            }
+
+            is QueueItem.Sighting -> dao.deleteSighting(item.sighting.id)
+        }
+    }
+}
+
+/** One thing waiting to be sent. */
+sealed interface QueueItem {
+    val tag: String
+    val at: Long
+    val problem: QueueProblem?
+
+    data class Photo(val photo: QueuedPhoto) : QueueItem {
+        override val tag get() = photo.tag
+        override val at get() = photo.takenAt
+        override val problem get() = photo.problem
+    }
+
+    data class Sighting(val sighting: QueuedSighting) : QueueItem {
+        override val tag get() = sighting.tag
+        override val at get() = sighting.seenAt
+        override val problem get() = sighting.problem
+    }
 }

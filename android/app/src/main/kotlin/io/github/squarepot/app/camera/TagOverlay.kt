@@ -35,6 +35,7 @@ import io.github.squarepot.app.recognition.Detection
 import io.github.squarepot.app.recognition.FrameSize
 import io.github.squarepot.app.recognition.Point
 import io.github.squarepot.app.recognition.SingleTargetSelector
+import io.github.squarepot.app.recognition.TagCode
 import java.time.LocalDate
 import kotlin.math.max
 
@@ -54,7 +55,10 @@ fun TagOverlay(
     modifier: Modifier = Modifier,
     reservedTop: Dp = 0.dp,
     reservedBottom: Dp = 0.dp,
+    seen: Set<String> = emptySet(),
 ) {
+    // In inventory mode, the numbers seen in the walk carry a check mark.
+    fun number(code: TagCode) = if (code.value in seen) "✓ ${code.value}" else code.value
     val measurer = rememberTextMeasurer()
     val texts = rememberCaptionTexts()
     val selected = state.selected
@@ -77,16 +81,16 @@ fun TagOverlay(
                 val area = ViewBox(0f, reservedTop.toPx(), size.width, size.height - reservedBottom.toPx())
                 val note = if (state.selectedByTap) texts.yourPick else null
                 val card = CaptionCard(content, state.captions.look, color, note)
-                painter.caption(card, selected.code.value, label, area)
+                painter.caption(card, number(selected.code), label, area)
             } else {
-                painter.tab(selected.code.value, label, selectedTab(color))
+                painter.tab(number(selected.code), label, selectedTab(color))
             }
         }
         val withNames = atLabel && state.captions.neighbours == NeighbourNames.SHORT_NAME
         neighbours.sortedByDescending { it.area }.forEach { neighbour ->
             val plant = state.plants[neighbour.code.value]?.singleOrNull()
             val name = plant?.takeIf { withNames }?.let { shortName(it, state.schema) }.orEmpty()
-            painter.neighbour(neighbour.code.value, painter.bounds(neighbour, map), name.annotated(), taken)
+            painter.neighbour(number(neighbour.code), painter.bounds(neighbour, map), name.annotated(), taken)
                 ?.let { taken += it }
         }
     }

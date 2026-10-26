@@ -56,6 +56,24 @@ interface QueueDao {
     @Query("SELECT tag FROM sightings WHERE seenAt >= :since UNION SELECT tag FROM photos WHERE takenAt >= :since")
     fun observeSeenSince(since: Long): Flow<List<String>>
 
+    @Query("SELECT * FROM photos WHERE sentAt IS NULL ORDER BY takenAt")
+    fun observeWaitingPhotos(): Flow<List<QueuedPhoto>>
+
+    @Query("SELECT * FROM sightings WHERE sentAt IS NULL ORDER BY seenAt")
+    fun observeWaitingSightings(): Flow<List<QueuedSighting>>
+
+    @Query("UPDATE photos SET problem = NULL, problemMessage = NULL WHERE id = :id")
+    suspend fun retryPhoto(id: String)
+
+    @Query("UPDATE sightings SET problem = NULL WHERE id = :id")
+    suspend fun retrySighting(id: String)
+
+    @Query("DELETE FROM photos WHERE id = :id")
+    suspend fun deletePhoto(id: String)
+
+    @Query("DELETE FROM sightings WHERE id = :id")
+    suspend fun deleteSighting(id: String)
+
     @Query("DELETE FROM photos WHERE sentAt < :before")
     suspend fun forgetPhotosSentBefore(before: Long)
 
