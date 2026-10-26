@@ -254,6 +254,30 @@ class QueueSenderTest {
     }
 
     @Test
+    fun `a refused item can be retried or discarded`() = runTest {
+        outbox.addPhoto("999999", shot("a.jpg"), takenAt = 1_000L, comment = null)
+        outbox.seen("999998", SightingKind.SEEN)
+        respond("""[{"id": "id-2", "result": "unknown_number"}]""")
+        respond("""{"code": "not_found", "message": "No plant has the number 999999."}""", code = 404)
+        sender.send(api)
+        val (photo, sighting) = outbox.items.first()
+        assertEquals(QueueProblem.UNKNOWN_NUMBER, photo.problem)
+        assertEquals(QueueProblem.UNKNOWN_NUMBER, sighting.problem)
+
+        val before = added
+        outbox.retry(photo)
+        assertEquals(before + 1, added)
+        assertNull(outbox.items.first().first().problem)
+        assertTrue(outbox.hasPending())
+
+        outbox.discard(sighting)
+        assertEquals(listOf("id-1"), outbox.items.first().map { (it as QueueItem.Photo).photo.id })
+        outbox.discard(outbox.items.first().single())
+        assertTrue(outbox.items.first().isEmpty())
+        assertFalse("the discarded photo's file is removed", File(photoDir, "id-1.jpg").exists())
+    }
+
+    @Test
     fun `sent items are forgotten after a while`() = runTest {
         outbox.seen("004217", SightingKind.SEEN)
         respond("""[{"id": "id-1", "result": "recorded"}]""")

@@ -94,8 +94,14 @@ data class FieldDefinitionDto(
     val aliases: List<String> = emptyList(),
     val required: Boolean = false,
     val pattern: String? = null,
+    /** The values the field takes, when it has a fixed list (such as `status`). */
+    val values: List<FieldValueDto> = emptyList(),
     val display: DisplayDto? = null,
 )
+
+/** One value of a field with a fixed list: the key the sheet holds and its label. */
+@Serializable
+data class FieldValueDto(val key: String, val label: LabelDto)
 
 @Serializable
 data class DisplayDto(

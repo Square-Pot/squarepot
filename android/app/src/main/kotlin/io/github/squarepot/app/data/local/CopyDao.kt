@@ -39,6 +39,9 @@ interface CopyDao {
     @Query("SELECT * FROM plants")
     suspend fun allPlants(): List<PlantEntity>
 
+    @Query("SELECT * FROM plants")
+    fun observePlants(): Flow<List<PlantEntity>>
+
     @Upsert
     suspend fun upsertCollections(collections: List<CollectionEntity>)
 

@@ -124,4 +124,44 @@
     <string name="bench_progress">Decoding photo %1$d of %2$d</string>
     <string name="bench_saved">Saved %1$s</string>
     <string name="bench_failed">Bench failed: %1$s</string>
+    <!-- Inventory mode -->
+    <string name="inventory_mode">Inventory mode</string>
+    <string name="walk_progress">Seen %1$d of %2$d · since %3$s</string>
+    <string name="queue_chip">↑ %1$d</string>
+    <string name="queue_chip_problems">↑ %1$d · %2$d to check</string>
+    <string name="card_seen_no_photo">Seen, no photo</string>
+    <string name="card_seen_in_walk">Already seen in this walk</string>
+    <string name="card_never_seen">Not seen yet</string>
+    <string name="card_last_seen">Last seen %1$s</string>
+    <string name="card_status">Status: %1$s</string>
+    <string name="card_collision_hint">Fix the number in the sheet first.</string>
+    <plurals name="card_photos">
+        <item quantity="one">%d photo</item>
+        <item quantity="other">%d photos</item>
+    </plurals>
+    <string name="walk_title">Inventory walk</string>
+    <string name="walk_mode">Inventory mode</string>
+    <string name="walk_mode_hint">A tap on a label opens the plant\'s card. A plant counts as seen only by a button on its card, never by a scan.</string>
+    <string name="walk_collection">Collection</string>
+    <string name="walk_all_collections">All collections</string>
+    <string name="walk_column">Only where</string>
+    <string name="walk_column_none">Everywhere</string>
+    <string name="walk_genus">Genus</string>
+    <string name="walk_no_values">No plant has a value in this column.</string>
+    <string name="walk_since_title">Since</string>
+    <string name="walk_since">Sightings count from %1$s.</string>
+    <string name="walk_in_scope">Plants in this walk: %1$d · seen: %2$d</string>
+    <string name="walk_restart">Start over from now</string>
+    <string name="queue_title">Queue</string>
+    <string name="queue_empty">Nothing waits to be sent.</string>
+    <string name="queue_hint">Sent as soon as the phone is online.</string>
+    <string name="queue_photo">Photo of %1$s</string>
+    <string name="queue_seen">Seen %1$s</string>
+    <string name="queue_status">Status of %1$s</string>
+    <string name="queue_retry">Retry</string>
+    <string name="queue_discard">Discard</string>
+    <string name="problem_unknown_number">No plant has this number.</string>
+    <string name="problem_too_large">The photo is too large for the server.</string>
+    <string name="problem_rejected">The server could not take the photo.</string>
+    <string name="problem_missing_file">The photo\'s file is gone from the phone.</string>
 </resources>
