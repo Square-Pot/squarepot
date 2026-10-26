@@ -82,10 +82,10 @@ def bucket(status: int = 200) -> tuple[S3Storage, RecordingSession]:
 
 def test_a_file_is_put_into_the_bucket_by_path() -> None:
     storage, session = bucket()
-    storage.put("photos/004217/a b.jpg", b"jpeg", "image/jpeg")
+    storage.put("photos/004217/a_b.jpg", b"jpeg", "image/jpeg")
     [(method, url, data, headers)] = session.calls
     assert (method, data) == ("PUT", b"jpeg")
-    assert url == "https://storage.yandexcloud.net/square-pot-photos/photos/004217/a%20b.jpg"
+    assert url == "https://storage.yandexcloud.net/square-pot-photos/photos/004217/a_b.jpg"
     assert headers["content-type"] == "image/jpeg"
     assert "host" not in headers
     assert headers["authorization"].startswith(
@@ -156,9 +156,20 @@ def test_a_folder_serves_a_file_only_at_its_signed_address(tmp_path: Path) -> No
 
 
 @pytest.mark.parametrize(
-    "key", ["../x.jpg", "photos/004217/..", "photos/004217/../../x", "photos/4217/x.jpg", "x"]
+    "key",
+    [
+        "../x.jpg",
+        "photos/004217/..",
+        "photos/004217/../../x",
+        "photos/4217/x.jpg",
+        "x",
+        "photos/004217/a b",
+    ],
 )
-def test_a_folder_takes_only_photo_keys(tmp_path: Path, key: str) -> None:
-    storage = DiskStorage(tmp_path, b"secret", "/files")
-    with pytest.raises(PhotoStorageError, match="not a photo key"):
-        storage.put(key, b"", "image/jpeg")
+def test_only_photo_keys_are_stored(tmp_path: Path, key: str) -> None:
+    folder = DiskStorage(tmp_path, b"secret", "/files")
+    storage, session = bucket()
+    for store in (folder, storage):
+        with pytest.raises(PhotoStorageError, match="not a photo key"):
+            store.put(key, b"", "image/jpeg")
+    assert session.calls == []

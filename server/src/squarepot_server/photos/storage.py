@@ -163,7 +163,10 @@ class S3Storage:
         self.clock = clock
 
     def object_url(self, key: str) -> str:
-        return f"{self.base_url}/{quote(key, safe='/-_.~')}"
+        # Photo keys need no quoting, so the path signed is the path sent.
+        if not KEY.fullmatch(key):
+            raise PhotoStorageError(f"not a photo key: {key!r}")
+        return f"{self.base_url}/{key}"
 
     def request(
         self, method: str, key: str, body: bytes = b"", extra: dict[str, str] | None = None
