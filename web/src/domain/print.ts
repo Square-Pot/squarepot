@@ -41,6 +41,17 @@ export function slotAt(layout: Layout, x: number, y: number): number | null {
 /** Places to leave empty, fewer than a page holds: the label type, and with it the page, can change after the choice. */
 export const clampSkip = (skip: number, perPage: number): number => Math.max(0, Math.min(skip, perPage - 1));
 
+/** Ids in a comma-separated header such as `X-Cut-Captions`; none when it is empty or missing. */
+export const parseIdList = (header: string | null): string[] =>
+  (header ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+/** The page, from 1, that holds the label at `index` in print order. */
+export const pageOf = (index: number, skip: number, perPage: number): number =>
+  perPage > 0 ? Math.floor((skip + index) / perPage) + 1 : 1;
+
 export const pageCount = (labels: number, skip: number, perPage: number): number =>
   perPage > 0 ? Math.max(1, Math.ceil((skip + labels) / perPage)) : 1;
 

@@ -10,7 +10,9 @@ import {
   grid,
   MAX_PLANTS,
   pageCount,
+  pageOf,
   pageSize,
+  parseIdList,
   printableFields,
   printOrder,
   slotAt,
@@ -61,6 +63,8 @@ interface Preview {
   key: string;
   url: string | null;
   pages: number;
+  /** Plants whose caption or burial text the server cut short, on any page. */
+  cut: string[];
   error: string | null;
 }
 
@@ -128,11 +132,12 @@ export function PrintView({ schema, collection, templates, rows, found, state, o
           if (data === undefined) throw apiError(response, error);
           url = URL.createObjectURL(new Blob([data], { type: "image/svg+xml" }));
           const count = Number(response.headers.get("X-Page-Count") ?? "1");
-          setPreview({ key: previewKey, url, pages: count, error: null });
+          const cut = parseIdList(response.headers.get("X-Cut-Captions"));
+          setPreview({ key: previewKey, url, pages: count, cut, error: null });
         })
         .catch((error: unknown) => {
           if (abort.signal.aborted) return;
-          setPreview({ key: previewKey, url: null, pages: 1, error: error instanceof Error ? error.message : String(error) });
+          setPreview({ key: previewKey, url: null, pages: 1, cut: [], error: error instanceof Error ? error.message : String(error) });
         });
     }, 250);
     return () => {
@@ -144,6 +149,8 @@ export function PrintView({ schema, collection, templates, rows, found, state, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewKey]);
   const current = preview?.key === previewKey ? preview : null;
+  const cutIds = new Set(current?.cut ?? []);
+  const cutRows = printed.filter((row) => cutIds.has(row.plant.id));
 
   const download = () => {
     if (!body) return;
@@ -420,6 +427,38 @@ export function PrintView({ schema, collection, templates, rows, found, state, o
               ? t("Каждое поле — строкой «Поле: значение»; что не влезет, обрежется.", "Each field on its own line, «Field: value»; what does not fit is cut.")
               : t("Печатается мельче, если после подписи осталось место; обрезается первым.", "Printed smaller when the caption leaves room; cut first.")}
           </p>
+
+          {cutRows.length > 0 && (
+            <div className="hint" role="status">
+              <span className="hi">
+                <Icon name="warn" size={16} />
+              </span>
+              <div>
+                {t(
+                  `На ${String(cutRows.length)} ${cutRows.length === 1 ? "бирке" : "бирках"} текст не влез и обрезан «…»: `,
+                  `On ${String(cutRows.length)} label${cutRows.length === 1 ? "" : "s"} the text does not fit and is cut with «…»: `,
+                )}
+                {cutRows.slice(0, 5).map((row, i) => (
+                  <span key={row.plant.id}>
+                    {i > 0 && ", "}
+                    <button
+                      className="more"
+                      type="button"
+                      title={t("Показать лист с этой биркой", "Show the sheet with this label")}
+                      onClick={() => { setPage(pageOf(printed.indexOf(row), skip, perPage)); }}
+                    >
+                      {row.plant.tag}
+                    </button>
+                  </span>
+                ))}
+                {cutRows.length > 5 && " …"}
+                {". "}
+                {kind === "vertical"
+                  ? t("Уберите поле или выберите горизонтальную бирку.", "Remove a field or pick the horizontal label.")
+                  : t("Уберите поле.", "Remove a field.")}
+              </div>
+            </div>
+          )}
 
           <details className="more2">
             <summary>{t("Лист и порядок", "Sheet and order")}</summary>

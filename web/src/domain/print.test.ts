@@ -9,6 +9,8 @@ import {
   defaultKind,
   grid,
   pageCount,
+  pageOf,
+  parseIdList,
   printOrder,
   slotAt,
   toEntries,
@@ -62,6 +64,21 @@ describe("grid", () => {
     expect(pageCount(0, 0, 44)).toBe(1);
     expect(pageCount(44, 0, 44)).toBe(1);
     expect(pageCount(44, 1, 44)).toBe(2);
+  });
+});
+
+describe("cut captions", () => {
+  it("are read from the header, which may be empty", () => {
+    expect(parseIdList("main:000001,main:000042")).toEqual(["main:000001", "main:000042"]);
+    expect(parseIdList("")).toEqual([]);
+    expect(parseIdList(null)).toEqual([]);
+  });
+
+  it("are found on their page, the skipped places counted", () => {
+    expect(pageOf(0, 0, 16)).toBe(1);
+    expect(pageOf(15, 0, 16)).toBe(1);
+    expect(pageOf(15, 1, 16)).toBe(2);
+    expect(pageOf(40, 3, 16)).toBe(3);
   });
 });
 
