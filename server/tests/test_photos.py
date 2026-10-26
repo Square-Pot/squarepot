@@ -69,6 +69,24 @@ def test_a_photo_is_uploaded_and_served_at_its_address(client: TestClient, tmp_p
     assert client.get(body["url"].replace("signature=", "signature=0")).status_code == 404
 
 
+def test_thumbnail_addresses_are_signed_in_one_request(client: TestClient) -> None:
+    upload(client, FIRST)
+    upload(client, SECOND)
+    client.delete(f"/api/v1/photos/{SECOND}")
+    unknown = "2c3d4e5f-6a7b-4c8d-9e0f-a1b2c3d4e5f6"
+    response = client.post("/api/v1/photos/thumbnails", json={"ids": [FIRST, SECOND, unknown]})
+    assert response.status_code == 200
+    body = response.json()
+    assert list(body["urls"]) == [FIRST]
+    assert body["expires_at"]
+    thumbnail = client.get(body["urls"][FIRST], headers={"Authorization": ""})
+    assert thumbnail.status_code == 200
+    with Image.open(io.BytesIO(thumbnail.content)) as opened:
+        assert max(opened.size) <= 480
+    too_many = {"ids": [FIRST] * 201}
+    assert client.post("/api/v1/photos/thumbnails", json=too_many).status_code == 422
+
+
 def test_the_same_upload_again_changes_nothing(client: TestClient) -> None:
     first = upload(client, FIRST).json()
     again = upload(client, FIRST)

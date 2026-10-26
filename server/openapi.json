@@ -987,11 +987,11 @@
             "schema": {
               "type": "string",
               "maxLength": 1000,
-              "description": "The owner's comment, so that a queued photo is one request.",
+              "description": "The owner's comment, so that a queued photo is one request. It travels in the address, which access logs record: a longer or private note is better sent with `PATCH`.",
               "default": "",
               "title": "Comment"
             },
-            "description": "The owner's comment, so that a queued photo is one request."
+            "description": "The owner's comment, so that a queued photo is one request. It travels in the address, which access logs record: a longer or private note is better sent with `PATCH`."
           }
         ],
         "responses": {
@@ -1468,6 +1468,93 @@
             "description": "Service Unavailable"
           }
         }
+      }
+    },
+    "/api/v1/photos/thumbnails": {
+      "post": {
+        "tags": [
+          "photos"
+        ],
+        "summary": "Sign the thumbnail addresses of many photos",
+        "description": "For a list of plants in a web page, where an image cannot send the token to `/thumbnail`: up to 200 photo ids in, one signed address each out. Ask again after `expires_at`.",
+        "operationId": "sign_thumbnails",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThumbnailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thumbnails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/photos/{photo_id}/thumbnail": {
@@ -3656,6 +3743,51 @@
           "owner"
         ],
         "title": "TakenFrom"
+      },
+      "ThumbnailRequest": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "ThumbnailRequest"
+      },
+      "Thumbnails": {
+        "properties": {
+          "urls": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Urls",
+            "description": "Address by photo id. Unknown and deleted photos are left out. Each one can be fetched without the token until `expires_at`; it may be relative to the server."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "urls",
+          "expires_at"
+        ],
+        "title": "Thumbnails",
+        "description": "Signed thumbnail addresses, for pages that cannot send the token with an image."
       }
     },
     "securitySchemes": {

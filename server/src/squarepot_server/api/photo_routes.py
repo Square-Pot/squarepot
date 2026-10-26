@@ -12,7 +12,13 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Res
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, RedirectResponse
 
-from squarepot_server.api.models import MainPhotoChoice, Photo, PhotoChange
+from squarepot_server.api.models import (
+    MainPhotoChoice,
+    Photo,
+    PhotoChange,
+    ThumbnailRequest,
+    Thumbnails,
+)
 from squarepot_server.api.routes import RuntimeDep, errors, require_token
 from squarepot_server.db import PhotoRow
 from squarepot_server.photos.images import UnsupportedImage
@@ -104,7 +110,11 @@ async def upload_photo(
         str,
         Query(
             max_length=1000,
-            description="The owner's comment, so that a queued photo is one request.",
+            description=(
+                "The owner's comment, so that a queued photo is one request. It travels in "
+                "the address, which access logs record: a longer or private note is better "
+                "sent with `PATCH`."
+            ),
         ),
     ] = "",
 ) -> Photo:
@@ -183,6 +193,21 @@ REDIRECT: dict[int | str, dict[str, Any]] = {
         "description": "To an address of the file that works without the token for six hours."
     }
 }
+
+
+@router.post(
+    "/photos/thumbnails",
+    summary="Sign the thumbnail addresses of many photos",
+    description=(
+        "For a list of plants in a web page, where an image cannot send the token to "
+        "`/thumbnail`: up to 200 photo ids in, one signed address each out. Ask again after "
+        "`expires_at`."
+    ),
+)
+def sign_thumbnails(body: ThumbnailRequest, runtime: RuntimeDep) -> Thumbnails:
+    photos = photos_of(runtime)
+    urls, expires_at = run(lambda: photos.thumbnails(body.ids))
+    return Thumbnails(urls=urls, expires_at=expires_at)
 
 
 @router.get(

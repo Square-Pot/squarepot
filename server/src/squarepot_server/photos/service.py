@@ -200,6 +200,19 @@ class Photos:
             else:
                 chosen.photo_id = row.id
 
+    def thumbnails(self, photo_ids: list[UUID]) -> tuple[dict[str, str], datetime]:
+        """Signed thumbnail addresses of the photos not deleted, and when they expire."""
+        expires_at = self.clock() + URLS_LAST
+        with self.sessions.begin() as session:
+            rows = session.scalars(
+                select(PhotoRow).where(
+                    PhotoRow.id.in_({str(photo_id) for photo_id in photo_ids}),
+                    PhotoRow.deleted_at.is_(None),
+                )
+            ).all()
+        urls = {row.id: self.storage.url(row.thumbnail_key, expires_at) for row in rows}
+        return urls, expires_at
+
     def to_api(self, row: PhotoRow, main: str | None) -> Photo:
         expires_at = self.clock() + URLS_LAST
         return Photo(

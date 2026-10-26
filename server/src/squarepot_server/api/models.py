@@ -494,6 +494,22 @@ class MainPhotoChoice(ApiModel):
     )
 
 
+class ThumbnailRequest(ApiModel):
+    ids: list[UUID] = Field(min_length=1, max_length=200)
+
+
+class Thumbnails(ApiModel):
+    """Signed thumbnail addresses, for pages that cannot send the token with an image."""
+
+    urls: dict[str, str] = Field(
+        description=(
+            "Address by photo id. Unknown and deleted photos are left out. Each one can be "
+            "fetched without the token until `expires_at`; it may be relative to the server."
+        )
+    )
+    expires_at: AwareDatetime
+
+
 class SightingKind(StrEnum):
     SEEN = "seen"
     STATUS = "status"
