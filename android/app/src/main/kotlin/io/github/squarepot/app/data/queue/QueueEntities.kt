@@ -50,7 +50,7 @@ data class QueuedPhoto(
     val takenAt: Long,
     /** The owner's comment, or null. */
     val comment: String?,
-    /** The photo is on the server; only its comment may still be waiting. */
+    /** The photo is on the server. */
     val uploaded: Boolean = false,
     /** When the photo and its comment reached the server, epoch millis; null while queued. */
     val sentAt: Long? = null,

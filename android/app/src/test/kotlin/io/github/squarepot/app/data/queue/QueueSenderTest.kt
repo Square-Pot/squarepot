@@ -120,11 +120,10 @@ class QueueSenderTest {
     }
 
     @Test
-    fun `a photo is uploaded, then its comment, and its file is removed`() = runTest {
+    fun `a photo is uploaded with its comment, and its file is removed`() = runTest {
         outbox.addPhoto("004217", shot(), takenAt = 1_000L, comment = "  first flower ")
         assertFalse(File(folder.root, "shot.jpg").exists())
         respond(photoJson("id-1", "004217"), code = 201)
-        respond(photoJson("id-1", "004217"))
 
         assertEquals(QueueOutcome.Done(sent = 1), sender.send(api))
 
@@ -135,20 +134,19 @@ class QueueSenderTest {
         assertEquals("1970-01-01T00:00:01Z", upload.url.queryParameter("taken_at"))
         assertEquals("image/jpeg", upload.headers["Content-Type"])
         assertEquals(16, upload.body!!.size)
-        val comment = server.takeRequest()
-        assertEquals("PATCH", comment.method)
-        assertEquals("""{"comment":"first flower"}""", comment.body!!.utf8())
+        assertEquals("first flower", upload.url.queryParameter("comment"))
+        assertEquals(1, server.requestCount)
         assertFalse(File(photoDir, "id-1.jpg").exists())
         assertEquals(0, outbox.waiting.first())
     }
 
     @Test
-    fun `a photo without a comment is one request`() = runTest {
+    fun `a photo without a comment is sent without one`() = runTest {
         outbox.addPhoto("004217", shot(), takenAt = 1_000L, comment = " ")
         respond(photoJson("id-1", "004217"), code = 201)
 
         assertEquals(QueueOutcome.Done(sent = 1), sender.send(api))
-        assertEquals(1, server.requestCount)
+        assertNull(server.takeRequest().url.queryParameter("comment"))
     }
 
     @Test
@@ -206,21 +204,6 @@ class QueueSenderTest {
 
         assertEquals(QueueOutcome.Failed(SyncFailure.RATE_LIMITED, sent = 0), sender.send(api))
         assertTrue(outbox.hasPending())
-    }
-
-    @Test
-    fun `a photo whose comment failed is not uploaded again`() = runTest {
-        outbox.addPhoto("004217", shot(), takenAt = 1_000L, comment = "repotted")
-        respond(photoJson("id-1", "004217"), code = 201)
-        respond("""{"code": "unavailable", "message": "Down"}""", code = 503)
-        assertEquals(QueueOutcome.Failed(SyncFailure.SERVER, sent = 0), sender.send(api))
-        server.takeRequest()
-        server.takeRequest()
-
-        respond(photoJson("id-1", "004217"))
-        assertEquals(QueueOutcome.Done(sent = 1), sender.send(api))
-        assertEquals("PATCH", server.takeRequest().method)
-        assertEquals(3, server.requestCount)
     }
 
     @Test
