@@ -17,11 +17,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.squarepot.app.bench.BenchScreen
 import io.github.squarepot.app.camera.CameraScreen
 import io.github.squarepot.app.camera.CaptionSettingsScreen
+import io.github.squarepot.app.camera.NotSeenScreen
 import io.github.squarepot.app.camera.QueueScreen
 import io.github.squarepot.app.camera.WalkScreen
 import io.github.squarepot.app.copy.CopyScreen
 
-private enum class Screen { CAMERA, CAPTIONS, BENCH, COPY, WALK, QUEUE }
+private enum class Screen { CAMERA, CAPTIONS, BENCH, COPY, WALK, QUEUE, NOT_SEEN }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,10 +33,15 @@ class MainActivity : ComponentActivity() {
                 Surface {
                     var screen by rememberSaveable { mutableStateOf(Screen.CAMERA) }
                     BackHandler(enabled = screen != Screen.CAMERA) {
-                        screen = if (screen == Screen.BENCH) Screen.CAPTIONS else Screen.CAMERA
+                        screen = when (screen) {
+                            Screen.BENCH -> Screen.CAPTIONS
+                            Screen.NOT_SEEN -> Screen.WALK
+                            else -> Screen.CAMERA
+                        }
                     }
                     when (screen) {
                         Screen.CAMERA -> CameraScreen(
+                            viewModel(),
                             viewModel(),
                             viewModel(),
                             viewModel(),
@@ -51,7 +57,17 @@ class MainActivity : ComponentActivity() {
                         )
                         Screen.BENCH -> BenchScreen(viewModel(), onBack = { screen = Screen.CAPTIONS })
                         Screen.COPY -> CopyScreen()
-                        Screen.WALK -> WalkScreen(viewModel(), onBack = { screen = Screen.CAMERA })
+                        Screen.WALK -> WalkScreen(
+                            viewModel(),
+                            onBack = { screen = Screen.CAMERA },
+                            onOpenNotSeen = { screen = Screen.NOT_SEEN },
+                        )
+                        Screen.NOT_SEEN -> NotSeenScreen(
+                            viewModel(),
+                            viewModel(),
+                            viewModel(),
+                            onBack = { screen = Screen.WALK },
+                        )
                         Screen.QUEUE -> QueueScreen(viewModel(), onBack = { screen = Screen.CAMERA })
                     }
                 }

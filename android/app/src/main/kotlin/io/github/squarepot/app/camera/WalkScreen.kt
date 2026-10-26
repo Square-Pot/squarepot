@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,10 +38,10 @@ import io.github.squarepot.app.data.walkColumns
 /**
  * The inventory walk (opened from the walk bar on the camera): inventory mode on or off, which
  * plants the walk covers (a collection, then optionally one value of one column, such as a
- * shelf), and since when sightings count.
+ * shelf), since when sightings count, and the plants not seen yet.
  */
 @Composable
-fun WalkScreen(viewModel: InventoryViewModel, onBack: () -> Unit) {
+fun WalkScreen(viewModel: InventoryViewModel, onBack: () -> Unit, onOpenNotSeen: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val walk = state.walk
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
@@ -93,6 +94,7 @@ fun WalkScreen(viewModel: InventoryViewModel, onBack: () -> Unit) {
                 stringResource(R.string.walk_in_scope, state.progress.total, state.progress.seen),
                 style = MaterialTheme.typography.bodyMedium,
             )
+            Button(onClick = onOpenNotSeen) { Text(stringResource(R.string.not_seen_open, state.notSeen.size)) }
             OutlinedButton(onClick = viewModel::restart) { Text(stringResource(R.string.walk_restart)) }
         }
     }

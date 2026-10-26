@@ -7,6 +7,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.Resources
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -56,6 +57,7 @@ import io.github.squarepot.app.BuildConfig
 import io.github.squarepot.app.R
 import io.github.squarepot.app.data.CaptionPlace
 import io.github.squarepot.app.data.copyText
+import io.github.squarepot.app.data.local.PlantEntity
 import io.github.squarepot.app.recognition.SingleTargetSelector
 import io.github.squarepot.app.recognition.TagCode
 import io.github.squarepot.app.recognition.isHit
@@ -74,6 +76,7 @@ fun CameraScreen(
     viewModel: CameraViewModel,
     inventory: InventoryViewModel,
     photos: PhotoViewModel,
+    status: StatusViewModel,
     onOpenSettings: () -> Unit,
     onOpenCopy: () -> Unit,
     onOpenWalk: () -> Unit,
@@ -125,13 +128,13 @@ fun CameraScreen(
                 modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = topHeight),
             )
         }
-        if (inventoryOn) InventorySheets(state, inventoryState, inventory, photos, shutter)
+        if (inventoryOn) InventorySheets(state, inventoryState, inventory, photos, status, shutter)
     }
 }
 
 /**
  * Inventory mode's sheets: the card of a tapped label, whose "Take photo" takes one and closes
- * it, and then the photo's review.
+ * it, then the photo's review; and the card's status sheet, whose outcome shows as a toast.
  */
 @Composable
 private fun InventorySheets(
@@ -139,12 +142,15 @@ private fun InventorySheets(
     inventory: InventoryUiState,
     cards: InventoryViewModel,
     photos: PhotoViewModel,
+    status: StatusViewModel,
     shutter: Shutter,
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val review by photos.review.collectAsStateWithLifecycle()
+    val edit by status.state.collectAsStateWithLifecycle()
+    var statusOf by remember { mutableStateOf<PlantEntity?>(null) }
     inventory.card?.let { tag ->
         PlantCardSheet(
             tag,
@@ -153,19 +159,48 @@ private fun InventorySheets(
             onSeen = cards::markSeen,
             onTakePhoto = {
                 cards.closeCard()
-                scope.launch {
-                    try {
-                        shutter.take(context)?.let { photos.taken(tag.value, it) }
-                    } catch (e: ImageCaptureException) {
-                        val message = resources.getString(R.string.capture_failed, e.message.orEmpty())
-                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                    }
-                }
+                scope.launch { takePhoto(context, resources, shutter) { photos.taken(tag.value, it) } }
+            },
+            onStatus = {
+                val id = camera.plants[tag.value]?.singleOrNull()?.id
+                statusOf = inventory.plants.firstOrNull { it.id == id }
+                cards.closeCard()
             },
             onDismiss = cards::closeCard,
         )
     }
     review?.let { PhotoReviewSheet(it, camera, photos) }
+    statusOf?.let { plant ->
+        StatusSheet(
+            tag = plant.tag.orEmpty(),
+            current = plant.fields[STATUS],
+            schema = camera.schema,
+            editable = inventory.collections.any { it.id == plant.collectionId && it.editable },
+            busy = edit.busy,
+            onSet = {
+                status.apply(listOf(plant), it, fromCard = true)
+                statusOf = null
+            },
+            onDismiss = { statusOf = null },
+        )
+    }
+    edit.outcome?.let { outcome ->
+        val text = statusOutcomeText(outcome)
+        LaunchedEffect(outcome) {
+            Toast.makeText(context, text, Toast.LENGTH_LONG).show()
+            status.outcomeShown()
+        }
+    }
+}
+
+/** Takes a photo with [shutter] and hands it to [onShot]; a failure shows as a toast. */
+private suspend fun takePhoto(context: Context, resources: Resources, shutter: Shutter, onShot: (Shot) -> Unit) {
+    try {
+        shutter.take(context)?.let(onShot)
+    } catch (e: ImageCaptureException) {
+        val message = resources.getString(R.string.capture_failed, e.message.orEmpty())
+        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+    }
 }
 
 /** Asks for the camera once; shows [camera] when it is granted, else why the app needs it. */
@@ -381,3 +416,4 @@ private val TAP_REACH = 32.dp
 /** Which build this is, so a phone run can be matched to its commit at a glance. */
 internal val BUILD = "${BuildConfig.VERSION_NAME} · ${BuildConfig.COMMIT.take(SHORT_COMMIT)}"
 private const val SHORT_COMMIT = 7
+private const val STATUS = "status"

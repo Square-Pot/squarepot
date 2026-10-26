@@ -28,6 +28,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -102,8 +103,8 @@ internal fun WalkBar(
 
 /**
  * The card a tap on a label opens in inventory mode: the plant's caption, when it was last seen,
- * its photos and status, "Take photo" and "Seen, no photo". Only these buttons record a sighting:
- * the scan that opened the card does not.
+ * its photos and status, "Take photo", "Seen, no photo" and "Status…". Only these record a
+ * sighting: the scan that opened the card does not.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -113,6 +114,7 @@ internal fun PlantCardSheet(
     inventory: InventoryUiState,
     onSeen: (TagCode) -> Unit,
     onTakePhoto: () -> Unit,
+    onStatus: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val texts = rememberCaptionTexts()
@@ -150,6 +152,7 @@ internal fun PlantCardSheet(
                         OutlinedButton(onClick = { onSeen(tag) }, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.card_seen_no_photo))
                         }
+                        TextButton(onClick = onStatus) { Text(stringResource(R.string.card_status_button)) }
                     }
                 }
             }

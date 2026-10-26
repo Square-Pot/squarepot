@@ -165,6 +165,23 @@ data class PhotoDto(
     val comment: String? = null,
 )
 
+/** `POST /api/v1/collections/{id}/status`: one status for many plants of a collection (ADR 0008). */
+@Serializable
+data class BulkStatusDto(
+    /** A status key such as `lost`; null clears it. */
+    val status: String?,
+    @SerialName("status_date") val statusDate: String? = null,
+    val plants: List<StatusSeenDto>,
+)
+
+/** A plant and the status the phone last saw for it; the sheet is written only if it still holds that. */
+@Serializable
+data class StatusSeenDto(val id: String, val seen: String?)
+
+/** What the server did for a plant: written, changed_in_sheet or not_found. */
+@Serializable
+data class StatusResultDto(val id: String, val result: String)
+
 /** The body of every error response. */
 @Serializable
 data class ErrorDto(val code: String, val message: String)
