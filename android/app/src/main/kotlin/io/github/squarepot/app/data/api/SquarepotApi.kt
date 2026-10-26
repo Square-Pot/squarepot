@@ -48,20 +48,17 @@ class SquarepotApi(server: HttpUrl, private val token: String, private val clien
 
     /**
      * Uploads the JPEG [photo] of plant [tag] as photo [id], taken at [takenAt] (ISO 8601) unless the
-     * camera recorded the time. Sending the same [id] again changes nothing and returns the photo.
+     * camera recorded the time, with the owner's [comment]. Sending the same [id] again changes
+     * nothing and returns the photo.
      */
-    suspend fun uploadPhoto(id: String, tag: String, takenAt: String, photo: File): PhotoDto {
+    suspend fun uploadPhoto(id: String, tag: String, takenAt: String, comment: String?, photo: File): PhotoDto {
         val url = url("photos", id) {
             addQueryParameter("tag", tag)
             addQueryParameter("taken_at", takenAt)
+            if (comment != null) addQueryParameter("comment", comment)
         }
         return send(request(url).put(photo.asRequestBody(JPEG)), PhotoDto.serializer())
     }
-
-    suspend fun changePhotoComment(id: String, comment: String): PhotoDto = send(
-        request(url("photos", id)).patch(json(PhotoChangeDto.serializer(), PhotoChangeDto(comment))),
-        PhotoDto.serializer(),
-    )
 
     private suspend fun <T> get(path: String, serializer: KSerializer<T>, query: HttpUrl.Builder.() -> Unit = {}): T =
         send(request(url(path, query = query)), serializer)
