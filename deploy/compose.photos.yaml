@@ -1,0 +1,15 @@
+# Adds the photo bucket's key to compose.yaml, for SQUAREPOT_PHOTOS=s3. Use it
+# with the other files, for example with
+# COMPOSE_FILE=compose.yaml:compose.photos.yaml in .env.
+services:
+  server:
+    environment:
+      SQUAREPOT_S3_KEY_FILE: /run/secrets/photos-key
+    secrets:
+      - photos-key
+
+secrets:
+  photos-key:
+    # The key id on the first line, the secret on the second. Keep it out of
+    # the repository.
+    file: ${SQUAREPOT_PHOTOS_KEY_FILE:-./photos-key}

@@ -20,6 +20,14 @@ class StoreKind(StrEnum):
     FILE = "file"
 
 
+class PhotoStoreKind(StrEnum):
+    """Where plant photos are kept (ADR 0007)."""
+
+    NONE = "none"
+    DISK = "disk"
+    S3 = "s3"
+
+
 class CollectionConfig(BaseModel):
     """One collection: a tab of a Google Sheet, or a CSV file laid out as one."""
 
@@ -49,6 +57,15 @@ class Settings(BaseSettings):
     api_docs: bool = Field(
         default=False, description="Serve /docs, /redoc and /openapi.json, for development."
     )
+    photos: PhotoStoreKind = PhotoStoreKind.NONE
+    photos_dir: Path = Path("data/photos")
+    s3_endpoint: str = "https://storage.yandexcloud.net"
+    s3_region: str = "ru-central1"
+    s3_bucket: str | None = Field(default=None, min_length=3)
+    s3_key_file: Path | None = Field(
+        default=None,
+        description="A file holding the key id on its first line, the secret on its second.",
+    )
 
     @model_validator(mode="after")
     def collections_match_the_store(self) -> Settings:
@@ -77,6 +94,8 @@ class Settings(BaseSettings):
                 )
             if self.store == StoreKind.FILE and collection.file is None:
                 raise ValueError(f"collection {collection.id!r} needs a file with the file store")
+        if self.photos == PhotoStoreKind.S3 and not (self.s3_bucket and self.s3_key_file):
+            raise ValueError("photos in s3 need SQUAREPOT_S3_BUCKET and SQUAREPOT_S3_KEY_FILE")
         return self
 
 

@@ -33,6 +33,10 @@ fails when the committed file is out of date.
 | `POST /api/v1/labels` | Prints labels for plants, as a PDF or one SVG page. |
 | `POST /api/v1/collections/{collection_id}/plants` | Adds a plant as a new row of the sheet, with the next free number ([ADR 0006](../docs/adr/0006-editing-plants-from-the-apps.md)). |
 | `PATCH /api/v1/plants/{plant_id}` | Changes cells of a plant's row, unless the sheet changed them first, or gives it a number. |
+| `PUT /api/v1/photos/{photo_id}?tag=…` | Uploads a photo of a numbered plant; the body is the image ([ADR 0007](../docs/adr/0007-plant-photos.md)). |
+| `GET /api/v1/plants/by-tag/{tag}/photos` | Lists a plant's photos in the order taken, with addresses that expire. |
+| `PATCH`, `DELETE /api/v1/photos/{photo_id}`, `POST …/restore` | Changes a photo's comment or time taken, deletes it, or restores it within 30 days. |
+| `PUT /api/v1/plants/by-tag/{tag}/main-photo` | Chooses the plant's main photo; else the newest is shown. |
 
 Every route except `health` needs the operator's API token as
 `Authorization: Bearer <token>`. A client address that sends 10 wrong or
@@ -107,6 +111,24 @@ instead, through the Sheets and Drive APIs.
 Adding and editing plants writes to the sheet, and so needs the service
 account: a link gives read-only access
 ([sheet-format.md](../docs/sheet-format.md#how-square-pot-writes)).
+
+### Photos
+
+Photos are off until `SQUAREPOT_PHOTOS` is set
+([ADR 0007](../docs/adr/0007-plant-photos.md)):
+
+- `disk` keeps them in the data volume. Simple, but they are lost with the
+  host, so back the volume up.
+- `s3` keeps them in a private bucket of an S3-compatible service, such as
+  Yandex Object Storage. Create a bucket used only by Square-Pot, with
+  versioning on and a lifecycle rule that removes old versions after 30 days,
+  and a key that can reach only that bucket. Save the key as `deploy/photos-key`,
+  the key id on its first line and the secret on its second, which git
+  ignores. In `.env`, set `SQUAREPOT_PHOTOS=s3`, `SQUAREPOT_S3_BUCKET`, and
+  add `compose.photos.yaml` to `COMPOSE_FILE`.
+
+The server turns each photo upright, drops its EXIF data, including where it
+was taken, and keeps a large JPEG and a thumbnail, one photo at a time.
 
 ### Demo mode
 

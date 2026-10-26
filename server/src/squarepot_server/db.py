@@ -124,6 +124,39 @@ class AddedPlant(Base):
     added_at: Mapped[datetime]
 
 
+class PhotoRow(Base):
+    """A photo of the plant with a number (ADR 0007); its files are in the photo storage."""
+
+    __tablename__ = "photos"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    tag: Mapped[str] = mapped_column(String(6), index=True)
+    seq: Mapped[int] = mapped_column(index=True)
+    # Storage keys of the large photo, its thumbnail, and its description in JSON.
+    key: Mapped[str] = mapped_column(Text)
+    thumbnail_key: Mapped[str] = mapped_column(Text)
+    meta_key: Mapped[str] = mapped_column(Text)
+    taken_at: Mapped[datetime]
+    # Where taken_at came from: camera, client, upload, or owner.
+    taken_from: Mapped[str] = mapped_column(String(16))
+    uploaded_at: Mapped[datetime]
+    width: Mapped[int]
+    height: Mapped[int]
+    size: Mapped[int]
+    comment: Mapped[str] = mapped_column(Text, default="")
+    # Deleted photos are kept for a while, so that they can be restored.
+    deleted_at: Mapped[datetime | None]
+
+
+class MainPhoto(Base):
+    """The photo the owner chose to show for a number; else the newest is shown."""
+
+    __tablename__ = "main_photos"
+
+    tag: Mapped[str] = mapped_column(String(6), primary_key=True)
+    photo_id: Mapped[str] = mapped_column(ForeignKey("photos.id"))
+
+
 def make_engine(url: str) -> Engine:
     if not url.startswith("sqlite"):
         return create_engine(url)

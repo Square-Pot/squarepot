@@ -15,7 +15,7 @@ from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException
 
 from squarepot_server import __version__, web
-from squarepot_server.api import routes
+from squarepot_server.api import photo_routes, routes
 from squarepot_server.api.models import Error
 from squarepot_server.config import Settings, get_settings
 from squarepot_server.runtime import Runtime
@@ -24,6 +24,7 @@ from squarepot_server.store import CollectionStore
 ERROR_CODES = {
     status.HTTP_401_UNAUTHORIZED: "unauthorized",
     status.HTTP_404_NOT_FOUND: "not_found",
+    status.HTTP_413_CONTENT_TOO_LARGE: "too_large",
     status.HTTP_405_METHOD_NOT_ALLOWED: "method_not_allowed",
     status.HTTP_422_UNPROCESSABLE_CONTENT: "invalid_request",
     status.HTTP_429_TOO_MANY_REQUESTS: "too_many_requests",
@@ -100,6 +101,8 @@ def create_app(settings: Settings | None = None, store: CollectionStore | None =
     app.add_exception_handler(Exception, on_unexpected_error)
     app.include_router(routes.public)
     app.include_router(routes.router)
+    app.include_router(photo_routes.public)
+    app.include_router(photo_routes.router)
     # The web app answers whatever no route matches, routes added later included.
     app.router.default = web.serve
     return app

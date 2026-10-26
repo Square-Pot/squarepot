@@ -37,6 +37,7 @@ RUN useradd --system --uid 10001 squarepot && mkdir /data && chown squarepot /da
 USER squarepot
 ENV PATH=/app/server/.venv/bin:$PATH \
     SQUAREPOT_DATABASE_URL=sqlite:////data/squarepot.db \
+    SQUAREPOT_PHOTOS_DIR=/data/photos \
     SQUAREPOT_WEB_DIR=/app/web
 VOLUME /data
 EXPOSE 8000

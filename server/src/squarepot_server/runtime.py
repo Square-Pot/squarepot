@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,9 +14,17 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from squarepot_server.api.models import FieldSchema
 from squarepot_server.backoff import Backoff
-from squarepot_server.config import CollectionConfig, Settings, StoreKind
+from squarepot_server.config import CollectionConfig, PhotoStoreKind, Settings, StoreKind
 from squarepot_server.db import make_engine
 from squarepot_server.fields import Cell, load_schema
+from squarepot_server.photos.service import Photos
+from squarepot_server.photos.storage import (
+    DiskStorage,
+    PhotoStorage,
+    S3Storage,
+    Signer,
+    read_key_file,
+)
 from squarepot_server.store import (
     CollectionStore,
     CsvFileStore,
@@ -26,6 +35,7 @@ from squarepot_server.store import (
 from squarepot_server.sync import Syncer, SyncWorker, migrate
 
 log = logging.getLogger(__name__)
+PHOTO_FILES_ROUTE = "/api/v1/photo-files"
 
 
 class UnavailableStore:
@@ -55,6 +65,25 @@ def google_store(credentials_file: Path | None) -> CollectionStore:
         return UnavailableStore(f"the service account key cannot be used: {error}")
 
 
+def photo_storage(settings: Settings) -> PhotoStorage | None:
+    """The configured photo storage, or None when photos are off or cannot be stored."""
+    if settings.photos == PhotoStoreKind.DISK:
+        token = settings.api_token.get_secret_value().encode()
+        secret = hashlib.sha256(b"squarepot photo files\n" + token).digest()
+        return DiskStorage(settings.photos_dir, secret, PHOTO_FILES_ROUTE)
+    if settings.photos == PhotoStoreKind.S3 and settings.s3_key_file and settings.s3_bucket:
+        try:
+            key_id, secret_key = read_key_file(settings.s3_key_file)
+        except (OSError, ValueError) as error:
+            # The message names the file, never its contents.
+            log.error("photos are off: cannot use the key file %s: %s", settings.s3_key_file, error)
+            return None
+        signer = Signer(key_id, secret_key, settings.s3_region)
+        base_url = f"{settings.s3_endpoint.rstrip('/')}/{settings.s3_bucket}"
+        return S3Storage(requests.Session(), base_url, signer)
+    return None
+
+
 @dataclass
 class Runtime:
     settings: Settings
@@ -63,6 +92,7 @@ class Runtime:
     sessions: sessionmaker[Session]
     syncer: Syncer
     worker: SyncWorker | None
+    photos: Photos | None = None
     backoff: Backoff = field(default_factory=Backoff)
 
     @classmethod
@@ -82,11 +112,14 @@ class Runtime:
             store = google_store(settings.google_credentials_file)
         syncer = Syncer(sessions, store, schema, settings.collections)
         syncer.prepare()
+        storage = photo_storage(settings)
+        photos = Photos(sessions, storage, syncer.lock) if storage is not None else None
         worker = None
         if settings.sync_interval_seconds > 0:
-            worker = SyncWorker(syncer, settings.sync_interval_seconds)
+            chores = [photos.purge] if photos is not None else []
+            worker = SyncWorker(syncer, settings.sync_interval_seconds, chores)
             worker.start()
-        return cls(settings, schema, engine, sessions, syncer, worker)
+        return cls(settings, schema, engine, sessions, syncer, worker, photos)
 
     def stop(self) -> None:
         if self.worker is not None:

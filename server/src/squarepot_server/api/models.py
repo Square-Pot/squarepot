@@ -361,6 +361,72 @@ class EditConflict(ApiModel):
     )
 
 
+class TakenFrom(StrEnum):
+    CAMERA = "camera"
+    CLIENT = "client"
+    UPLOAD = "upload"
+    OWNER = "owner"
+
+
+class Photo(ApiModel):
+    """A photo of a plant, kept by its number (ADR 0007)."""
+
+    id: UUID = Field(description="The id the client chose when uploading the photo.")
+    tag: Tag = Field(description="The number of the plant in the photo.")
+    taken_at: AwareDatetime = Field(
+        description="When the photo was taken. Photos of a plant are ordered by it."
+    )
+    taken_from: TakenFrom = Field(
+        description=(
+            "Where `taken_at` comes from: the camera's own record, the time the client gave, "
+            "the upload, or the owner who changed it."
+        )
+    )
+    uploaded_at: AwareDatetime
+    width: int = Field(ge=1, description="Width of the large photo, in pixels.")
+    height: int = Field(ge=1, description="Height of the large photo, in pixels.")
+    comment: str = Field(description="The owner's comment, usually empty.")
+    main: bool = Field(
+        description=(
+            "Whether this is the plant's main photo: the one the owner chose, or else the newest."
+        )
+    )
+    deleted_at: AwareDatetime | None = Field(
+        description=(
+            "When the photo was deleted; it can be restored for 30 days after. `null` for a "
+            "photo that is not deleted."
+        )
+    )
+    url: str = Field(
+        description=(
+            "Address of the large JPEG, at most 2560 pixels on its longer side. It works "
+            "without the token until `urls_expire_at`, then ask for the photos again. It may be "
+            "relative to the server."
+        )
+    )
+    thumbnail_url: str = Field(
+        description="Address of a JPEG at most 480 pixels on its longer side."
+    )
+    urls_expire_at: AwareDatetime
+
+
+class PhotoChange(ApiModel):
+    """Changes to a photo; fields left out stay as they are."""
+
+    comment: str | None = Field(
+        default=None, max_length=1000, description="An empty string removes it."
+    )
+    taken_at: AwareDatetime | None = Field(
+        default=None, description="When the photo was taken, as the owner says."
+    )
+
+
+class MainPhotoChoice(ApiModel):
+    photo_id: UUID | None = Field(
+        description="The photo to show for the plant; `null` shows the newest again."
+    )
+
+
 class SyncKind(StrEnum):
     FULL = "full"
     DELTA = "delta"

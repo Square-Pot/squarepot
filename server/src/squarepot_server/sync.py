@@ -9,7 +9,7 @@ import logging
 import secrets
 import threading
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -255,11 +255,14 @@ def issue_json(issue: Issue) -> dict[str, Any]:
 
 
 class SyncWorker:
-    """Runs the syncer in a background thread, every `interval` seconds."""
+    """Runs the syncer in a background thread, every `interval` seconds, then the chores."""
 
-    def __init__(self, syncer: Syncer, interval: float) -> None:
+    def __init__(
+        self, syncer: Syncer, interval: float, chores: Sequence[Callable[[], object]] = ()
+    ) -> None:
         self.syncer = syncer
         self.interval = interval
+        self.chores = chores
         self.stopped = threading.Event()
         self.thread = threading.Thread(target=self.loop, name="sync", daemon=True)
 
@@ -276,4 +279,9 @@ class SyncWorker:
                 self.syncer.run_once()
             except Exception:
                 log.exception("sync failed")
+            for chore in self.chores:
+                try:
+                    chore()
+                except Exception:
+                    log.exception("%s failed", getattr(chore, "__name__", "a chore"))
             self.stopped.wait(self.interval)
