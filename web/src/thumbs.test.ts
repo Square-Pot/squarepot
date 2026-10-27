@@ -26,6 +26,20 @@ describe("thumbnail addresses", () => {
     expect(post).toHaveBeenCalledTimes(3);
   });
 
+  it("answered after the token is forgotten are dropped, and asked for again", async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    post.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
+    requestThumbnails(["a"]);
+    resetThumbnails();
+    post.mockResolvedValueOnce({ data: { urls: { a: "/new/a" }, expires_at: later() } });
+    requestThumbnails(["a"]);
+    expect(post).toHaveBeenCalledTimes(2);
+    answer({ data: { urls: { a: "/old/a" }, expires_at: later() } });
+    await settle();
+    requestThumbnails(["a"]);
+    expect(post).toHaveBeenCalledTimes(2);
+  });
+
   it("are not asked for again at once after a failure", async () => {
     post.mockResolvedValue({ error: { message: "photos are off" } });
     requestThumbnails(["a"]);

@@ -29,7 +29,8 @@ On a numbered plant's card the owner adds photos (JPEG, PNG or WebP, one upload
 at a time, each with an id chosen in the browser so a retry makes no copy),
 picks the main one, edits a photo's comment or date, and deletes or restores
 one. The card loads the plant's photos with their signed addresses, which it
-fetches again before they expire. The list shows each plant's main photo, its
+fetches again before they expire. The list can show each plant's main photo (the
+«photo» column, on by default in a browser that has not chosen its columns yet), its
 address signed in batches by `POST /api/v1/photos/thumbnails`, because an image
 cannot send the token.
 
