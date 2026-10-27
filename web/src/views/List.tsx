@@ -19,6 +19,7 @@ import {
 import { useFormat } from "../format";
 import { useI18n } from "../i18n";
 import { navigate, onLinkClick } from "../router";
+import { useThumbnails } from "../thumbs";
 import { allColumns, loadColumns, saveColumns } from "./columns";
 import { Icon, Marked, Name } from "./common";
 
@@ -52,6 +53,9 @@ export function ListView({ schema, collection, rows, now, result, state, onState
   const filters = filterCount(state);
   const facets = countFacets(rows, state, collection.custom_columns, now);
   const page = result.slice(0, shown);
+  const thumbnail = useThumbnails(
+    columns.includes("photo") ? page.flatMap((row) => (row.plant.main_photo_id ? [row.plant.main_photo_id] : [])) : [],
+  );
   // Former plants are left out of the counts, as of the default list.
   const active = rows.filter((row) => !isFormer(row));
   const untagged = active.filter((row) => !row.plant.tag).length;
@@ -73,6 +77,7 @@ export function ListView({ schema, collection, rows, now, result, state, onState
 
   const columnLabel = (key: string): string => {
     if (key.startsWith("c:")) return key.slice(2);
+    if (key === "photo") return t("Фото", "Photo");
     if (key === "last_photo") return t("Последнее фото", "Last photo");
     if (key === "last_seen") return t("Видели", "Seen");
     const field =
@@ -109,6 +114,10 @@ export function ListView({ schema, collection, rows, now, result, state, onState
           </a>
         </td>
       );
+    }
+    if (key === "photo") {
+      const url = thumbnail(plant.main_photo_id);
+      return <td key={key} className="thumb">{url ? <img src={url} alt="" loading="lazy" /> : <span className="none">—</span>}</td>;
     }
     if (key === "last_photo") {
       if (!plant.last_photo) return <td key={key} className="dt"><span className="none">{t("нет", "none")}</span></td>;
@@ -209,7 +218,7 @@ export function ListView({ schema, collection, rows, now, result, state, onState
                 onState({ ...state, sort: { key: event.target.value, desc: false } });
               }}
             >
-              {available.map((key) => (
+              {available.filter((key) => key !== "photo").map((key) => (
                 <option key={key} value={key}>
                   {columnLabel(key)}
                 </option>
@@ -268,6 +277,7 @@ export function ListView({ schema, collection, rows, now, result, state, onState
                   <tr>
                     {columns.map((key) => {
                       const on = state.sort.key === key;
+                      if (key === "photo") return <th key={key} className="thumb"><span className="sr">{columnLabel(key)}</span></th>;
                       return (
                         <th key={key} aria-sort={on ? (state.sort.desc ? "descending" : "ascending") : undefined}>
                           <button type="button" onClick={() => { sortBy(key); }}>

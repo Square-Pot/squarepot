@@ -149,6 +149,10 @@ tbody tr:last-child td { border-bottom: 0; }
 td.num { font-family: var(--f-mono); font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 td.nm { font-family: var(--f-name); font-size: 15.5px; line-height: 1.2; min-width: 220px; }
 td.dt { white-space: nowrap; font-variant-numeric: tabular-nums; }
+td.thumb, th.thumb { width: 52px; padding-top: 4px; padding-bottom: 4px; }
+td.thumb img { display: block; width: 44px; height: 44px; object-fit: cover; }
+td.thumb .none { display: block; width: 44px; text-align: center; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .none { color: var(--muted); font-style: italic; font-family: var(--f-ui); font-size: 12.5px; }
 .cards { display: none; }
 .pcard { display: grid; gap: 3px; padding: 11px 12px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
