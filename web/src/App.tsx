@@ -6,6 +6,7 @@ import { plantsOf } from "./domain/copy";
 import { filterRows, isFormer, makeRows, parseListState, serializeListState, sortRows, type ListState, type Row } from "./domain/query";
 import { I18nContext, initialLang, makeI18n, saveLang, useI18n, type Lang } from "./i18n";
 import { navigate, routePath, useLocation } from "./router";
+import { resetThumbnails } from "./thumbs";
 import { Header } from "./views/Header";
 import { ListView } from "./views/List";
 import { PlantCard } from "./views/PlantCard";
@@ -56,6 +57,7 @@ function Browse() {
   const forget = () => {
     setToken(null);
     resetData();
+    resetThumbnails();
   };
 
   if (!schema || !copy) {
