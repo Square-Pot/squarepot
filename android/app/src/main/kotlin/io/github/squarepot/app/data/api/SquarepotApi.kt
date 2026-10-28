@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -60,6 +61,14 @@ class SquarepotApi(server: HttpUrl, private val token: String, private val clien
         return send(request(url).put(photo.asRequestBody(JPEG)), PhotoDto.serializer())
     }
 
+    /** Sets [status] (null clears it) for [plants] of [collectionId], at most [MAX_STATUS_PLANTS]; needs `editable`. */
+    suspend fun setStatus(collectionId: String, status: String?, plants: List<StatusSeenDto>): List<StatusResultDto> =
+        send(
+            request(url("collections", collectionId, "status"))
+                .post(json(BulkStatusDto.serializer(), BulkStatusDto(status, plants = plants))),
+            ListSerializer(StatusResultDto.serializer()),
+        )
+
     private suspend fun <T> get(path: String, serializer: KSerializer<T>, query: HttpUrl.Builder.() -> Unit = {}): T =
         send(request(url(path, query = query)), serializer)
 
@@ -94,14 +103,20 @@ class SquarepotApi(server: HttpUrl, private val token: String, private val clien
 
         /** Most sightings one request takes. */
         const val MAX_SIGHTINGS = 500
+
+        /** Most plants one status request takes. */
+        const val MAX_STATUS_PLANTS = 500
     }
 }
 
 private val JSON = "application/json".toMediaType()
 private val JPEG = "image/jpeg".toMediaType()
 
+/** Request bodies spell out nulls: the server requires keys such as `status` and `seen` even when null. */
+private val RequestJson = Json(ApiJson) { explicitNulls = true }
+
 private fun <T> json(serializer: KSerializer<T>, value: T) =
-    ApiJson.encodeToString(serializer, value).toRequestBody(JSON)
+    RequestJson.encodeToString(serializer, value).toRequestBody(JSON)
 
 /** An error response ([status] and the server's [code]), or an unreadable response (status 0). */
 class ApiException(val status: Int, val code: String?, message: String, cause: Throwable? = null) :

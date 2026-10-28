@@ -72,7 +72,13 @@ data class PlantDto(
     @SerialName("last_photo") val lastPhoto: String? = null,
     /** The photo to show for the plant: the owner's choice, else the newest. */
     @SerialName("main_photo_id") val mainPhotoId: String? = null,
+    /** Cells the import rejected, by field key; such a field is missing from [fields]. */
+    val invalid: Map<String, InvalidCellDto> = emptyMap(),
 )
+
+/** A cell the import rejected: where it is, what it held (as text), and why. */
+@Serializable
+data class InvalidCellDto(val cell: String, val value: String, val reason: String)
 
 /** `GET /api/v1/schema`: schema/fields.yaml as JSON. */
 @Serializable
@@ -164,6 +170,23 @@ data class PhotoDto(
     @SerialName("taken_at") val takenAt: String,
     val comment: String? = null,
 )
+
+/** `POST /api/v1/collections/{id}/status`: one status for many plants of a collection (ADR 0008). */
+@Serializable
+data class BulkStatusDto(
+    /** A status key such as `lost`; null clears it. */
+    val status: String?,
+    @SerialName("status_date") val statusDate: String? = null,
+    val plants: List<StatusSeenDto>,
+)
+
+/** A plant and the status the phone last saw for it; the sheet is written only if it still holds that. */
+@Serializable
+data class StatusSeenDto(val id: String, val seen: String?)
+
+/** What the server did for a plant: written, changed_in_sheet or not_found. */
+@Serializable
+data class StatusResultDto(val id: String, val result: String)
 
 /** The body of every error response. */
 @Serializable

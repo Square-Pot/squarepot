@@ -301,7 +301,8 @@ class SyncEngineTest {
         val seen = """
             {"id": "p1", "collection_id": "main", "tag": "000001", "row": 2, "fields": {"genus": "Lithops"},
                 "status_since": "2026-10-01", "last_seen": "2026-10-26T14:03:11Z", "photo_count": 3,
-                "last_photo": "2026-10-20T09:00:00+03:00", "main_photo_id": "6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b"}
+                "last_photo": "2026-10-20T09:00:00+03:00", "main_photo_id": "6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b",
+                "invalid": {"status": {"cell": "T2", "value": "умерр", "reason": "not a status"}}}
         """.trimIndent()
         val editable = """{"id": "main", "name": "Main", "plant_count": 1, "editable": true}"""
         respond(full(cursor = "c1", plants = listOf(seen, plant("p2", "000002")), collections = listOf(editable)))
@@ -315,6 +316,7 @@ class SyncEngineTest {
         assertEquals(3, p1.photoCount)
         assertEquals(1_792_476_000_000L, p1.lastPhoto)
         assertEquals("6f1c2b9e-3d4a-4e8f-9b7c-1a2d3e4f5a6b", p1.mainPhotoId)
+        assertEquals("умерр", p1.rejectedStatus)
         val p2 = plants.getValue("p2")
         assertNull(p2.lastSeen)
         assertEquals(0, p2.photoCount)
