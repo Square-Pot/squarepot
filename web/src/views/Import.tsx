@@ -318,13 +318,15 @@ function ReviewCard({
   const act = (action: Promise<void>) => {
     setBusy(true);
     setProblem(null);
-    action
-      .catch((failure: unknown) => {
-        setProblem(failure instanceof Error ? failure.message : String(failure));
-      })
-      .then(() => {
+    action.then(
+      () => {
         setBusy(false);
-      });
+      },
+      (failure: unknown) => {
+        setProblem(failure instanceof Error ? failure.message : String(failure));
+        setBusy(false);
+      },
+    );
   };
 
   const submit = () => {
