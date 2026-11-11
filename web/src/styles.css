@@ -363,3 +363,45 @@ details.more2 .in { display: grid; gap: 10px; padding: 0 0 12px; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* batch import (ADR 0008, stage 2, mockups v2 §4) */
+.imppage { padding: 16px 22px 30px; display: grid; gap: 12px; align-content: start; }
+.imphead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.imphead h2 { margin: 0; font-family: var(--f-name); font-weight: 400; font-size: 27px; }
+.impsub { margin: 0; color: var(--muted); max-width: 84ch; font-size: 13.5px; }
+.imppage .problem.inline { margin: 0; }
+.impadd { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.impadd .pnote { flex: 1; min-width: 220px; }
+.imp-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.tile { padding: 10px 12px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; border: 0; text-align: left; color: var(--fg); font: inherit; }
+.tile b { display: block; font-family: var(--f-name); font-weight: 400; font-size: 30px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.tile span { font-size: 12.5px; color: var(--muted); }
+.tile.warn b { color: var(--warn); }
+.tile.err b { color: var(--err); }
+.tile.dim b { color: var(--muted); }
+.tile.on { box-shadow: inset 0 0 0 2px var(--accent); }
+.igrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; }
+.icard { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); display: grid; font-size: 12.5px; min-width: 0; }
+.icard.closed { opacity: 0.55; }
+.icard img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--surface2); }
+.icard .noimg { display: block; width: 100%; aspect-ratio: 1; background: var(--surface2); }
+.icard .ib { padding: 7px 9px 9px; display: grid; gap: 4px; min-width: 0; align-content: start; }
+.icard .warn { color: var(--warn); font-weight: 600; }
+.icard .st { color: var(--muted); }
+.icard .mt { color: var(--muted); font-size: 11.5px; display: flex; justify-content: space-between; gap: 6px; }
+.icard .num { font-family: var(--f-mono); font-size: 12px; }
+.icard .nm { font-family: var(--f-name); font-size: 14px; line-height: 1.2; overflow-wrap: anywhere; }
+.icard .why { font-size: 11.5px; color: var(--muted); }
+.icard .why.err { color: var(--err); }
+.ia { display: flex; gap: 4px; flex-wrap: wrap; }
+.ibtn { font-size: 12px; padding: 4px 8px; border: 1px solid var(--line); background: none; cursor: pointer; border-radius: 2px; color: var(--fg); font-weight: 600; }
+.ibtn:hover { background: var(--hover); }
+.ibtn.pri { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.ibtn:disabled { opacity: 0.4; cursor: default; }
+.ifile { display: grid; gap: 4px; }
+.ifile input { width: 100%; font-size: 12.5px; padding: 5px 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 2px; color: var(--fg); font: inherit; }
+
+@container (max-width: 760px) {
+  .imppage { padding: 12px 14px 24px; }
+  .imp-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

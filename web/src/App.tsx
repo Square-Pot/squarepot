@@ -8,6 +8,7 @@ import { I18nContext, initialLang, makeI18n, saveLang, useI18n, type Lang } from
 import { navigate, routePath, useLocation } from "./router";
 import { resetThumbnails } from "./thumbs";
 import { Header } from "./views/Header";
+import { ImportView } from "./views/Import";
 import { ListView } from "./views/List";
 import { PlantCard } from "./views/PlantCard";
 import { PrintView } from "./views/Print";
@@ -140,6 +141,8 @@ function Browse() {
             </a>
           </div>
         )
+      ) : route.page === "import" ? (
+        <ImportView key={collection.id} rows={rows} listHref={listHref} />
       ) : (
         <ListView
           key={collection.id}
@@ -152,6 +155,7 @@ function Browse() {
           onState={onState}
           plantHref={plantHref}
           printHref={routePath({ page: "print", collection: collection.id }) + suffix}
+          importHref={routePath({ page: "import", collection: collection.id })}
         />
       )}
     </div>

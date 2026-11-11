@@ -35,9 +35,10 @@ interface Props {
   onState: (next: ListState) => void;
   plantHref: (row: Row) => string;
   printHref: string;
+  importHref: string;
 }
 
-export function ListView({ schema, collection, rows, now, result, state, onState, plantHref, printHref }: Props) {
+export function ListView({ schema, collection, rows, now, result, state, onState, plantHref, printHref, importHref }: Props) {
   const { t, label } = useI18n();
   const format = useFormat();
   const search = useRef<HTMLInputElement>(null);
@@ -228,6 +229,10 @@ export function ListView({ schema, collection, rows, now, result, state, onState
           <a className="btn sec" href={printHref} onClick={(event) => { onLinkClick(event, printHref); }}>
             <Icon name="print" />
             <span className="tx">{t("Напечатать бирки", "Print labels")}</span>
+          </a>
+          <a className="btn sec" href={importHref} onClick={(event) => { onLinkClick(event, importHref); }}>
+            <Icon name="camera" />
+            <span className="tx">{t("Импорт фото", "Import photos")}</span>
           </a>
           <span className="colsbtn">
             <button className="btn sec" type="button" aria-expanded={columnsOpen} onClick={() => { setColumnsOpen(!columnsOpen); }}>
