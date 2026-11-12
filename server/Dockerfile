@@ -1,7 +1,13 @@
 # The API server, with the web app it serves at /. Build from the repository
 # root, which holds schema/ and web/:
 #   docker build -f server/Dockerfile .
+#   docker build -f server/Dockerfile --build-arg SQUAREPOT_COMMIT=<sha> .
 FROM node:24.22.1-trixie-slim@sha256:43b9ba1142b8dcf33fa8f922ca1be85714adc444e0586c7cf7726daaeabc1bea AS web
+
+# The commit the web app shows on every screen (task #186). Optional: an
+# empty value builds fine and the app says `dev`. It is baked into the web
+# assets only; the runtime image does not carry it.
+ARG SQUAREPOT_COMMIT=""
 
 WORKDIR /app/web
 # Dependencies first, so that code changes do not reinstall them.
