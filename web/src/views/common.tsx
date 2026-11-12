@@ -2,6 +2,7 @@
 // Small pieces shared by the views.
 import type { Run } from "../domain/names";
 import { highlight, highlightRuns } from "../domain/query";
+import { BUILD_COMMIT, BUILD_LINE, commitUrl } from "../version";
 
 /** A plant name, its epithets in italics, with the search match marked. */
 export function Name({ runs, query = "" }: { runs: Run[]; query?: string }) {
@@ -45,6 +46,21 @@ const ICONS = {
   key: <><circle cx="8" cy="15" r="4" /><path d="M11 12l8-8M16 7l3 3" /></>,
   camera: <><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></>,
 };
+
+/** The build's version and commit, on every screen (task #185): a link to the
+ * public commit when there is one, `dev` otherwise. */
+export function VersionMark() {
+  const url = commitUrl(BUILD_COMMIT);
+  return url ? (
+    <a className="ver" href={url} target="_blank" rel="noopener noreferrer" title={BUILD_COMMIT}>
+      {BUILD_LINE}
+    </a>
+  ) : (
+    <span className="ver" title="dev build">
+      {BUILD_LINE}
+    </span>
+  );
+}
 
 export function Icon({ name, size = 16 }: { name: keyof typeof ICONS; size?: number }) {
   return (

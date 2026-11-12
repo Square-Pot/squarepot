@@ -405,3 +405,10 @@ details.more2 .in { display: grid; gap: 10px; padding: 0 0 12px; }
   .imppage { padding: 12px 14px 24px; }
   .imp-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* build version (task #185) */
+.brandgrp { display: inline-flex; align-items: baseline; gap: 8px; }
+.ver { font-family: var(--f-mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+a.ver { text-decoration: none; }
+a.ver:hover { color: var(--fg); }
+.token > .ver { margin-top: 14px; }
