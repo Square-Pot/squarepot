@@ -3,7 +3,7 @@ import { useState } from "react";
 import { checkToken } from "../api/client";
 import { setToken } from "../api/token";
 import { useI18n } from "../i18n";
-import { Icon } from "./common";
+import { Icon, VersionMark } from "./common";
 
 /** The first visit: the owner pastes the API token, which is checked, then kept in this browser. */
 export function TokenScreen() {
@@ -65,6 +65,7 @@ export function TokenScreen() {
           {busy ? t("Проверяем…", "Checking…") : t("Войти", "Sign in")}
         </button>
       </form>
+      <VersionMark />
     </main>
   );
 }

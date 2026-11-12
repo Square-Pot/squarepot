@@ -3,7 +3,7 @@ import type { Collection } from "../api/types";
 import { useFormat } from "../format";
 import { useI18n } from "../i18n";
 import { navigate, routePath } from "../router";
-import { Icon } from "./common";
+import { Icon, VersionMark } from "./common";
 
 interface Props {
   collections: Collection[];
@@ -20,7 +20,10 @@ export function Header({ collections, current, plantCount, onForget }: Props) {
   return (
     <>
       <header className="ah">
-        <span className="brand">Square-Pot</span>
+        <span className="brandgrp">
+          <span className="brand">Square-Pot</span>
+          <VersionMark />
+        </span>
         <div className="coll">
           {collections.length > 1 ? (
             <select

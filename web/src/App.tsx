@@ -13,6 +13,7 @@ import { ListView } from "./views/List";
 import { PlantCard } from "./views/PlantCard";
 import { PrintView } from "./views/Print";
 import { TokenScreen } from "./views/TokenScreen";
+import { VersionMark } from "./views/common";
 
 export function App() {
   const [lang, setLang] = useState<Lang>(initialLang);
@@ -72,6 +73,7 @@ function Browse() {
         ) : (
           <p aria-busy="true">{t("Загружаем коллекцию…", "Loading the collection…")}</p>
         )}
+        <VersionMark />
       </div>
     );
   }
@@ -84,6 +86,7 @@ function Browse() {
             {collections[0].name}
           </a>
         )}
+        <VersionMark />
       </div>
     );
   }
