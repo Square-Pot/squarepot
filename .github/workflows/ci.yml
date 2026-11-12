@@ -192,6 +192,7 @@ jobs:
       - name: Build
         run: |
           docker build --file server/Dockerfile \
+            --build-arg SQUAREPOT_COMMIT="${GITHUB_SHA}" \
             --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --tag squarepot-server:ci .
@@ -213,7 +214,11 @@ jobs:
           grep --quiet '<div id="root"></div>' index.html
           script="$(grep --only-matching '/assets/[^"]*\.js' index.html | head -n 1)"
           test -n "${script}"
-          curl --fail --silent --show-error --output /dev/null "http://127.0.0.1:8000${script}"
+          curl --fail --silent --show-error --output app.js "http://127.0.0.1:8000${script}"
+          # The commit passed as a build arg must reach the served bundle (task
+          # #186): it proves the wiring is not a no-op, and the version mark
+          # links to it.
+          grep --quiet --fixed-strings "${GITHUB_SHA}" app.js
 
       # How much memory the server needs, to size the cap on a small host: idle
       # with the demo plants, then at its peak after the largest label request.
