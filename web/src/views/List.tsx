@@ -21,7 +21,7 @@ import { useI18n } from "../i18n";
 import { navigate, onLinkClick } from "../router";
 import { useThumbnails } from "../thumbs";
 import { allColumns, loadColumns, saveColumns } from "./columns";
-import { Icon, Marked, Name } from "./common";
+import { Icon, Marked, Name, VersionMark } from "./common";
 
 const PAGE = 100;
 
@@ -181,6 +181,10 @@ export function ListView({ schema, collection, rows, now, result, state, onState
     <div className="lay">
       <aside className="facets" aria-label={t("Фильтры", "Filters")}>
         {facetPanel("side")}
+        <div className="vblock">
+          <span className="t">{t("Версия", "Version")}</span>
+          <VersionMark />
+        </div>
       </aside>
       <div className="main">
         <div className="tools">
