@@ -326,7 +326,7 @@
           "inventory"
         ],
         "summary": "List a collection's plants, filtered for an inventory",
-        "description": "Every plant of the collection, in sheet order, that matches all the filters given. Former plants, those with a `status`, are left out unless `former` is true. The apps filter their own copies the same way; this is for the bot and for scripts.",
+        "description": "Every plant of the collection, in sheet order, that matches all the filters given. Former plants, those whose `status` is `\"gone\"`, are left out unless `former` is true. The apps filter their own copies the same way; this is for the bot and for scripts.",
         "operationId": "list_plants",
         "security": [
           {
