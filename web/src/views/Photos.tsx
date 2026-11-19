@@ -61,11 +61,15 @@ export function Photos({ schema, plant }: Props) {
     if (good.length) photos.upload(good);
   };
 
-  const status = plant.fields.status;
-  const statusLabel = status
-    ? schema.fields.find((field) => field.key === "status")?.values?.find((value) => value.key === status)?.label
-    : undefined;
-  const statusText = status ? (statusLabel ? `${t(statusLabel.ru, statusLabel.en)} (${status})` : status) : t("нет", "none");
+  const statusLabel = schema.fields
+    .find((field) => field.key === "status")
+    ?.values?.find((value) => value.key === "0")?.label;
+  const statusText =
+    plant.status === "gone"
+      ? statusLabel
+        ? t(statusLabel.ru, statusLabel.en)
+        : t("выбыло", "gone")
+      : t("нет", "none");
 
   return (
     <section className="blk photos" aria-label={t("Фото", "Photos")}>

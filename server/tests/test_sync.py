@@ -28,7 +28,7 @@ def ids(items: list[dict[str, Any]]) -> list[str]:
 def test_full_copy(client: TestClient) -> None:
     body = sync(client)
     assert body["kind"] == "full"
-    assert body["schema_version"] == 1
+    assert body["schema_version"] == 2
     assert ids(body["collections"]) == ["main"]
     assert len(body["plants"]) == 3
     assert body["removed_collections"] == body["removed_plants"] == []
@@ -263,7 +263,7 @@ def test_a_new_schema_version_rereads_sheets_and_resets_cursors(
 ) -> None:
     cursor = sync(client)["cursor"]
     syncer = runtime(client).syncer
-    newer = FieldSchema.model_validate({**syncer.schema.model_dump(by_alias=True), "version": 2})
+    newer = FieldSchema.model_validate({**syncer.schema.model_dump(by_alias=True), "version": 99})
     syncer.schema = newer
     runtime(client).schema = newer
     reads = store.reads
@@ -271,7 +271,7 @@ def test_a_new_schema_version_rereads_sheets_and_resets_cursors(
     assert store.reads == reads + 1
     body = sync(client, cursor)
     assert body["kind"] == "full"
-    assert body["schema_version"] == 2
+    assert body["schema_version"] == 99
 
 
 def test_a_changed_field_rereads_sheets_without_resetting_cursors(

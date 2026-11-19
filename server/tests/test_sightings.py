@@ -31,7 +31,7 @@ def store() -> FakeStore:
             HEADER,
             ["004217", "Lithops", "lesliei"],
             ["004218", "Conophytum", "bilobum"],
-            ["004219", "Lithops", "dorotheae", "dead"],
+            ["004219", "Lithops", "dorotheae", "0"],
             [None, "Lithops", "aucampiae"],
         ],
     )
