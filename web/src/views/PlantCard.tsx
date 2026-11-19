@@ -127,58 +127,63 @@ export function PlantCard({ schema, collection, templates, row, now, list, listH
 
       <div className="cgrid">
         <div className="side-main">
-          {groups.map((group) => (
-            <section key={group.title} className="blk">
-              <h3>{group.title}</h3>
-              <dl className="kv">
-                {group.fields.map((field) => {
-                  const shownValue = value(field);
-                  const bad = plant.invalid[field.key];
-                  return (
-                    <div key={field.key}>
+          {groups.map((group) => {
+            // Empty fields stay off the card; broken values stay visible. A
+            // group with nothing to show goes entirely.
+            const visible = group.fields.filter((field) => value(field) || plant.invalid[field.key]);
+            const hasSeeding = group.fields.some((field) => field.key === "seeding_date");
+            if (!visible.length && !(hasSeeding && ageField && plantAge)) return null;
+            return (
+              <section key={group.title} className="blk">
+                <h3>{group.title}</h3>
+                <dl className="kv">
+                  {visible.map((field) => {
+                    const shownValue = value(field);
+                    const bad = plant.invalid[field.key];
+                    return (
+                      <div key={field.key}>
+                        <dt>
+                          {label(field.label)}
+                          <span className="key">{field.key}</span>
+                        </dt>
+                        {bad ? (
+                          <dd>
+                            <span className="bad">{bad.value}</span>
+                            <span className="cell">{bad.cell}</span>
+                            <span className="why">
+                              {bad.reason}. {t("Поле пока пустое.", "The field is left empty for now.")}
+                            </span>
+                          </dd>
+                        ) : (
+                          <dd>{shownValue}</dd>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {hasSeeding && ageField && plantAge && (
+                    <div>
                       <dt>
-                        {label(field.label)}
-                        <span className="key">{field.key}</span>
+                        {label(ageField.label)}
+                        <span className="key">{t("вычисляется", "computed")}</span>
                       </dt>
-                      {bad ? (
-                        <dd>
-                          <span className="bad">{bad.value}</span>
-                          <span className="cell">{bad.cell}</span>
-                          <span className="why">
-                            {bad.reason}. {t("Поле пока пустое.", "The field is left empty for now.")}
-                          </span>
-                        </dd>
-                      ) : shownValue ? (
-                        <dd>{shownValue}</dd>
-                      ) : (
-                        <dd className="e">{t("пусто", "empty")}</dd>
-                      )}
+                      <dd>{plantAge}</dd>
                     </div>
-                  );
-                })}
-                {group.fields.some((field) => field.key === "seeding_date") && ageField && (
-                  <div>
-                    <dt>
-                      {label(ageField.label)}
-                      <span className="key">{t("вычисляется", "computed")}</span>
-                    </dt>
-                    {plantAge ? <dd>{plantAge}</dd> : <dd className="e">{t("пусто", "empty")}</dd>}
-                  </div>
-                )}
-              </dl>
-            </section>
-          ))}
-          {collection.custom_columns.length > 0 && (
+                  )}
+                </dl>
+              </section>
+            );
+          })}
+          {collection.custom_columns.some((column) => own(plant.custom, column)) && (
             <section className="blk">
               <h3>
                 {t("Свои колонки", "Your columns")}
                 <small>{t("из таблицы, как есть", "from the sheet, as they are")}</small>
               </h3>
               <dl className="kv">
-                {collection.custom_columns.map((column) => (
+                {collection.custom_columns.filter((column) => own(plant.custom, column)).map((column) => (
                   <div key={column}>
                     <dt>{column}</dt>
-                    {own(plant.custom, column) ? <dd>{own(plant.custom, column)}</dd> : <dd className="e">{t("пусто", "empty")}</dd>}
+                    <dd>{own(plant.custom, column)}</dd>
                   </div>
                 ))}
               </dl>
