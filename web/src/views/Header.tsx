@@ -1,51 +1,65 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { useState } from "react";
 import type { Collection } from "../api/types";
+import { isTag } from "../domain/datamatrix";
+import { isFormer, type Row } from "../domain/query";
 import { useFormat } from "../format";
 import { useI18n } from "../i18n";
 import { navigate, routePath } from "../router";
-import { Icon, VersionMark } from "./common";
+import { Icon } from "./common";
+import { HeaderTag } from "./HeaderTag";
 
 interface Props {
   collections: Collection[];
   current: Collection;
-  plantCount: number;
+  rows: Row[];
   onForget: () => void;
 }
 
-export function Header({ collections, current, plantCount, onForget }: Props) {
+export function Header({ collections, current, rows, onForget }: Props) {
   const { t, lang, plural, setLang } = useI18n();
   const format = useFormat();
   const synced = current.synced_at ? format.time(current.synced_at) : null;
+  // The header label shows one random numbered plant of the collection; the
+  // pick is made once per page load, and again when the collection changes
+  // (the component is keyed by the collection). The picked plant is re-found
+  // in fresh rows, and the label goes when the plant is gone from the sheet.
+  const [pickedId] = useState<string | null>(() => {
+    const pool = rows.filter((row) => isTag(row.plant.tag) && row.nameText);
+    return pool[Math.floor(Math.random() * pool.length)]?.plant.id ?? null;
+  });
+  const tagRow = rows.find((row) => row.plant.id === pickedId) ?? null;
+  const plantCount = rows.filter((row) => !isFormer(row)).length;
 
   return (
     <>
       <header className="ah">
-        <span className="brandgrp">
-          <span className="brand">Square-Pot</span>
-          <VersionMark />
+        <span className="brandline">
+          {tagRow && tagRow.plant.tag && <HeaderTag tag={tagRow.plant.tag} name={tagRow.name} />}
+          <div className="coll">
+            <b>SquarePot</b>
+            <span className="cline">
+              {collections.length > 1 && (
+                <select
+                  aria-label={t("Коллекция", "Collection")}
+                  value={current.id}
+                  onChange={(event) => {
+                    navigate(routePath({ page: "list", collection: event.target.value }));
+                  }}
+                >
+                  {collections.map((collection) => (
+                    <option key={collection.id} value={collection.id}>
+                      {collection.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <span>
+                {plantCount} {plural(plantCount, "растение", "растения", "растений", "plants")}
+              </span>
+            </span>
+          </div>
         </span>
-        <div className="coll">
-          {collections.length > 1 ? (
-            <select
-              aria-label={t("Коллекция", "Collection")}
-              value={current.id}
-              onChange={(event) => {
-                navigate(routePath({ page: "list", collection: event.target.value }));
-              }}
-            >
-              {collections.map((collection) => (
-                <option key={collection.id} value={collection.id}>
-                  {collection.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <b>{current.name}</b>
-          )}
-          <span>
-            {plantCount} {plural(plantCount, "растение", "растения", "растений", "plants")}
-          </span>
-        </div>
         <span
           className={current.error ? "sync warn" : "sync"}
           title={t("Сервер регулярно перечитывает таблицу", "The server rereads the sheet regularly")}
