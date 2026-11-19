@@ -45,6 +45,8 @@ class Health(ApiModel):
 
 
 Key = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]*$", examples=["genus"])]
+# A value key is a field key or a number: the status values are "0" and "1".
+ValueKey = Annotated[str, Field(pattern=r"^([a-z][a-z0-9_]*|[0-9]+)$", examples=["h"])]
 
 
 class Label(ApiModel):
@@ -81,7 +83,7 @@ class Display(ApiModel):
 class FieldValue(ApiModel):
     """One allowed value of a field that takes a fixed set of values."""
 
-    key: Key = Field(description="The value as stored and served in `Plant.fields`.")
+    key: ValueKey = Field(description="The value as stored and served in `Plant.fields`.")
     label: Label
     aliases: list[str] = Field(
         default=[],
@@ -161,13 +163,16 @@ class Collection(ApiModel):
     name: str = Field(description="Display name chosen by the owner.", examples=["Lithops"])
     plant_count: int = Field(
         ge=0,
-        description="Number of plants in the collection: imported plants without a `status`.",
+        description=(
+            "Number of plants in the collection: those whose `status` cell is empty or "
+            "reads as `1`."
+        ),
     )
     former_count: int = Field(
         ge=0,
         description=(
-            "Number of former plants: imported plants with a `status`, such as dead or sold. "
-            "They are served like any other plant."
+            "Number of former plants: those whose `status` cell reads as `0` — gone, dead, "
+            "sold and so on. They are served like any other plant."
         ),
     )
     synced_at: AwareDatetime | None = Field(
@@ -236,13 +241,28 @@ class Plant(ApiModel):
         ),
         examples=[{"Marathon": "yes", "soil": "pumice 70%"}],
     )
+    status: Literal["gone"] | None = Field(
+        description=(
+            '`"gone"` when the plant is no longer in the collection (the sheet\'s `status` '
+            "cell reads as `0`); `null` while the plant is in it. The living state is not "
+            "output, and the reason a plant is gone lives in `status_comment`."
+        ),
+        examples=["gone"],
+    )
     status_since: date | None = Field(
         description=(
-            "Since when the plant has its `status` (`fields.status`): the sheet's "
+            "The date of the last status change, in either direction: the sheet's "
             "`status_date` when it has one, otherwise the day the server first saw this "
-            "status in the sheet. `null` for a plant without a status."
+            "status in the sheet. `null` for a plant in the collection."
         ),
         examples=["2025-06-14"],
+    )
+    status_comment: str | None = Field(
+        description=(
+            "The comment to the last status change, from the sheet's `status_comment` cell, "
+            'such as "sold at the fair". `null` while there is none.'
+        ),
+        examples=["dried out in July"],
     )
     last_seen: AwareDatetime | None = Field(
         description=(
@@ -307,9 +327,10 @@ class FieldChange(ApiModel):
     )
     value: str | None = Field(
         description=(
-            "The new value, in the canonical form of `Plant.fields`: `YYYY-MM-DD` for a date, "
-            "a plain decimal such as `12.50`, a status key such as `dead`. Any text for a "
-            "custom column. `null` or an empty string empties the cell."
+            "The new value, in the canonical form of `Plant.fields`: `YYYY-MM-DD` for a date "
+            "or a plain decimal such as `12.50`. Any text for a custom column. `null` or an "
+            "empty string empties the cell. A status is not a field: change it with the "
+            "collection's status endpoint."
         ),
     )
 
@@ -385,28 +406,40 @@ class EditConflict(ApiModel):
 
 class StatusSeen(ApiModel):
     id: str = Field(description="The plant's `id`.", examples=["main:004217"])
-    seen: str | None = Field(
+    seen: Literal["gone"] | None = Field(
         description=(
-            "The status the client last saw: the plant's `fields.status`, the rejected "
-            "`invalid` value if the import rejected the cell, or `null` for none. If the sheet "
-            "no longer holds it, that plant is not written."
+            'The status the client last saw: the plant\'s `status` (`"gone"`), or `null` for '
+            "a plant in the collection. If the sheet no longer holds that state, the plant "
+            "is not written."
         )
     )
 
 
 class BulkStatus(ApiModel):
-    """One status for many plants of a collection (ADR 0008)."""
+    """One status for many plants of a collection (ADR 0009)."""
 
-    status: str | None = Field(
-        description="A status key such as `lost`; `null` or empty clears the status.",
-        examples=["lost"],
+    status: Literal["gone"] | None = Field(
+        description=(
+            '`"gone"` writes `0` into the sheet: the plant leaves the collection. `null` '
+            "writes `1`: it returns. The same request in the other direction undoes a "
+            "change."
+        ),
+        examples=["gone"],
     )
     status_date: date | None = Field(
         default=None,
         description=(
-            "Written into `status_date` with the status; without it that cell is emptied. "
-            "A tab without a `status_date` column is left so, unless a date is given."
+            "The date of the change, written into `status_date`; without it the server's day "
+            "is written. Lets an inventory walk backdate a change."
         ),
+    )
+    comment: str | None = Field(
+        default=None,
+        description=(
+            "A note about the change, written into `status_comment`; it overwrites the old "
+            "one, and empty or absent clears the cell."
+        ),
+        examples=["sold at the fair"],
     )
     plants: list[StatusSeen] = Field(min_length=1, max_length=500)
 

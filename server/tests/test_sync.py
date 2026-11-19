@@ -171,10 +171,10 @@ def test_former_plants_are_counted_apart_and_still_served(
     store.put(
         "main",
         [
-            ["tag", "genus", "status", "status_date"],
-            [4217, "Lithops", "", ""],
-            [4218, "Conophytum", "dead", "2025-06-14"],
-            [4219, "Lithops", "sold", ""],
+            ["tag", "genus", "status", "status_date", "status_comment"],
+            [4217, "Lithops", "", "", ""],
+            [4218, "Conophytum", 0, "2025-06-14", "frozen"],
+            [4219, "Lithops", "0", "", "sold at the fair"],
         ],
     )
     runtime(client).syncer.run_once()
@@ -183,8 +183,13 @@ def test_former_plants_are_counted_apart_and_still_served(
     assert (main["plant_count"], main["former_count"]) == (1, 2)
     assert len(body["plants"]) == 3
     plants = client.get("/api/v1/plants/by-tag/004218").json()["plants"]
-    assert plants[0]["fields"]["status"] == "dead"
+    assert plants[0]["status"] == "gone"
+    assert "status" not in plants[0]["fields"]
     assert plants[0]["status_since"] == "2025-06-14"
+    assert plants[0]["status_comment"] == "frozen"
+    plants = client.get("/api/v1/plants/by-tag/004219").json()["plants"]
+    assert plants[0]["status"] == "gone"
+    assert plants[0]["status_comment"] == "sold at the fair"
 
 
 def test_the_server_records_since_when_a_plant_has_its_status(
@@ -208,21 +213,21 @@ def test_the_server_records_since_when_a_plant_has_its_status(
     syncer.run_once()
     assert since("004217") is None
 
-    put("dead")
+    put("0")
     syncer.run_once()
     assert since("004217") == "2026-10-25"
 
-    # Another edit keeps the day; a different status starts a new one.
+    # Another edit keeps the day; a change in either direction starts a new one.
     syncer.clock = lambda: datetime(2026, 11, 2, 12, tzinfo=UTC)
-    put("dead", notes="a pity")
+    put("0", notes="a pity")
     syncer.run_once()
     assert since("004217") == "2026-10-25"
-    put("gifted")
+    put("1")
     syncer.run_once()
     assert since("004217") == "2026-11-02"
 
     # A date in the sheet wins; without a status there is none.
-    put("gifted", status_date="2026-10-30")
+    put("1", status_date="2026-10-30")
     syncer.run_once()
     assert since("004217") == "2026-10-30"
     put("")

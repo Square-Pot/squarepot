@@ -7,7 +7,7 @@ import logging
 import re
 import secrets
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from datetime import date, datetime
+from datetime import datetime
 from typing import Annotated, Any, cast
 from uuid import UUID
 
@@ -40,7 +40,6 @@ from squarepot_server.api.models import (
 from squarepot_server.backoff import client_key
 from squarepot_server.db import CollectionRow, PlantRow, current_seq, get_meta
 from squarepot_server.edits import Conflict, Editor, InvalidEdit, NotEditable, NotFound
-from squarepot_server.fields import STATUS, STATUS_DATE
 from squarepot_server.labels.caption import NAME, caption, entries, extra_text
 from squarepot_server.labels.layout import TEMPLATES, Item, LayoutError, Page, layout_pages
 from squarepot_server.labels.render import to_pdf, to_svg
@@ -150,7 +149,9 @@ def to_plant(
         fields=row.fields,
         custom=row.custom,
         invalid=row.invalid,
-        status_since=status_since(row),
+        status="gone" if row.status_seen == "0" else None,
+        status_since=row.status_since,
+        status_comment=row.status_comment,
         last_seen=max(times, default=None),
         photo_count=summary.count if summary else 0,
         last_photo=summary.last if summary else None,
@@ -168,15 +169,6 @@ def to_plants(session: Session, rows: Sequence[PlantRow]) -> list[Plant]:
 def plant_out(runtime: Runtime, row: PlantRow) -> Plant:
     with runtime.sessions.begin() as session:
         return to_plants(session, [row])[0]
-
-
-def status_since(row: PlantRow) -> date | None:
-    """The sheet's status date wins over the day the server first saw the status."""
-    if STATUS not in row.fields:
-        return None
-    if STATUS_DATE in row.fields:
-        return date.fromisoformat(row.fields[STATUS_DATE])
-    return row.status_since
 
 
 def make_cursor(session: Session, seq: int) -> str:
@@ -351,9 +343,10 @@ def edit_plant(
         "For an inventory: up to 500 plants, each with the status the client saw. The tab "
         "is read once; every plant whose status cell still holds what the client saw is "
         "written, all in one write, and the answer says per plant whether it was written. "
-        "An empty `status` clears it, so a wrong change is undone the same way (ADR 0008). "
-        "Setting a status is not a sighting by itself: the client sends that separately."
-        + EDIT_RULES
+        '`status` `"gone"` writes `0` into the sheet and `null` writes `1`, so a wrong '
+        "change is undone by the same request in the other direction; `comment` and the "
+        "date are written with every change (ADR 0009). Setting a status is not a sighting "
+        "by itself: the client sends that separately." + EDIT_RULES
     ),
     response_model=list[StatusResult],
     responses=EDIT_RESPONSES,

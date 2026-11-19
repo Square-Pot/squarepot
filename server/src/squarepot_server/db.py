@@ -97,9 +97,11 @@ class PlantRow(Base):
     custom: Mapped[dict[str, Any]] = mapped_column(default=dict)
     # Cells the import rejected, by field: {"cell", "value", "reason"}.
     invalid: Mapped[dict[str, Any]] = mapped_column(default=dict)
-    # The status as last seen, and the day it was first seen so; both null without one.
+    # The status as last seen, the resolved day of the last change, and the
+    # comment to it; all null for a plant in the collection (ADR 0009).
     status_seen: Mapped[str | None] = mapped_column(Text)
     status_since: Mapped[date | None]
+    status_comment: Mapped[str | None] = mapped_column(Text)
 
 
 class RegisteredTag(Base):

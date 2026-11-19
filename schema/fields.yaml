@@ -37,7 +37,7 @@
 #   computed  values derived from fields, never stored in the sheet
 #   presets   named field selections shipped by default; users add their own
 
-version: 1
+version: 2
 
 fields:
   - key: tag
@@ -183,31 +183,39 @@ fields:
     label: {en: Status, ru: Статус}
     group: extra
     description: >-
-      Why the plant is no longer in the collection. Empty means it is. A plant
-      with a status is left out of counts and of default lists and searches,
-      but is still served, found by its number and recognised by the camera.
-      Its number is never issued again.
+      Whether the plant is still in the collection. An empty cell means it
+      is; otherwise the cell holds `1` (in the collection) or `0` (gone —
+      dead, withered, sold, gifted or lost; the reason belongs in
+      `status_comment`). A checkbox cell is read as `1` or `0`. Any other
+      value is reported as invalid, and the plant counts as being in the
+      collection, so that nothing leaves the collection unnoticed. A plant
+      with `0` is left out of counts and of default lists and searches, but
+      is still served, found by its number and recognised by the camera. Its
+      number is never issued again.
     values:
-      - key: dead
-        label: {en: Dead, ru: Погиб}
-        aliases: [погиб, умер]
-      - key: gifted
-        label: {en: Gifted, ru: Подарен}
-        aliases: [подарен]
-      - key: sold
-        label: {en: Sold, ru: Продан}
-        aliases: [продан]
-      - key: lost
-        label: {en: Lost, ru: Потерян}
-        aliases: [потерян]
+      - key: "1"
+        label: {en: In the collection, ru: В коллекции}
+      - key: "0"
+        label: {en: Gone, ru: Выбыло}
 
   - key: status_date
     type: date
-    label: {en: Status date, ru: Дата выбытия}
+    label: {en: Status date, ru: Дата изменения статуса}
     group: extra
     description: >-
-      When the plant died, or was given away, sold or lost. Optional: without
-      it, Square-Pot shows the day it first saw the status in the sheet.
+      The date of the last status change, in either direction. Optional:
+      without it, Square-Pot shows the day it first saw the new status in the
+      sheet.
+
+  - key: status_comment
+    type: text
+    label: {en: Status comment, ru: Комментарий к статусу}
+    group: extra
+    description: >-
+      A free-text note about the last status change: why the plant left, or
+      where it went to. Optional. Each status change overwrites it; a return
+      with no comment clears it. It is one note about the latest change, not
+      a journal.
 
 computed:
   - key: name
@@ -242,4 +250,4 @@ presets:
     fields: [tag, field_number, name, ex, locality, age]
   - key: full
     label: {en: Full, ru: Полная}
-    fields: [tag, field_number, name, synonym, ex, locality, source, seeding_date, purchase_date, price, currency, age, notes, description, status, status_date]
+    fields: [tag, field_number, name, synonym, ex, locality, source, seeding_date, purchase_date, price, currency, age, notes, description]

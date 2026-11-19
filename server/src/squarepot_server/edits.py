@@ -30,6 +30,7 @@ from squarepot_server.db import AddedPlant, PlantRow, RegisteredTag
 from squarepot_server.fields import (
     MAX_CUSTOM_VALUE,
     STATUS,
+    STATUS_COMMENT,
     STATUS_DATE,
     TAG,
     InvalidValue,
@@ -143,6 +144,8 @@ class Editor:
             definition = definitions.get(key)
             if key == TAG:
                 problems.append("tag: numbers are issued by the server, ask for issue_number")
+            elif key in (STATUS, STATUS_DATE, STATUS_COMMENT):
+                problems.append(f"{key}: use POST /collections/<id>/status to change a status")
             elif definition is None:
                 problems.append(f"{key}: no such field")
             else:
@@ -339,28 +342,39 @@ class Editor:
             return self.found(collection.id, tag, row)
 
     def set_status(self, collection_id: str, bulk: BulkStatus) -> list[StatusOutcome]:
-        """One status for many plants (ADR 0008): one read of the tab, one write.
+        """One status for many plants (ADR 0009): one read of the tab, one write.
 
-        Each plant is written only if its status cell still holds what the client saw.
+        The values are `"gone"` (the sheet's `0`) and None (its `1`); the date and the
+        comment are written with every change. Each plant is written only if its status
+        cell still holds what the client saw: on a difference the sheet wins, nothing is
+        written for that plant, and the client retries after a fresh sync.
         """
         ids = [plant.id for plant in bulk.plants]
         if len(set(ids)) < len(ids):
             raise InvalidEdit("plants: a plant is named more than once")
-        day = bulk.status_date.isoformat() if bulk.status_date is not None else None
+        comment = (bulk.comment or "").strip() or None
+        if comment is not None and len(comment) > MAX_CUSTOM_VALUE:
+            raise InvalidEdit(f"comment: is longer than {MAX_CUSTOM_VALUE} characters")
         with self.syncer.lock:
             collection = self.config(collection_id)
             store = self.store(collection)
-            changes = self.changes(
-                {
-                    STATUS: FieldChange(seen=None, value=bulk.status),
-                    STATUS_DATE: FieldChange(seen=None, value=day),
-                },
-                {},
-            )
             tab = self.read(store, collection)
-            if STATUS_DATE not in tab.fields and day is None:
-                changes = [change for change in changes if change.name != STATUS_DATE]
-            cells = self.cells(tab, changes, number=False)
+            missing = [
+                key for key in (STATUS, STATUS_DATE, STATUS_COMMENT) if key not in tab.fields
+            ]
+            if missing:
+                raise InvalidEdit(
+                    "the sheet has "
+                    + ", ".join(f"no '{key}' column" for key in missing)
+                    + ': add the status columns (docs/sheet-format.md, "The status")'
+                )
+            day = bulk.status_date or self.syncer.clock().date()
+            value = "0" if bulk.status == "gone" else "1"
+            cells = [
+                CellWrite(tab.fields[STATUS], value),
+                CellWrite(tab.fields[STATUS_DATE], day),
+                CellWrite(tab.fields[STATUS_COMMENT], comment),
+            ]
             with self.syncer.sessions.begin() as session:
                 plants = {
                     plant.id: plant
@@ -372,7 +386,6 @@ class Editor:
                         )
                     )
                 }
-            status = changes[0]
             outcomes = []
             writes: dict[int, list[CellWrite]] = {}
             for wanted in bulk.plants:
@@ -380,7 +393,7 @@ class Editor:
                 row = self.row(tab, plant) if plant is not None else None
                 if row is None:
                     outcomes.append(StatusOutcome.NOT_FOUND)
-                elif current(row, status) != wanted.seen:
+                elif ("gone" if row.status == "0" else None) != wanted.seen:
                     outcomes.append(StatusOutcome.CHANGED_IN_SHEET)
                 else:
                     writes[row.row] = cells
@@ -391,9 +404,9 @@ class Editor:
                 except StoreRefused as error:
                     raise NotEditable(NOT_SHARED) from error
                 log.info(
-                    "collection %s: wrote %s in %d rows",
+                    "collection %s: wrote status %s in %d rows",
                     collection.id,
-                    written(changes, False),
+                    value,
                     len(writes),
                 )
                 self.syncer.sync_collection(collection, force=True)

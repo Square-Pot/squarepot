@@ -69,20 +69,13 @@ def test_dates_and_decimals_are_written_as_such(client: TestClient, store: FakeS
         "fields": {
             "seeding_date": change("2024-03-15", "2025-01-02"),
             "price": change("12.5", "13.50"),
-            "status": change(None, "dead"),
         }
     }
     response = edit(client, "main:004217", body)
     assert response.status_code == 200
-    assert store.writes == [
-        (2, [CellWrite(3, date(2025, 1, 2)), CellWrite(4, Decimal("13.50")), CellWrite(5, "dead")])
-    ]
+    assert store.writes == [(2, [CellWrite(3, date(2025, 1, 2)), CellWrite(4, Decimal("13.50"))])]
     fields = response.json()["fields"]
-    assert (fields["seeding_date"], fields["price"], fields["status"]) == (
-        "2025-01-02",
-        "13.50",
-        "dead",
-    )
+    assert (fields["seeding_date"], fields["price"]) == ("2025-01-02", "13.50")
 
 
 def test_a_cell_changed_in_the_sheet_wins(client: TestClient, store: FakeStore) -> None:
@@ -128,7 +121,9 @@ def test_a_rejected_cell_is_seen_as_its_rejected_value(client: TestClient) -> No
         ({"seeding_date": "15.03.2024"}, {}, "seeding_date: write it as '2024-03-15'"),
         ({"seeding_date": "soon"}, {}, "seeding_date: not a date (YYYY-MM-DD)"),
         ({"price": "12,5"}, {}, "price: not a number"),
-        ({"status": "Погиб"}, {}, "status: write it as 'dead'"),
+        ({"status": "dead"}, {}, "status: use POST /collections/<id>/status to change a status"),
+        ({"status_date": "2026-01-01"}, {}, "status_date: use POST /collections/<id>/status"),
+        ({"status_comment": "sold"}, {}, "status_comment: use POST /collections/<id>/status"),
         ({"genus": ""}, {}, "genus: is required"),
         ({"genus": " Lithops"}, {}, "genus: write it as 'Lithops'"),
         ({"tag": "004300"}, {}, "tag: numbers are issued by the server"),

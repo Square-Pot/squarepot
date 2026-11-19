@@ -64,7 +64,7 @@
       "additionalProperties": false,
       "required": ["key", "label"],
       "properties": {
-        "key": {"$ref": "#/$defs/key"},
+        "key": {"type": "string", "pattern": "^([a-z][a-z0-9_]*|[0-9]+)$"},
         "label": {"$ref": "#/$defs/label"},
         "aliases": {
           "type": "array",

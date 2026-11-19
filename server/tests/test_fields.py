@@ -110,11 +110,15 @@ def test_every_imported_key_comes_from_the_schema(schema: FieldSchema) -> None:
     values[keys.index("price")] = 12.5
     values[keys.index("currency")] = "eur"
     values[keys.index("label_type")] = "h"
-    values[keys.index("status")] = "dead"
+    values[keys.index("status")] = "0"
+    values[keys.index("status_comment")] = "a note"
     parsed = parse_tab(schema, [list(keys), values])
     assert parsed.issues == []
     [row] = parsed.rows
-    assert set(row.fields) == set(keys) - {"tag"}
+    assert set(row.fields) == set(keys) - {"tag", "status", "status_date", "status_comment"}
+    assert row.status == "0"
+    assert row.status_date == "2024-03-15"
+    assert row.status_comment == "a note"
 
 
 @pytest.mark.parametrize(
@@ -239,22 +243,29 @@ def test_an_unknown_label_type_is_reported(schema: FieldSchema) -> None:
 @pytest.mark.parametrize(
     ("cell", "status"),
     [
-        ("dead", "dead"),
-        (" Sold ", "sold"),
-        ("Погиб", "dead"),
-        ("умер", "dead"),
-        ("ПОДАРЕН", "gifted"),
+        (0, "0"),
+        (1, "1"),
+        (0.0, "0"),
+        ("0", "0"),
+        (" 1 ", "1"),
+        (True, "1"),
+        (False, "0"),
     ],
 )
-def test_a_status_is_stored_as_its_key(schema: FieldSchema, cell: str, status: str) -> None:
-    assert one(schema, ["genus", "status"], ["Lithops", cell])["status"] == status
+def test_a_status_is_stored_as_its_key(schema: FieldSchema, cell: Cell, status: str) -> None:
+    parsed = parse_tab(schema, [["genus", "status"], ["Lithops", cell]])
+    assert parsed.issues == []
+    [row] = parsed.rows
+    assert row.status == status
+    assert "status" not in row.fields
 
 
 def test_an_unknown_status_is_reported_and_the_plant_stays(schema: FieldSchema) -> None:
     parsed = parse_tab(schema, [["genus", "status"], ["Lithops", "болеет"]])
     [row] = parsed.rows
     assert row.fields == {"genus": "Lithops"}
-    assert row.invalid["status"]["reason"] == "not one of dead, gifted, sold, lost"
+    assert row.status is None
+    assert row.invalid["status"]["reason"] == "not 0 or 1"
 
 
 def test_number_cells_in_text_fields_read_as_text(schema: FieldSchema) -> None:
