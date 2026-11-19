@@ -11,8 +11,8 @@ const ECC_CODEWORDS = 5;
 const TAG = /^(?!000000)[0-9]{6}$/;
 
 /** A label number the encoder accepts: six digits, not 000000. */
-export const isTag = (value: string | undefined): value is string =>
-  value !== undefined && TAG.test(value);
+export const isTag = (value: string | null | undefined): value is string =>
+  value !== null && value !== undefined && TAG.test(value);
 
 // GF(256) with the Data Matrix field polynomial x^8 + x^5 + x^3 + x^2 + 1.
 const EXP = new Array<number>(255);
@@ -92,7 +92,9 @@ class Placement {
       column += this.columns;
       row += 4 - ((this.columns + 4) % 8);
     }
-    this.cells[row][column] = [codeword, bit];
+    const cells = this.cells[row];
+    if (cells === undefined) throw new Error(`row ${String(row)} is outside the placement`);
+    cells[column] = [codeword, bit];
   }
 
   private utah(row: number, column: number, codeword: number): void {
@@ -202,7 +204,7 @@ class Placement {
     }
   }
 
-  private cell(row: number, column: number): [number, number] {
+  cell(row: number, column: number): [number, number] {
     const cell = this.cells[row]?.[column];
     if (cell === null || cell === undefined) throw new Error(`cell ${row},${column} was never placed`);
     return cell;
@@ -215,22 +217,27 @@ const PLACEMENT = new Placement(DATA_SIZE, DATA_SIZE);
 export function encode(tag: string): boolean[][] {
   if (!TAG.test(tag)) throw new Error(`not a label number: ${tag}`);
   const words = codewords(tag);
-  const matrix = Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, () => false));
+  const matrix: boolean[][] = [];
+  for (let row = 0; row < SIZE; row++) {
+    const cells = new Array<boolean>(SIZE).fill(false);
+    cells[0] = true;
+    cells[SIZE - 1] = row % 2 === 1;
+    matrix.push(cells);
+  }
   // The finder pattern is the solid left column and bottom row; the timing
   // pattern alternates along the top row and the right column.
-  for (let row = 0; row < SIZE; row++) {
-    matrix[row][0] = true;
-    matrix[row][SIZE - 1] = row % 2 === 1;
-  }
-  for (let column = 0; column < SIZE; column++) {
-    matrix[SIZE - 1][column] = true;
-    matrix[0][column] = column % 2 === 0;
-  }
+  const top = matrix[0];
+  const bottom = matrix[SIZE - 1];
+  if (top === undefined || bottom === undefined) throw new Error("the symbol was not built");
+  bottom.fill(true);
+  for (let column = 0; column < SIZE; column++) top[column] = column % 2 === 0;
   for (let row = 0; row < DATA_SIZE; row++) {
+    const cells = matrix[row + 1];
+    if (cells === undefined) throw new Error("the symbol was not built");
     for (let column = 0; column < DATA_SIZE; column++) {
       // Every module of a 10x10 symbol's data region carries a codeword bit.
       const [codeword, bit] = PLACEMENT.cell(row, column);
-      matrix[row + 1][column + 1] = ((words[codeword] ?? 0) & (0x80 >> bit)) !== 0;
+      cells[column + 1] = ((words[codeword] ?? 0) & (0x80 >> bit)) !== 0;
     }
   }
   return matrix;
