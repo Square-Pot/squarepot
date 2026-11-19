@@ -12,7 +12,6 @@ from sqlalchemy import select
 from squarepot_server.api.models import Plant, SightingBatch, SightingResult
 from squarepot_server.api.routes import RuntimeDep, SessionDep, errors, require_token, to_plants
 from squarepot_server.db import CollectionRow, PlantRow
-from squarepot_server.fields import STATUS
 
 router = APIRouter(
     prefix="/api/v1",
@@ -64,8 +63,9 @@ def before(day: date | None, moment: datetime | None) -> bool:
     summary="List a collection's plants, filtered for an inventory",
     description=(
         "Every plant of the collection, in sheet order, that matches all the filters given. "
-        "Former plants, those with a `status`, are left out unless `former` is true. The "
-        "apps filter their own copies the same way; this is for the bot and for scripts."
+        "Former plants, those whose `status` is `\"gone\"`, are left out unless `former` is "
+        "true. The apps filter their own copies the same way; this is for the bot and for "
+        "scripts."
     ),
     responses=errors(status.HTTP_404_NOT_FOUND),
 )
@@ -96,7 +96,7 @@ def list_plants(
     return [
         plant
         for plant in to_plants(session, rows)
-        if (former or STATUS not in plant.fields)
+        if (former or plant.status != "gone")
         and before(seen_before, plant.last_seen)
         and before(photo_before, plant.last_photo)
         and (has_photo is None or (plant.photo_count > 0) == has_photo)

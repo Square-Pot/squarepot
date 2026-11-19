@@ -98,7 +98,7 @@ describe("inventory filters", () => {
     seen(3, "000003", { photo_count: 2, last_photo: "2026-10-01T10:00:00Z", last_seen: "2026-10-01T10:00:00Z" }),
     seen(4, "000004", { photo_count: 1, last_photo: "2025-05-01T10:00:00Z", last_seen: "2026-09-01T10:00:00Z" }),
     seen(5, "000005", { last_seen: "2026-10-20T10:00:00Z" }),
-    seen(6, "000006", {}, { status: "dead" }),
+    seen(6, "000006", { status: "gone" }),
   ]);
   const found = (change: Partial<ListState>) => rows(filterRows(INVENTORY, state(change), NOW));
 
