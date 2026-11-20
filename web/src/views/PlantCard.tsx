@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { useEffect } from "react";
-import type { Collection, FieldDefinition, FieldSchema, LabelTemplate } from "../api/types";
+import { useEffect, useState } from "react";
+import { api, apiError } from "../api/client";
+import type { Collection, FieldDefinition, FieldSchema, LabelTemplate, Plant } from "../api/types";
+import { refresh } from "../data";
 import { age, styled } from "../domain/names";
 import { own, type Row } from "../domain/query";
 import { sheetRowUrl } from "../domain/sheet";
@@ -192,6 +194,7 @@ export function PlantCard({ schema, collection, templates, row, now, list, listH
         </div>
         <div className="side">
           <LabelPreview plant={plant} templates={templates} />
+          {collection.editable && <StatusBlock schema={schema} collection={collection} plant={plant} />}
           <div className="blk syncb">
             <h3>{t("Где в таблице", "Where in the sheet")}</h3>
             <div className="row">
@@ -213,11 +216,144 @@ export function PlantCard({ schema, collection, templates, row, now, list, listH
               </a>
             )}
             <p className="ro2">
-              <Icon name="lock" size={13} /> {t("Только просмотр. Править — в этой строке таблицы.", "View only. Edit this row in the sheet.")}
+              <Icon name="lock" size={13} /> {t("Остальное правится в этой строке таблицы.", "Everything else is edited in this row of the sheet.")}
             </p>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/** The status of a plant and its change: gone or back, with an optional date
+ * and one comment, written through the collection's bulk status endpoint
+ * (ADR 0009). The living state is never displayed. */
+function StatusBlock({ schema, collection, plant }: { schema: FieldSchema; collection: Collection; plant: Plant }) {
+  const { t, label } = useI18n();
+  const format = useFormat();
+  const [editing, setEditing] = useState<null | "gone" | "back">(null);
+  const [date, setDate] = useState("");
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ bad: boolean; text: string } | null>(null);
+
+  const gone = plant.status === "gone";
+  const statusField = schema.fields.find((field) => field.key === "status");
+  const dateField = schema.fields.find((field) => field.key === "status_date");
+  const commentField = schema.fields.find((field) => field.key === "status_comment");
+  const goneValue = statusField?.values?.find((value) => value.key === "0");
+  const statusText = goneValue ? label(goneValue.label) : t("Выбыло", "Gone");
+
+  const start = (which: "gone" | "back") => {
+    setEditing(which);
+    setDate("");
+    setComment("");
+    setNote(null);
+  };
+
+  const apply = async () => {
+    if (!editing) return;
+    setBusy(true);
+    setNote(null);
+    const which = editing;
+    try {
+      const response = await api.POST("/api/v1/collections/{collection_id}/status", {
+        params: { path: { collection_id: collection.id } },
+        body: {
+          status: which === "gone" ? "gone" : null,
+          status_date: date || null,
+          comment: comment.trim() || null,
+          plants: [{ id: plant.id, seen: plant.status }],
+        },
+      });
+      if (!response.data) throw apiError(response.response, response.error);
+      const result = response.data.find((item) => item.id === plant.id)?.result;
+      if (result === "written") {
+        setEditing(null);
+        setNote({
+          bad: false,
+          text: which === "gone" ? t("Статус записан в таблицу.", "The status is written to the sheet.") : t("Растение вернулось в коллекцию.", "The plant is back in the collection."),
+        });
+        await refresh();
+      } else if (result === "changed_in_sheet") {
+        setEditing(null);
+        setNote({
+          bad: true,
+          text: t("Ячейка статуса в таблице уже другая: ничего не записано, показываем свежую копию.", "The status cell in the sheet already changed: nothing was written; showing the fresh copy."),
+        });
+        await refresh();
+      } else {
+        setEditing(null);
+        setNote({ bad: true, text: t("Этого растения больше нет в таблице.", "This plant is no longer in the sheet.") });
+        await refresh();
+      }
+    } catch (error) {
+      setNote({ bad: true, text: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="blk syncb" aria-label={t("Статус", "Status")}>
+      <h3>{t("Статус", "Status")}</h3>
+      {gone ? (
+        <>
+          <div className="row">
+            <span>{statusField ? label(statusField.label) : t("Статус", "Status")}</span>
+            <span>{statusText}</span>
+          </div>
+          {plant.status_since && (
+            <div className="row">
+              <span>{dateField ? label(dateField.label) : t("Дата", "Date")}</span>
+              <span>{format.date(plant.status_since)}</span>
+            </div>
+          )}
+          {plant.status_comment && (
+            <div className="row">
+              <span>{commentField ? label(commentField.label) : t("Комментарий", "Comment")}</span>
+              <span>{plant.status_comment}</span>
+            </div>
+          )}
+          {editing === null && (
+            <button className="btn sec" type="button" onClick={() => { start("back"); }}>
+              {t("Вернуть в коллекцию", "Return to the collection")}
+            </button>
+          )}
+        </>
+      ) : editing === null ? (
+        <button className="btn sec" type="button" onClick={() => { start("gone"); }}>
+          {t("Отметить как выбывшее", "Mark as gone")}
+        </button>
+      ) : null}
+      {editing && (
+        <div className="sform">
+          <label>
+            <span>{dateField ? label(dateField.label) : t("Дата изменения", "Date of the change")}</span>
+            <input type="date" value={date} onChange={(event) => { setDate(event.target.value); }} />
+          </label>
+          <p className="ro2">{t("Пусто — запишется сегодняшний день.", "Empty writes the server's day.")}</p>
+          <label>
+            <span>{commentField ? label(commentField.label) : t("Комментарий", "Comment")}</span>
+            <input
+              type="text"
+              value={comment}
+              maxLength={200}
+              placeholder={editing === "gone" ? t("зачем ушло: продано, погибло…", "why it left: sold, died…") : t("откуда вернулось…", "where it came back from…")}
+              onChange={(event) => { setComment(event.target.value); }}
+            />
+          </label>
+          <div className="acts">
+            <button className="btn pri" type="button" disabled={busy} onClick={() => { void apply(); }}>
+              {editing === "gone" ? t("Отметить выбывшим", "Mark as gone") : t("Вернуть", "Return")}
+            </button>
+            <button className="btn ghost" type="button" disabled={busy} onClick={() => { setEditing(null); }}>
+              {t("Отмена", "Cancel")}
+            </button>
+          </div>
+        </div>
+      )}
+      {note && <p className={note.bad ? "bad" : "ro2"}>{note.text}</p>}
+    </section>
   );
 }
