@@ -165,6 +165,19 @@ export function ListView({ schema, collection, rows, now, result, state, onState
       );
     }
     if (key === "age") return <td key={key} className="dt">{format.age(age(plant.fields, now))}</td>;
+    // A status is a plant of its own, not a field: only a gone plant shows
+    // one (ADR 0009); the living state is not output at all.
+    if (key === "status") {
+      if (plant.status !== "gone") return <td key={key} />;
+      const value = schema.fields.find((field) => field.key === "status")?.values?.find((item) => item.key === "0");
+      return <td key={key} className="dt">{value ? label(value.label) : t("Выбыло", "Gone")}</td>;
+    }
+    if (key === "status_date") {
+      return <td key={key} className="dt">{plant.status === "gone" ? format.date(plant.status_since ?? undefined) : ""}</td>;
+    }
+    if (key === "status_comment") {
+      return <td key={key}>{plant.status === "gone" ? (plant.status_comment ?? "") : ""}</td>;
+    }
     if (key.startsWith("c:")) return <td key={key}>{own(plant.custom, key.slice(2)) ?? ""}</td>;
     const type = schema.fields.find((field) => field.key === key)?.type;
     const value = plant.fields[key] ?? "";
@@ -526,7 +539,7 @@ function FacetPanel({
       </div>
       <div className="fgroup">
         <p className="fttl small">{t("Выбывшие", "Former plants")}</p>
-        <p className="sub2">{t("Со статусом: погиб, подарен, продан, потерян", "With a status: dead, gifted, sold, lost")}</p>
+        <p className="sub2">{t("Не в коллекции; причина — в комментарии к статусу", "Gone from the collection; the reason is the status comment")}</p>
         {(
           [
             ["hide", t("Скрыть", "Hide")],
