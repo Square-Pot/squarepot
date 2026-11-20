@@ -159,7 +159,7 @@ export const own = <T>(record: Record<string, T>, key: string): T | undefined =>
 
 const customValue = (row: Row, column: string): string => own(row.plant.custom, column)?.trim() ?? "";
 
-export const isFormer = (row: Row): boolean => !!row.plant.fields.status;
+export const isFormer = (row: Row): boolean => row.plant.status === "gone";
 
 /** A former plant is still found by its whole number, as the camera finds it. */
 function foundByNumber(row: Row, q: string): boolean {

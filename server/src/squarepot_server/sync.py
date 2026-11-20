@@ -10,7 +10,7 @@ import secrets
 import threading
 from collections import Counter
 from collections.abc import Callable, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +30,7 @@ from squarepot_server.db import (
     next_seq,
     set_meta,
 )
-from squarepot_server.fields import STATUS, Issue, ParsedTab, Row, TabError, parse_tab
+from squarepot_server.fields import Issue, ParsedTab, Row, TabError, parse_tab
 from squarepot_server.store import CollectionStore, StoreError
 
 log = logging.getLogger(__name__)
@@ -149,7 +149,7 @@ class Syncer:
                     parsed = parse_tab(self.schema, self.store.read(collection))
                     self.apply(session, collection.id, parsed)
                     row.store_version = version
-                    former = sum(STATUS in plant.fields for plant in parsed.rows)
+                    former = sum(row.status == "0" for row in parsed.rows)
                     row.plant_count = len(parsed.rows) - former
                     row.former_count = former
                     row.issues = [issue_json(issue) for issue in parsed.issues]
@@ -175,7 +175,6 @@ class Syncer:
         for plant_id, row in zip(plant_ids(collection_id, parsed.rows), parsed.rows, strict=True):
             seen.add(plant_id)
             plant = existing.get(plant_id)
-            status = row.fields.get(STATUS)
             if plant is None:
                 session.add(
                     PlantRow(
@@ -187,12 +186,28 @@ class Syncer:
                         fields=row.fields,
                         custom=row.custom,
                         invalid=row.invalid,
-                        status_seen=status,
-                        status_since=today if status else None,
+                        status_seen=row.status,
+                        status_since=self.since(row.status, row.status_date, None, today),
+                        status_comment=row.status_comment,
                     )
                 )
                 continue
-            new = (row.tag, row.row, row.fields, row.custom, row.invalid, status)
+            since = self.since(
+                row.status,
+                row.status_date,
+                plant.status_since if row.status == plant.status_seen else None,
+                today,
+            )
+            new = (
+                row.tag,
+                row.row,
+                row.fields,
+                row.custom,
+                row.invalid,
+                row.status,
+                since,
+                row.status_comment,
+            )
             if (
                 not plant.removed
                 and (
@@ -202,14 +217,16 @@ class Syncer:
                     plant.custom,
                     plant.invalid,
                     plant.status_seen,
+                    plant.status_since,
+                    plant.status_comment,
                 )
                 == new
             ):
                 continue
-            if status != plant.status_seen:
-                plant.status_seen = status
-                plant.status_since = today if status else None
             plant.tag, plant.row, plant.fields, plant.custom, plant.invalid = new[:5]
+            plant.status_seen = row.status
+            plant.status_since = since
+            plant.status_comment = row.status_comment
             plant.removed = False
             plant.seq = next_seq(session)
         for plant_id, plant in existing.items():
@@ -219,6 +236,17 @@ class Syncer:
 
         tags = [row.tag for row in parsed.rows if row.tag] + parsed.skipped_tags
         self.register(session, collection_id, tags, parsed)
+
+    @staticmethod
+    def since(
+        status: str | None, status_date: str | None, previous: date | None, today: date
+    ) -> date | None:
+        """The day of the plant's last status change: the sheet's date wins (ADR 0009)."""
+        if status is None:
+            return None
+        if status_date is not None:
+            return date.fromisoformat(status_date)
+        return previous or today
 
     def register(
         self, session: Session, collection_id: str, tags: list[str], parsed: ParsedTab

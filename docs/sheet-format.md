@@ -128,32 +128,42 @@ printing overrides it.
 
 ## The status
 
-The optional `status` column marks a plant that is no longer in the
-collection. An empty cell means the plant is in it. The other values are:
+The optional `status` column says whether a plant is still in the
+collection. **An empty cell means it is.** Otherwise the cell holds `1`
+(in the collection) or `0` (gone):
 
-| Value | Shown as | Also read |
-| --- | --- | --- |
-| `dead` | Dead / Погиб | `погиб`, `умер` |
-| `gifted` | Gifted / Подарен | `подарен` |
-| `sold` | Sold / Продан | `продан` |
-| `lost` | Lost / Потерян | `потерян` |
+| Value | Shown as |
+| --- | --- |
+| `1` | In the collection / В коллекции |
+| `0` | Gone / Выбыло |
 
-Values are read ignoring case, and the Russian words are read as their value;
-the sheet keeps what the owner typed. Any other value is reported as invalid,
-and the plant counts as being in the collection, so that nothing leaves the
-collection unnoticed.
+A checkbox cell is read as `1` (checked) or `0` (unchecked). Any other
+value is reported as invalid, and the plant counts as being in the
+collection, so that nothing leaves the collection unnoticed. The old words
+(`dead`, `gifted`, …) are not read; the reason a plant is gone belongs in
+the comment, not in the value
+([ADR 0009](adr/0009-plant-status-two-states.md)).
 
-The date comes by itself: Square-Pot notes the day it first sees a status in
-the sheet, or sees it change to another one, and shows it with the status.
-Nothing is written to the sheet. To give the date yourself, use the optional
-`status_date` column: a date there always wins. For a plant without a
-number, Square-Pot recognises the row by its contents, so editing the row
-again gives the date of that edit; use `status_date` to keep the real one.
+Two more optional columns belong to the status:
 
-A plant with a status is a former plant. It is left out of the collection's
-plant count and counted apart, and its number stays registered and is never
-issued to another plant. Every plant, former or not, is still served to the
-apps with its status and the date.
+- `status_date`: the date of the last status change, in either direction.
+  Square-Pot writes it with every change it writes: the date given in the
+  request, or the server's day. A hand edit in the sheet that changes
+  `status` and `status_date` together keeps the sheet's date; a hand edit
+  of `status` alone shows the day the server first saw the new value.
+  Without the column, Square-Pot falls back to the day it first saw the
+  status.
+- `status_comment`: free text, a note about the last change — "sold at the
+  fair", "dried out in July". Each change overwrites it; returning a
+  plant with no comment clears it. It is one note about the latest change,
+  not a journal: the owner who wants history adds their own column, which
+  Square-Pot then reads as a custom column.
+
+A plant with `status` `0` is a former plant. It is left out of the
+collection's plant count and counted apart, and its number stays
+registered and is never issued to another plant. Every plant, former or
+not, is still served to the apps with its status, the date and the
+comment.
 
 Planned in the apps and not built yet:
 
@@ -175,7 +185,12 @@ From the web app and the phone, while online, the owner can:
 - **add a plant**: Square-Pot adds a row after the last row of the tab;
 - **give a plant a number**, when it is added or later: Square-Pot writes the
   next free number into the empty `tag` cell, and sets that cell's format to
-  plain text.
+  plain text;
+- **change plants' statuses**: Square-Pot writes `status` (`0` or `1`),
+  `status_date` and `status_comment` together, up to 500 plants in one
+  batched write, and only the plants whose status cell still holds what the
+  client saw. A tab without these columns is not written: the owner adds
+  them first.
 
 Before writing, Square-Pot reads the tab again and finds the plant's row: by
 its number when it has one, otherwise by its position together with the
@@ -191,7 +206,7 @@ Values are written so that they read back as themselves:
 
 - text as typed text, never as a formula, number or date;
 - a date as a date and a decimal as a number, so the cell keeps its format;
-- a value from a list, such as a status, as its key: `dead`;
+- a value from a list, such as `label_type`, as its key: `h`;
 - an empty value empties the cell.
 
 A value the field does not accept, or one not in canonical form, such as

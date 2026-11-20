@@ -23,9 +23,10 @@ SERIAL_EPOCH = date(1899, 12, 30)
 ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LEGACY_DATE = re.compile(r"^(\d{1,2})\.(\d{1,2})\.(\d{4})$")
 TAG = "tag"
-# A plant with any value in this field is no longer in the collection.
+# A plant with a `0` in this field is no longer in the collection (ADR 0009).
 STATUS = "status"
 STATUS_DATE = "status_date"
+STATUS_COMMENT = "status_comment"
 ELLIPSIS = "…"
 # Custom columns: the most per tab, the longest name, and the longest value kept.
 MAX_CUSTOM_COLUMNS = 50
@@ -59,6 +60,11 @@ class Row:
     custom: dict[str, str] = field(default_factory=dict)
     # Cells the import rejected, by field: {"cell", "value", "reason"}.
     invalid: dict[str, dict[str, str]] = field(default_factory=dict)
+    # The status cell as its key ("0" or "1"), and the parsed status date;
+    # both None without one. The comment to the last status change.
+    status: str | None = None
+    status_date: str | None = None
+    status_comment: str | None = None
 
 
 @dataclass
@@ -111,6 +117,16 @@ def read_date(cell: Cell) -> str:
     except ValueError:
         pass
     raise InvalidValue("not a date (YYYY-MM-DD)")
+
+
+def read_status(cell: Cell) -> str:
+    """The status cell as its key: a checkbox or the literal `0`/`1` (ADR 0009)."""
+    if isinstance(cell, bool):
+        return "1" if cell else "0"
+    text = number_text(cell) if isinstance(cell, int | float) else str(cell).strip()
+    if text in ("0", "1"):
+        return text
+    raise InvalidValue("not 0 or 1")
 
 
 def read_decimal(cell: Cell) -> str:
@@ -260,6 +276,9 @@ def parse_tab(schema: FieldSchema, values: list[list[Cell]]) -> ParsedTab:
         tag: str | None = None
         fields: dict[str, str] = {}
         invalid: dict[str, dict[str, str]] = {}
+        status: str | None = None
+        status_date: str | None = None
+        status_comment: str | None = None
         for index, definition in columns.items():
             cell = cells[index] if index < len(cells) else None
             if is_empty(cell):
@@ -267,6 +286,12 @@ def parse_tab(schema: FieldSchema, values: list[list[Cell]]) -> ParsedTab:
             try:
                 if definition.key == TAG:
                     tag = read_tag(cell)
+                elif definition.key == STATUS:
+                    status = read_status(cell)
+                elif definition.key == STATUS_DATE:
+                    status_date = read_date(cell)
+                elif definition.key == STATUS_COMMENT:
+                    status_comment = read_text(definition, cell)
                 else:
                     fields[definition.key] = read_value(definition, cell)
             except InvalidValue as error:
@@ -300,5 +325,7 @@ def parse_tab(schema: FieldSchema, values: list[list[Cell]]) -> ParsedTab:
             if tag is not None:
                 result.skipped_tags.append(tag)
             continue
-        result.rows.append(Row(number, tag, fields, extra, invalid))
+        result.rows.append(
+            Row(number, tag, fields, extra, invalid, status, status_date, status_comment)
+        )
     return result

@@ -326,7 +326,7 @@
           "inventory"
         ],
         "summary": "List a collection's plants, filtered for an inventory",
-        "description": "Every plant of the collection, in sheet order, that matches all the filters given. Former plants, those with a `status`, are left out unless `former` is true. The apps filter their own copies the same way; this is for the bot and for scripts.",
+        "description": "Every plant of the collection, in sheet order, that matches all the filters given. Former plants, those whose `status` is `\"gone\"`, are left out unless `former` is true. The apps filter their own copies the same way; this is for the bot and for scripts.",
         "operationId": "list_plants",
         "security": [
           {
@@ -590,7 +590,7 @@
           "plants"
         ],
         "summary": "Set one status for many plants",
-        "description": "For an inventory: up to 500 plants, each with the status the client saw. The tab is read once; every plant whose status cell still holds what the client saw is written, all in one write, and the answer says per plant whether it was written. An empty `status` clears it, so a wrong change is undone the same way (ADR 0008). Setting a status is not a sighting by itself: the client sends that separately. Values are checked first: `422` names every value that would not read back as itself, and every column the sheet lacks; Square-Pot never adds columns. `503` when Google cannot be reached. Only collections with `editable` can be edited (ADR 0006).",
+        "description": "For an inventory: up to 500 plants, each with the status the client saw. The tab is read once; every plant whose status cell still holds what the client saw is written, all in one write, and the answer says per plant whether it was written. `status` `\"gone\"` writes `0` into the sheet and `null` writes `1`, so a wrong change is undone by the same request in the other direction; `comment` and the date are written with every change (ADR 0009). Setting a status is not a sighting by itself: the client sends that separately. Values are checked first: `422` names every value that would not read back as itself, and every column the sheet lacks; Square-Pot never adds columns. `503` when Google cannot be reached. Only collections with `editable` can be edited (ADR 0006).",
         "operationId": "set_status",
         "security": [
           {
@@ -2470,16 +2470,17 @@
           "status": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "const": "gone"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Status",
-            "description": "A status key such as `lost`; `null` or empty clears the status.",
+            "description": "`\"gone\"` writes `0` into the sheet: the plant leaves the collection. `null` writes `1`: it returns. The same request in the other direction undoes a change.",
             "examples": [
-              "lost"
+              "gone"
             ]
           },
           "status_date": {
@@ -2493,7 +2494,22 @@
               }
             ],
             "title": "Status Date",
-            "description": "Written into `status_date` with the status; without it that cell is emptied. A tab without a `status_date` column is left so, unless a date is given."
+            "description": "The date of the change, written into `status_date`; without it the server's day is written. Lets an inventory walk backdate a change."
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment",
+            "description": "A note about the change, written into `status_comment`; it overwrites the old one, and empty or absent clears the cell.",
+            "examples": [
+              "sold at the fair"
+            ]
           },
           "plants": {
             "items": {
@@ -2512,7 +2528,7 @@
           "plants"
         ],
         "title": "BulkStatus",
-        "description": "One status for many plants of a collection (ADR 0008)."
+        "description": "One status for many plants of a collection (ADR 0009)."
       },
       "Collection": {
         "properties": {
@@ -2536,13 +2552,13 @@
             "type": "integer",
             "minimum": 0.0,
             "title": "Plant Count",
-            "description": "Number of plants in the collection: imported plants without a `status`."
+            "description": "Number of plants in the collection: those whose `status` cell is empty or reads as `1`."
           },
           "former_count": {
             "type": "integer",
             "minimum": 0.0,
             "title": "Former Count",
-            "description": "Number of former plants: imported plants with a `status`, such as dead or sold. They are served like any other plant."
+            "description": "Number of former plants: those whose `status` cell reads as `0` — gone, dead, sold and so on. They are served like any other plant."
           },
           "synced_at": {
             "anyOf": [
@@ -2798,7 +2814,7 @@
               }
             ],
             "title": "Value",
-            "description": "The new value, in the canonical form of `Plant.fields`: `YYYY-MM-DD` for a date, a plain decimal such as `12.50`, a status key such as `dead`. Any text for a custom column. `null` or an empty string empties the cell."
+            "description": "The new value, in the canonical form of `Plant.fields`: `YYYY-MM-DD` for a date or a plain decimal such as `12.50`. Any text for a custom column. `null` or an empty string empties the cell. A status is not a field: change it with the collection's status endpoint."
           }
         },
         "additionalProperties": false,
@@ -2957,11 +2973,11 @@
         "properties": {
           "key": {
             "type": "string",
-            "pattern": "^[a-z][a-z0-9_]*$",
+            "pattern": "^([a-z][a-z0-9_]*|[0-9]+)$",
             "title": "Key",
             "description": "The value as stored and served in `Plant.fields`.",
             "examples": [
-              "genus"
+              "h"
             ]
           },
           "label": {
@@ -4019,6 +4035,22 @@
               }
             ]
           },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "gone"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "`\"gone\"` when the plant is no longer in the collection (the sheet's `status` cell reads as `0`); `null` while the plant is in it. The living state is not output, and the reason a plant is gone lives in `status_comment`.",
+            "examples": [
+              "gone"
+            ]
+          },
           "status_since": {
             "anyOf": [
               {
@@ -4030,9 +4062,24 @@
               }
             ],
             "title": "Status Since",
-            "description": "Since when the plant has its `status` (`fields.status`): the sheet's `status_date` when it has one, otherwise the day the server first saw this status in the sheet. `null` for a plant without a status.",
+            "description": "The date of the last status change, in either direction: the sheet's `status_date` when it has one, otherwise the day the server first saw this status in the sheet. `null` for a plant in the collection.",
             "examples": [
               "2025-06-14"
+            ]
+          },
+          "status_comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Comment",
+            "description": "The comment to the last status change, from the sheet's `status_comment` cell, such as \"sold at the fair\". `null` while there is none.",
+            "examples": [
+              "dried out in July"
             ]
           },
           "last_seen": {
@@ -4107,7 +4154,9 @@
           "row",
           "fields",
           "custom",
+          "status",
           "status_since",
+          "status_comment",
           "last_seen",
           "photo_count",
           "last_photo",
@@ -4327,14 +4376,15 @@
           "seen": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "const": "gone"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Seen",
-            "description": "The status the client last saw: the plant's `fields.status`, the rejected `invalid` value if the import rejected the cell, or `null` for none. If the sheet no longer holds it, that plant is not written."
+            "description": "The status the client last saw: the plant's `status` (`\"gone\"`), or `null` for a plant in the collection. If the sheet no longer holds that state, the plant is not written."
           }
         },
         "additionalProperties": false,
